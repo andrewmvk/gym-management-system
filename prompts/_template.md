@@ -1,26 +1,26 @@
-Tarefa: implementar [funcionalidade/regra específica, citando o FR/RN].
+Task: implement [specific feature/rule, citing the FR/RN].
 
-Contexto:
-- O sistema possui [descrever apenas os módulos relevantes para esta tarefa].
-- A funcionalidade pertence ao módulo [nome do módulo em apps/api ou apps/web].
-- [Qualquer regra de negócio (RN) que essa tarefa deve respeitar, citada pelo código RN-xx].
+Context:
+- The system has [describe only the modules relevant to this task].
+- The feature belongs to the [module name in apps/api or apps/web] module.
+- [Any business rule (RN) this task must honor, cited by its RN-xx code].
 
-Escopo permitido:
-- Alterar somente [arquivos/pastas exatos].
-- Não alterar [camadas, Docker, autenticação, banco, frontend etc. quando não fizerem parte da tarefa].
-- Não adicionar dependências novas sem justificar e pedir aprovação antes.
+Permitted scope:
+- Only change [exact files/folders].
+- Don't change [layers, Docker, auth, database, frontend, etc. when not part of this task].
+- Don't add new dependencies without justifying and asking for approval first.
 
-Requisitos funcionais:
-1. [requisito]
-2. [requisito]
+Functional requirements:
+1. [requirement]
+2. [requirement]
 
-Critérios de aceite:
-- [condição verificável]
-- [condição verificável]
+Acceptance criteria:
+- [verifiable condition]
+- [verifiable condition]
 
-Testes:
-- Criar ou ajustar apenas testes relacionados a esta funcionalidade/regra.
-- Rodar apenas os testes relacionados.
+Tests:
+- Create or adjust only tests related to this feature/rule.
+- Run only the related tests.
 
-Resposta final:
-- Responder em no máximo 10 linhas com arquivos alterados, testes executados e pendências.
+Final response:
+- Respond in at most 10 lines with files changed, tests run, and pending items.

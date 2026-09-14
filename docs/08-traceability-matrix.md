@@ -1,23 +1,23 @@
-# Matriz de Rastreabilidade
+# Traceability Matrix
 
-Unidade 2 §7: a matriz liga **requisito → prompt → artefato gerado → teste/evidência**. Preencha uma
-linha por prompt executado, na ordem em que foram enviados. Isso é o que comprova, pro professor (e
-pra você em seis meses), que cada trecho de código nasceu de um requisito rastreável — não de uma
-suposição do agente.
+Unit 2 §7: the matrix links **requirement → prompt → generated artifact → test/evidence**. Fill in one
+row per prompt executed, in the order they were sent. This is what proves, to the instructor (and to
+you in six months), that every piece of code was born from a traceable requirement — not from an
+agent's assumption.
 
-| Requisito | Prompt associado | Artefato gerado | Teste/evidência |
+| Requirement | Associated prompt | Generated artifact | Test/evidence |
 |---|---|---|---|
-| FR-16, FR-17, FR-24 | [P-01](../prompts/P-01-catalog-data-model.md) — schema do catálogo | `apps/api/src/db/schema/catalog.ts` + migration | `drizzle-kit generate` roda sem erro; colunas batem com `docs/05-data-model.md` |
-| FR-16, FR-17, FR-24 | [P-02](../prompts/P-02-catalog-backend.md) — procedures tRPC do catálogo | `apps/api/src/modules/catalog/{router,service,repository}.ts` | Teste unitário do predicate de disponibilidade cobrindo os 4 casos do RN-04 |
-| FR-16, FR-17, FR-24 | [P-03](../prompts/P-03-catalog-frontend.md) — tela de catálogo (staff) | `apps/web/src/app/(staff)/catalog/**` | Navegação manual via `docker compose up`; toggle de equipamento reflete no banco |
-| RN-04 | [P-04](../prompts/P-04-rn04-availability-tests.md) — regra de disponibilidade isolada | `isExerciseAvailable()` em `catalog/service.ts` | Vitest: 0 equip. vinculado, 1 disponível, 1 indisponível, múltiplos mistos |
-| _(próxima linha)_ | | | |
+| FR-16, FR-17, FR-24 | [P-01](../prompts/P-01-catalog-data-model.md) — catalog schema | `apps/api/src/db/schema/catalog.ts` + migration | `drizzle-kit generate` runs with no error; columns match `docs/05-data-model.md` |
+| FR-16, FR-17, FR-24 | [P-02](../prompts/P-02-catalog-backend.md) — catalog tRPC procedures | `apps/api/src/modules/catalog/{router,service,repository}.ts` | Unit test of the availability predicate covering RN-04's 4 cases |
+| FR-16, FR-17, FR-24 | [P-03](../prompts/P-03-catalog-frontend.md) — catalog screen (staff) | `apps/web/src/app/(staff)/catalog/**` | Manual navigation via `docker compose up`; equipment toggle reflects in the database |
+| RN-04 | [P-04](../prompts/P-04-rn04-availability-tests.md) — isolated availability rule | `isExerciseAvailable()` in `catalog/service.ts` | Vitest: 0 linked equipment, 1 available, 1 unavailable, multiple mixed |
+| _(next row)_ | | | |
 
-## Como preencher uma linha nova
+## How to fill in a new row
 
-1. Escolha um FR/RN ainda sem prompt associado (comece pelo MVP atual em `docs/07-mvp-roadmap.md`).
-2. Escreva o prompt no formato de `prompts/_template.md` e salve como `prompts/P-<nn>-<slug>.md`.
-3. Envie o prompt (cole aqui na conversa, ou entregue ao Codex).
-4. Depois que o agente responder, preencha "Artefato gerado" com os arquivos que ele de fato tocou
-   (confira no diff — não confie só na resposta em texto do agente, essa é a parte de **auditor**).
-5. Rode o teste/evidência descrito e só marque como concluído se ele realmente passar.
+1. Pick an FR/RN that doesn't yet have an associated prompt (start with the current MVP in `docs/07-mvp-roadmap.md`).
+2. Write the prompt in the format of `prompts/_template.md` and save it as `prompts/P-<nn>-<slug>.md`.
+3. Send the prompt (paste it here in the conversation, or hand it to Codex).
+4. After the agent responds, fill in "Generated artifact" with the files it actually touched
+   (check the diff — don't just trust the agent's text response, that's the **auditor** part).
+5. Run the described test/evidence and only mark it as done if it actually passes.

@@ -1,31 +1,31 @@
-Tarefa: implementar e testar isoladamente a regra de negócio RN-04 (disponibilidade de exercício
-por equipamento vinculado).
+Task: implement and test business rule RN-04 in isolation (exercise availability based on linked
+equipment).
 
-Contexto:
-- Regra (docs/06-regras-de-negocio.md, RN-04): um exercício é elegível se não precisa de nenhum
-  equipamento OU pelo menos um dos equipamentos vinculados a ele está disponível agora.
-- Esta função já deve existir como parte do módulo catalog (ver prompts/P-02-catalog-backend.md);
-  esta tarefa é sobre garantir que ela seja pura e totalmente coberta por teste, não sobre criar o
-  módulo inteiro de novo.
+Context:
+- Rule (docs/06-business-rules.md, RN-04): an exercise is eligible if it needs no equipment at
+  all OR at least one of its linked equipment items is currently available.
+- This function should already exist as part of the catalog module (see
+  prompts/P-02-catalog-backend.md); this task is about making sure it's pure and fully covered by
+  tests, not about creating the whole module again.
 
-Escopo permitido:
-- Alterar apenas a função isExerciseAvailable (ou equivalente) em
-  apps/api/src/modules/catalog/service.ts e seu arquivo de teste correspondente.
-- Não alterar schema, router, repository ou frontend.
-- Não adicionar dependências novas.
+Permitted scope:
+- Only change the isExerciseAvailable function (or equivalent) in
+  apps/api/src/modules/catalog/service.ts and its corresponding test file.
+- Don't change the schema, router, repository, or frontend.
+- Don't add new dependencies.
 
-Critérios de aceite:
-- A função é pura: recebe a lista de equipamentos já vinculados ao exercício (com seus
-  is_available) como parâmetro, sem fazer nenhuma query dentro dela.
-- Não precisa de equipamento (lista vazia) → sempre true.
-- Um equipamento vinculado, disponível → true.
-- Um equipamento vinculado, indisponível → false.
-- Múltiplos equipamentos, pelo menos um disponível → true.
-- Múltiplos equipamentos, todos indisponíveis → false.
+Acceptance criteria:
+- The function is pure: it receives the list of equipment already linked to the exercise (with
+  their is_available) as a parameter, with no query inside it.
+- No equipment needed (empty list) → always true.
+- One linked equipment item, available → true.
+- One linked equipment item, unavailable → false.
+- Multiple equipment items, at least one available → true.
+- Multiple equipment items, all unavailable → false.
 
-Testes:
-- Vitest cobrindo exatamente os cinco casos acima.
-- Rodar apenas o arquivo de teste desta função.
+Tests:
+- Vitest covering exactly the five cases above.
+- Run only this function's test file.
 
-Resposta final:
-- Responder em no máximo 8 linhas com arquivo alterado, testes executados e pendências.
+Final response:
+- Respond in at most 8 lines with the file changed, tests run, and pending items.

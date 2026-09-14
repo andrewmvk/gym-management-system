@@ -1,40 +1,41 @@
-Tarefa: implementar a tela de catálogo (área staff) para listar exercícios/equipamentos e permitir
-ao Admin cadastrar novos itens e alternar disponibilidade de equipamento.
+Task: implement the catalog screen (staff area) to list exercises/equipment and let the Admin
+register new items and toggle equipment availability.
 
-Contexto:
-- As procedures tRPC catalog.list, catalog.listEquipment, catalog.createExercise,
-  catalog.createEquipment e catalog.toggleEquipmentAvailability já existem (ver
+Context:
+- The tRPC procedures catalog.list, catalog.listEquipment, catalog.createExercise,
+  catalog.createEquipment, and catalog.toggleEquipmentAvailability already exist (see
   prompts/P-02-catalog-backend.md).
-- Convenções de frontend em rules/frontend.md: toda leitura/escrita de servidor via tRPC + React
-  Query (nunca fetch manual); formulários com react-hook-form + zodResolver, reaproveitando o
-  schema zod de packages/shared quando o input espelha uma procedure; shadcn/ui como base de
-  qualquer componente interativo.
-- Rotas ficam agrupadas por permissão, não por role: esta tela pertence ao grupo (staff)/ (rules/
-  frontend.md, seção "Routing / access structure").
+- Frontend conventions are in rules/frontend.md: all server reads/writes go through tRPC + React
+  Query (never manual fetch); forms use react-hook-form + zodResolver, reusing the zod schema
+  from packages/shared when the input mirrors a procedure; shadcn/ui as the base for any
+  interactive component.
+- Routes are grouped by permission, not by role: this screen belongs to the (staff)/ group
+  (rules/frontend.md, section "Routing / access structure").
 
-Escopo permitido:
-- Criar apenas apps/web/src/app/(staff)/catalog/** (page.tsx e componentes específicos dessa tela).
-- Não alterar rotas de member ou kiosk, não alterar nada em apps/api.
-- Não adicionar biblioteca de UI além do que já está no projeto (Tailwind + shadcn/ui).
+Permitted scope:
+- Only create apps/web/src/app/(staff)/catalog/** (page.tsx and components specific to this
+  screen).
+- Don't change member or kiosk routes, don't change anything in apps/api.
+- Don't add a UI library beyond what's already in the project (Tailwind + shadcn/ui).
 
-Requisitos funcionais:
-1. Lista de exercícios mostrando nome, grupo muscular e um badge "disponível"/"indisponível"
-   (usando o dado que catalog.list já retorna calculado).
-2. Lista de equipamentos com um toggle (switch) de disponibilidade por item.
-3. Formulário de cadastro de exercício (nome, grupo muscular, instruções, equipamentos vinculados).
-4. Formulário de cadastro de equipamento (nome).
+Functional requirements:
+1. Exercise list showing name, muscle group, and an "available"/"unavailable" badge (using the
+   data catalog.list already returns computed).
+2. Equipment list with a per-item availability toggle (switch).
+3. Exercise registration form (name, muscle group, instructions, linked equipment).
+4. Equipment registration form (name).
 
-Critérios de aceite:
-- O toggle de equipamento atualiza a UI e reconcilia com o servidor (React Query invalidation),
-  sem exigir reload manual da página.
-- O formulário de exercício bloqueia o submit se o nome estiver vazio, com mensagem de erro visível.
-- A tela é usável em viewport mobile (NFR-1) sem quebrar layout.
-- Os três estados de toda query (carregando, erro, vazio) são tratados explicitamente — nada
-  renderiza undefined silenciosamente (rules/error-handling.md).
+Acceptance criteria:
+- The equipment toggle updates the UI and reconciles with the server (React Query invalidation),
+  with no manual page reload required.
+- The exercise form blocks submit if the name is empty, with a visible error message.
+- The screen is usable at mobile viewport (NFR-1) without breaking the layout.
+- All three states of every query (loading, error, empty) are handled explicitly — nothing
+  silently renders undefined (rules/error-handling.md).
 
-Testes:
-- Este projeto não usa teste de componente (rules/testing.md) — a validação é manual: subir
-  docker compose e navegar até /catalog logado como o admin seedado.
+Tests:
+- This project doesn't use component testing (rules/testing.md) — validation is manual: bring up
+  docker compose and navigate to /catalog logged in as the seeded admin.
 
-Resposta final:
-- Responder em no máximo 10 linhas com arquivos criados, passos de validação manual e pendências.
+Final response:
+- Respond in at most 10 lines with files created, manual validation steps, and pending items.

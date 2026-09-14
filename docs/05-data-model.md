@@ -33,14 +33,14 @@ Single table for every person in the system — member, trainer, or admin alike.
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| email | text, unique | |
+| email | text, unique | Signup looks up an existing incomplete row by this value before creating a new one (FR-1) |
 | phone | text, nullable | |
 | password_hash | text, nullable | Null until aptitude clearance (FR-9); no login possible before it's set |
 | name | text | |
 | birthdate | date, nullable | Only ever populated for a member |
 | reference_photo_path | text, nullable | Server-side only (uploads volume); audit/recompute source, never served to the kiosk or any client. Only ever populated for a member |
 | reference_face_embedding | jsonb (float array), nullable | The only biometric artifact distributed outward, via the kiosk embeddings endpoint (FR-31). Only ever populated for a member |
-| aptitude_status | enum(`pending`,`cleared`,`rejected`), nullable | Final state after the questionnaire/certificate/admin-override flow resolves. Only ever populated for a member — a seeded trainer/admin account is never subject to this gate (FR-44) |
+| aptitude_status | enum(`pending`,`cleared`,`rejected`), nullable | Final state after the questionnaire/certificate/admin-override flow resolves. Only ever populated for a member — a seeded trainer/admin account is never subject to this gate (FR-44). A `rejected` row is permanent (FR-8) — its e-mail can never be reused for a new signup |
 | membership_status | enum(`active`,`inactive`), nullable | Mocked, no billing logic behind it. Only ever populated for a member |
 | membership_plan | text, nullable | Mocked plan tier label. Only ever populated for a member |
 | created_at | timestamp | |
@@ -52,7 +52,7 @@ Trainer/admin rows are created only by the seed script (FR-41) — there is no a
 One row per granular, independently-grantable permission — the building block CASL abilities are constructed from. **Add-mostly**: policies are seeded/added over time; an existing one shouldn't be deleted once any `f_user_policy_on_user` row references it, for the same reason `d_exercises` is add-only.
 | Column | Type | Notes |
 |---|---|---|
-| id | text PK | Human-readable slug matching the policy's purpose, e.g. `manage_onboarding`, `read_aptitude` — not a random uuid, since it's referenced directly as a stable identifier in code (`packages/shared/src/constants/policies.ts`) |
+| id | text PK | Human-readable slug matching the policy's purpose, e.g. `manage_onboarding`, `read_aptitude` — not a random uuid, since it's referenced directly as a stable identifier in code (`packages/shared/src/auth/constants/policies.ts`) |
 | description | text | Human-readable explanation, shown in the Admin policy screen (FR-43) |
 | operation | text | CASL action: `create` \| `read` \| `update` \| `delete` \| `manage` |
 | resource | text | CASL subject type the operation applies to, e.g. `TrainingPlan`, `MedicalCertificate`, `Catalog`, `UserPolicyAssignment`, `MemberApp`, `StaffApp` |
@@ -218,7 +218,7 @@ Singleton row for gym-wide info shown on the public/logged-in gym info page.
 
 These are queries, not tables:
 
-- **Personal metrics** (FR-36): training frequency, days trained, exercise breakdown, training volume — computed by joining `f_check_ins` and `f_training_plan_exercises`/`f_training_plans` for a given member. Reflects the corrected record where retroactive edits were made (FR-23).
+- **Personal metrics** (FR-36): training frequency/days trained counts distinct calendar days with a row in `f_check_ins` for that member — physical check-in only, not exercise completion. Exercise breakdown and training volume come from `f_training_plan_exercises`/`f_training_plans` instead. Reflects the corrected record where retroactive edits were made (FR-23).
 - **Current occupancy** (FR-37): `COUNT(*) FROM f_check_ins WHERE checked_in_at >= now() - interval '90 minutes'` (window is a tunable constant, not user-configurable) — an estimate, since there is no checkout event.
 - **Gym-wide equipment/muscle-group demand** (FR-38): aggregating today's `f_check_ins` joined to `f_training_plans`/`f_training_plan_exercises`/`d_exercises`, filtered to exercises currently available per the `d_exercise_equipment` → `d_gym_equipment.is_available` rule.
 - **A user's effective permissions** (FR-42): every non-expired `f_user_policy_on_user` row for that user, joined to `d_user_policy`, translated into CASL rules (see `d_user_policy`/`f_user_policy_on_user` above).

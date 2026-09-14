@@ -5,14 +5,14 @@ See [01-product-overview.md](./01-product-overview.md) for roles and context.
 ## 1. Functional Requirements
 
 ### 1.1 Signup & Aptitude Gate
-- FR-1: A prospective member can submit basic signup info: name, phone number, email, birthdate.
+- FR-1: A prospective member can submit basic signup info: name, phone number, email, birthdate. If a `d_users` row already exists for that e-mail without a password set and not finally rejected, the flow resumes from that row instead of creating a duplicate.
 - FR-2: As part of signup, the member captures a reference photo (webcam). The backend computes a face embedding from it; the embedding is what's used for later recognition, and the raw photo is retained server-side only (audit/recompute), never distributed to any client.
 - FR-3: The member completes a digital aptitude/health questionnaire before their signup can be finalized.
-- FR-4: The AI evaluates the questionnaire and returns one of: `cleared`, `not_cleared`, or `pending_retry` (the AI service is temporarily unavailable/erroring — a distinct technical state, never coded as a real clinical decision).
+- FR-4: The AI evaluates the questionnaire and returns one of: `cleared`, `not_cleared`, or `pending_retry` (the AI service is temporarily unavailable/erroring — a distinct technical state, never coded as a real clinical decision). A `pending_retry` result is only re-evaluated when the member reopens the page or explicitly requests a re-check — there is no background job retrying it automatically.
 - FR-5: If the result is `not_cleared` (or `pending_retry` persists), the member must upload a medical certificate for AI review, which likewise returns `cleared`, `not_cleared`, or `pending_retry`.
 - FR-6: Every certificate result — `cleared`, `not_cleared`, and `pending_retry` alike — is routed to the Gym Admin's backstop review queue, not only results the AI is uncertain about.
 - FR-7: An Admin can confirm or override a certificate's result. Overriding an AI `not_cleared` to `cleared` is the only recovery path available to a member the AI wrongly rejected, since no account exists yet and they cannot log in to contest it themselves.
-- FR-8: A member whose result is confirmed `not_cleared` (by AI or by Admin) cannot complete signup — no account/password is ever created for them.
+- FR-8: A member whose result is confirmed `not_cleared` (by AI or by Admin) cannot complete signup — no account/password is ever created for them. That e-mail stays permanently associated with the rejected record and can never be used to start a new signup.
 - FR-9: Once cleared (by AI or by Admin override), the member immediately sets a password and gains authenticated access to their account. Authentication is only available after this point — there is no login before aptitude clearance.
 
 ### 1.2 Onboarding (post-authentication)
@@ -50,7 +50,7 @@ See [01-product-overview.md](./01-product-overview.md) for roles and context.
 - FR-35: An Admin has a settings area to input/configure the values needed to call the external turnstile REST API (base URL, credentials/API key, field mappings) — the API itself is not built by this project.
 
 ### 1.6 Metrics & Gym Info
-- FR-36: The member can view personal metrics: training frequency, days trained, exercises performed (breakdown), training volume, and progress toward stated goals/pretensions.
+- FR-36: The member can view personal metrics: training frequency, days trained, exercises performed (breakdown), training volume, and progress toward stated goals/pretensions. "Days trained"/training frequency counts distinct calendar days with at least one recorded check-in (`f_check_ins`) — a day where only plan exercises were marked completed without a physical check-in does not count.
 - FR-37: There is no checkout event anywhere in the system. "Current occupancy" is an estimate, computed as the count of check-ins within a trailing rolling time window (e.g. the last 90 minutes) as of now — it is explicitly framed as an estimate, not an exact live headcount.
 - FR-38: The gym info area also shows, computed from seeded data: whether the gym is currently open, and which muscle groups/equipment are in demand today (an exercise only counts toward equipment demand if at least one of its linked equipment items is available, per FR-17).
 - FR-39: All "today"/date logic (plan dates, the occupancy window, gym open/closed hours) uses the server's local system timezone consistently — there is no per-user timezone handling.

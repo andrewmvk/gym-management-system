@@ -39,6 +39,8 @@ Every change should respect these (from `PRODUCT.md`):
 | [`rules/database.md`](./rules/database.md) | touching Drizzle schema, migrations, or seed data |
 | [`rules/testing.md`](./rules/testing.md) | deciding whether/how to test something |
 | [`rules/git-conventions.md`](./rules/git-conventions.md) | branching or writing a commit message |
+| [`rules/code-comments.md`](./rules/code-comments.md) | always — writing any code |
+| [`rules/response-language.md`](./rules/response-language.md) | always — every response |
 
 ## Keeping docs in sync
 

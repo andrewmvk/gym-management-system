@@ -30,11 +30,11 @@ Acceptance criteria:
   with no manual page reload required.
 - The exercise form blocks submit if the name is empty, with a visible error message.
 - The screen is usable at mobile viewport (NFR-1) without breaking the layout.
-- All three states of every query (loading, error, empty) are handled explicitly — nothing
+- All three states of every query (loading, error, empty) are handled explicitly - nothing
   silently renders undefined (rules/error-handling.md).
 
 Tests:
-- This project doesn't use component testing (rules/testing.md) — validation is manual: bring up
+- This project doesn't use component testing (rules/testing.md) - validation is manual: bring up
   docker compose and navigate to /catalog logged in as the seeded admin.
 
 Final response:

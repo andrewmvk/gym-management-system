@@ -6298,7 +6298,7 @@
         // Mid-generation the source legitimately holds a scaffold wrapper
         // with no variants yet (the server-side preflight wraps before the
         // agent writes). Tearing the session down here would destroy an
-        // in-flight generation; stay in GENERATING — the variant observer
+        // in-flight generation; stay in GENERATING - the variant observer
         // is armed and the server re-delivers a missed `done`.
         if (!opts.generationCompleted) {
           console.log('[impeccable] Source has scaffold but no variants yet; still generating.');
@@ -6306,7 +6306,7 @@
         }
         // Generation finished, yet the read shows only the scaffold: the
         // source view is stale and no further event will fire. Re-read a
-        // few times before surfacing recovery — a single silent return
+        // few times before surfacing recovery - a single silent return
         // here would strand the tab in GENERATING forever.
         const attempt = opts.attempt || 0;
         if (attempt < COMPLETED_SOURCE_FALLBACK_RETRIES) {
@@ -6636,7 +6636,7 @@
   // divs are scaffolded into page source, so SSR frameworks (Next.js App
   // Router) server-render them; toggling their `hidden` / inline `style` /
   // `--p-*` client-side trips a React 19 hydration mismatch on the next
-  // Fast-Refresh re-render — the same failure mode the scroll-anchor (#276)
+  // Fast-Refresh re-render - the same failure mode the scroll-anchor (#276)
   // and pick-cursor (#286) fixes address. A stylesheet rule has the same
   // computed effect without mutating any hydrated element's attributes.
   // (steps params keep driving `data-p-*` attributes, matching scoped CSS.)
@@ -7347,7 +7347,7 @@
   // Progress events must never overtake the event that CREATES their session:
   // the Go-time checkpoint and the generate POST are concurrent fetches, and
   // when the checkpoint lands first the server rightly refuses it as
-  // unknown_session — which must mean "foreign leftovers", not "you raced
+  // unknown_session - which must mean "foreign leftovers", not "you raced
   // your own Go click". The gate serializes creation before progress.
   let sessionCreationGate = Promise.resolve();
 

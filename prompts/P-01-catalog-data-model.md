@@ -1,11 +1,11 @@
 Task: implement the data model for the exercise and equipment catalog (FR-16, FR-17, FR-24).
 
 Context:
-- The system has no code yet under apps/ or packages/ — this is the project's first schema.
+- The system has no code yet under apps/ or packages/ - this is the project's first schema.
 - The entity belongs to the "catalog" domain: an exercise (d_exercises) can need zero or more
   pieces of equipment (d_gym_equipment), linked by an N:N table (d_exercise_equipment).
 - The exact schema (columns, types, nullability) is defined in docs/05-data-model.md, sections
-  "d_exercises", "d_gym_equipment", and "d_exercise_equipment" — use that document as the source
+  "d_exercises", "d_gym_equipment", and "d_exercise_equipment" - use that document as the source
   of truth, don't invent columns.
 - Naming and Drizzle conventions are in rules/database.md and rules/naming-conventions.md:
   snake_case tables prefixed d_/f_, uuid PK except where the doc says otherwise, snake_case
@@ -17,15 +17,15 @@ Permitted scope:
 - Don't create routers, services, repositories, or anything frontend in this task.
 - Don't change any other existing schema file.
 - Don't add dependencies beyond what's already planned in docs/04-architecture.md (Drizzle,
-  PostgreSQL driver) — if something is missing from package.json, flag it instead of installing
+  PostgreSQL driver) - if something is missing from package.json, flag it instead of installing
   it yourself.
 
 Functional requirements:
 1. FR-16: exercises come from a curated, structured library (not free text).
 2. FR-17: an exercise is eligible if it needs no equipment OR at least one linked equipment item
-   is available — the table needs to support this check (is_available on d_gym_equipment, joined
+   is available - the table needs to support this check (is_available on d_gym_equipment, joined
    via d_exercise_equipment).
-3. FR-24: d_exercises is add-only — don't create any soft-delete column or trigger, just don't
+3. FR-24: d_exercises is add-only - don't create any soft-delete column or trigger, just don't
    include any deletion mechanism.
 
 Acceptance criteria:

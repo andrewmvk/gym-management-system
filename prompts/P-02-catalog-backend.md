@@ -6,10 +6,10 @@ Context:
   d_gym_equipment, d_exercise_equipment.
 - The per-domain backend module structure is in rules/backend.md: router.ts (procedures + zod,
   no direct query), service.ts (logic), repository.ts (Drizzle only).
-- Authorization is 100% via CASL (ctx.ability.can(operation, resource)), never a role if-check —
+- Authorization is 100% via CASL (ctx.ability.can(operation, resource)), never a role if-check -
   see rules/backend.md section "Authorization (CASL)" and docs/04-architecture.md §11.
 - The availability rule (FR-17 / RN-04) must be a single predicate in catalog/service.ts, reused
-  by any procedure that needs to know whether an exercise is available — don't reimplement the
+  by any procedure that needs to know whether an exercise is available - don't reimplement the
   logic in more than one place (rules/backend.md, section "Exercise/equipment availability").
 
 Permitted scope:
@@ -20,12 +20,12 @@ Permitted scope:
 - Don't add new dependencies.
 
 Functional requirements:
-1. catalog.list — returns exercises with their linked equipment and whether each is currently
+1. catalog.list - returns exercises with their linked equipment and whether each is currently
    available (applying the predicate).
-2. catalog.listEquipment — returns all equipment with its current is_available.
-3. catalog.createExercise — creates an exercise; requires the catalog-management policy.
-4. catalog.createEquipment — creates a piece of equipment; requires the catalog-management policy.
-5. catalog.toggleEquipmentAvailability — flips is_available on a piece of equipment; requires the
+2. catalog.listEquipment - returns all equipment with its current is_available.
+3. catalog.createExercise - creates an exercise; requires the catalog-management policy.
+4. catalog.createEquipment - creates a piece of equipment; requires the catalog-management policy.
+5. catalog.toggleEquipmentAvailability - flips is_available on a piece of equipment; requires the
    catalog-management policy.
 6. There is no delete procedure for an exercise (FR-24 / RN-05) or for equipment.
 

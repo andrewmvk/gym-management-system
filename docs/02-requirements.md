@@ -77,7 +77,7 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 
 ### In Scope
 - Full signup → aptitude → onboarding → authenticated account flow, including the Admin backstop review of every certificate result.
-- Real in-browser facial detection/embedding computation (e.g. face-api.js or similar); only embeddings - never raw photos - are distributed to the kiosk.
+- Real facial embedding computation (e.g. face-api.js or similar): on the backend for the signup reference photo, in the browser at the kiosk. Only embeddings - never raw photos - are distributed to the kiosk.
 - A face-match confidence threshold with a basic tie-break/ambiguity check.
 - Admin-configurable integration point for an external (pre-existing, not built here) turnstile REST API, with check-ins always recorded independent of that call's success/failure.
 - AI-generated, AI-adjustable training plans backed by a curated, add-only exercise library and an equipment availability model (N:N exercises↔equipment).

@@ -5,6 +5,10 @@ in the same prompt**. Build the functional core first, then expand incrementally
 the course booklet's generic 5-MVP model to the real FRs in `docs/02-requirements.md`, in the order they
 should be implemented - each section is a set of small prompts, not a single prompt.
 
+The concrete prompts for every MVP, with their `Blocked by:` dependencies, MVP stage, and default owners,
+are in [`prompts/README.md`](../prompts/README.md). Each prompt states its MVP, so this roadmap and the
+catalog stay aligned.
+
 ## MVP 1 - Foundation (no AI, no biometrics, no e-mail)
 
 Goal: have something that boots and responds, with real data in the database, with no external
@@ -60,7 +64,7 @@ query).
 Goal: close out the course with the Unit 1 §11 final checklist satisfied across the whole prompt
 history.
 
-- Docker Compose with the 3 real containers (frontend, backend, db), `.env` variables.
+- Docker Compose with the 2 containers the course requires (frontend; backend + PostgreSQL), `.env` variables.
 - Test coverage for the remaining RNs that don't have a test yet.
 - Sync `docs/`, `rules/`, and `AGENTS.md` with any decision that changed along the way (AGENTS.md §"Keeping docs in sync").
 - Fill in `docs/08-traceability-matrix.md` to completion.

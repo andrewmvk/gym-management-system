@@ -36,7 +36,7 @@ Trainers and Admins are both "staff" but have distinct dashboards/permissions - 
 ## 5. Key Constraints Driving Design
 
 - **Single gym, single location** - no multi-tenancy needed in the data model or auth model.
-- **Mocked biometrics, real recognition logic**: facial recognition itself is implemented with a real in-browser face-detection/matching library; only the member database and the turnstile API responses are mocked/seeded (the turnstile API is treated as an existing external system the app integrates with, not one we build).
+- **Mocked biometrics, real recognition logic**: facial recognition itself is implemented with a real face-detection/embedding library (computed on the backend for the signup photo and in the browser at the kiosk); only the member database and the turnstile API responses are mocked/seeded (the turnstile API is treated as an existing external system the app integrates with, not one we build).
 - **Trainers never block the AI**: plans are generated and published immediately; trainer review is asynchronous and non-blocking, preserving the 24/7 value proposition.
 - **No visible persistent chat log**: the AI chat is stateless in the UI, but every message is mined for structured facts that are saved permanently to the member's profile/history - this is what makes future plans "remember" the member.
 - **Only face embeddings ever reach the kiosk** - never raw reference photos - to limit how much of the biometric dataset is exposed to the check-in panel.

@@ -17,7 +17,7 @@ exercise.
 | RN-01 | An aptitude/certificate result can only be `cleared`, `not_cleared`, or `pending_retry`; `pending_retry` can never be interpreted as a real decision. | FR-4, FR-5, PRODUCT.md principle 4 | An AI failure/timeout during evaluation records `pending_retry`, never `cleared` or `not_cleared`, and never throws an unhandled exception. |
 | RN-02 | Every medical certificate result - `cleared`, `not_cleared`, or `pending_retry` - is routed to the Admin's review queue, no exceptions. | FR-6 | Saving any `f_medical_certificates` row produces an entry in the Admin queue regardless of `ai_result`. |
 | RN-03 | A member with a final `not_cleared` result never receives a `password_hash` or authenticated access. | FR-8 | Attempting to set a password for a `d_users` row with `aptitude_status = rejected` must fail. |
-| RN-04 | An exercise is only includable in a plan if it needs no equipment OR at least one linked equipment item is `is_available = true`. | FR-17 | See `prompts/P-04-rn04-availability-tests.md`. |
+| RN-04 | An exercise is only includable in a plan if it needs no equipment OR at least one linked equipment item is `is_available = true`. | FR-17 | The predicate and its five cases are specified in `prompts/P-06-exercise-catalog.md`. |
 | RN-05 | `d_exercises` is add-only: no code path may delete a row. | FR-24, rules/database.md | No `catalog.deleteExercise` procedure exists in any router. |
 | RN-06 | If the AI is about to regenerate a plan for a date that already has a trainer's direct edit (`status = trainer_edited`), the member must confirm before the regeneration overwrites the edit. | FR-22 | Regenerating without prior confirmation must be rejected/blocked by the procedure. |
 | RN-07 | A retroactive correction directly overwrites that date's historical record; metrics must reflect the corrected version, not the original. | FR-23 | After a correction, a metric that sums that day uses the new values, not the old ones. |
@@ -28,5 +28,7 @@ exercise.
 
 ## How to use this in prompts
 
-Each RN becomes its own isolated formal prompt, in the same pattern as `docs/08-traceability-matrix.md`,
-following the Unit 1 §9 model. See `prompts/P-04-rn04-availability-tests.md` as a complete example.
+Each RN is verified inside the prompt of the feature it protects (see the "Acceptance criteria" and
+"Tests" of that prompt), following the Unit 1 §9 model. `prompts/README.md` lists which prompt covers
+which requirement, and `docs/08-traceability-matrix.md` tracks the evidence. `prompts/P-06-exercise-catalog.md`
+is a complete example for RN-04 and RN-05.

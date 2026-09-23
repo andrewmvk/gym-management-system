@@ -6,7 +6,7 @@ This file is the always-loaded index. It stays short by design - code-level conv
 
 ## Stack
 
-Next.js (TS) + Tailwind + shadcn/ui frontend · Node/Express + tRPC backend · Drizzle + PostgreSQL · custom JWT (httpOnly cookie) · OpenRouter for all AI calls · Resend for email · face-api.js-style in-browser face recognition · Docker Compose (`frontend`, `backend`, `db`).
+Next.js (TS) + Tailwind + shadcn/ui frontend · Node/Express + tRPC backend · Drizzle + PostgreSQL · custom JWT (httpOnly cookie) · OpenRouter for all AI calls · Resend for email · face-api.js-style face recognition (backend for the signup embedding, browser at the kiosk) · Docker Compose with two containers (`frontend`, and `backend` running the API plus PostgreSQL).
 
 ## Repo layout
 

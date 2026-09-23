@@ -8,7 +8,7 @@ web
 
 ## Stack
 
-Next.js (TypeScript) frontend with Tailwind CSS + shadcn/ui; Node.js + Express backend exposing tRPC (typed API shared with the frontend); Drizzle ORM over PostgreSQL; custom JWT auth via httpOnly cookie; OpenRouter API (configurable free-tier model) for all AI calls; a real transactional email provider (e.g. Resend) for onboarding invites; in-browser face-detection/embedding library (e.g. face-api.js) for both signup capture and kiosk check-in; local disk file storage via a Docker volume. Three Docker Compose containers: frontend, backend, db. The kiosk check-in panel is the same Next.js app running in a dedicated route, not a separate container. This stack was pre-decided in `docs/04-architecture.md` before this record was written, not chosen during this interview.
+Next.js (TypeScript) frontend with Tailwind CSS + shadcn/ui; Node.js + Express backend exposing tRPC (typed API shared with the frontend); Drizzle ORM over PostgreSQL; custom JWT auth via httpOnly cookie; OpenRouter API (configurable free-tier model) for all AI calls; a real transactional email provider (e.g. Resend) for onboarding invites; face-detection/embedding library (e.g. face-api.js), run on the backend for the signup reference embedding and in the browser for kiosk check-in; local disk file storage via a Docker volume. Two Docker Compose containers, as the course requires: frontend, and backend (Node API and PostgreSQL together). The kiosk check-in panel is the same Next.js app running in a dedicated route, not a separate container. This stack was pre-decided in `docs/04-architecture.md` before this record was written, not chosen during this interview.
 
 ## Users
 

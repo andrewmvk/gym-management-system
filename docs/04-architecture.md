@@ -15,8 +15,8 @@
 | File storage | Local disk via Docker volume (path/URL stored in Postgres) |
 | AI provider | OpenRouter API, using a free-tier model (configurable) |
 | Email | Real transactional provider (e.g. Resend) for the onboarding invite link |
-| Face recognition | In-browser face detection/embedding library (e.g. face-api.js), running client-side in both the signup flow (capture + embed reference) and the kiosk check-in flow (1:N match against embeddings) |
-| Containerization | Docker Compose: separate containers for frontend, backend, and Postgres |
+| Face recognition | Face detection/embedding library (e.g. face-api.js). The signup reference embedding is computed on the backend; the kiosk computes its probe embedding in the browser and runs the 1:N match against the embedding dataset. Both sides must use the same model and weights (see §5) |
+| Containerization | Docker Compose: two containers, `frontend` and `backend` (the Node API and PostgreSQL run together in the second one). This split is a course requirement |
 
 ## 2. Container Architecture
 
@@ -28,13 +28,11 @@ flowchart LR
     subgraph Kiosk Client
         KIOSK[Kiosk web app<br/>face-api.js runs here<br/>holds embeddings only, never photos]
     end
-    subgraph Backend Container
-        BE[Node.js + Express<br/>tRPC router<br/>Drizzle ORM]
+    subgraph Backend + DB Container
+        BE[Node.js + Express<br/>tRPC router<br/>Drizzle ORM<br/>face embedding at signup]
+        PG[(PostgreSQL)]
         VOL[(Docker volume<br/>/uploads)]
         BE --- VOL
-    end
-    subgraph DB Container
-        PG[(PostgreSQL)]
     end
     FE -- tRPC over HTTP, JWT cookie --> BE
     KIOSK -- fetch embeddings dataset<br/>KIOSK_API_KEY --> BE
@@ -45,7 +43,7 @@ flowchart LR
     BE -- API call --> MAIL[Email provider<br/>e.g. Resend]
 ```
 
-Three containers are orchestrated via `docker-compose.yml`: `frontend`, `backend`, `db`. The kiosk is the same Next.js frontend app running in a dedicated route/mode (not a fourth container), but is conceptually a separate, less-trusted client since it's the one physically exposed at the gym panel. The backend container mounts a volume for uploaded files (reference photos, exam attachments, medical certificates).
+Two containers are orchestrated via `docker-compose.yml`: `frontend`, and `backend`, which runs both the Node API and PostgreSQL (one container for the front and one for the back plus database, as the course requires). The two processes in the second container are started by an entrypoint script or a process supervisor; the exact mechanism is an implementation detail of the base setup. The kiosk is the same Next.js frontend app running in a dedicated route/mode (not a third container), but is conceptually a separate, less-trusted client since it's the one physically exposed at the gym panel. The backend container mounts a volume for uploaded files (reference photos, exam attachments, medical certificates) and one for the PostgreSQL data directory.
 
 This is a decoupled architecture (frontend and backend are separate deployables), which is why tRPC is used over plain Next.js API routes - it preserves end-to-end type safety across the network boundary between the two containers, and the frontend/backend still share TypeScript types (e.g. via a shared package or by importing the backend's router type).
 
@@ -69,7 +67,8 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 
 ## 5. Face Recognition & Embedding Distribution
 
-- Reference photos captured at signup are processed server-side into a face embedding (a fixed-length numeric vector) using the recognition library's embedding model. The raw photo is stored only on the backend's upload volume for audit/recompute purposes and is **never** sent to the kiosk or any other client.
+- Reference photos captured at signup are processed **on the backend** into a face embedding (a fixed-length numeric vector) using the recognition library's embedding model; the browser only captures and uploads the photo at signup. The raw photo is stored only on the backend's upload volume for audit/recompute purposes and is **never** sent to the kiosk or any other client.
+- The kiosk computes its probe embedding in the browser, so the backend and the browser must run the same embedding model with the same weights (for face-api.js, the same face recognition net producing 128-dimensional descriptors). Vectors from different models or versions are not comparable, and the match would silently fail.
 - The kiosk fetches only the embedding dataset (`{ memberId, embedding }` pairs, no images) from a dedicated backend endpoint gated by a static `KIOSK_API_KEY`, rather than being open to arbitrary callers.
 - Matching uses a similarity/distance threshold to decide "is this a match at all," plus a margin check between the best and second-best candidate to reject ambiguous ties - the member is asked to retry rather than the system guessing (FR-32).
 - This reduces exposure relative to shipping raw photos, but the full embedding dataset is still present in the kiosk's browser memory/network traffic; the kiosk is assumed to run on a trusted, non-public local network for this academic project - a real deployment would need a more hardened kiosk boundary (explicitly out of scope here, see [02-requirements.md](./02-requirements.md)).
@@ -110,7 +109,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 
 - **tRPC over REST/GraphQL**: chosen for type-safety across the frontend/backend boundary despite them being separate containers - avoids hand-written request/response types drifting out of sync.
 - **Drizzle over Prisma**: explicit client choice for this project (lighter runtime, SQL-close query builder).
-- **Face recognition runs client-side**: avoids sending raw face images to the backend for every recognition attempt; only the match result (member identity) needs to reach the backend to trigger the turnstile call.
+- **Kiosk face matching runs client-side**: avoids sending raw face images to the backend for every recognition attempt; only the match result (member identity) needs to reach the backend to trigger the turnstile call. The signup reference embedding is the opposite case: it is computed on the backend, where the raw photo already lives.
 - **Embeddings, not photos, reach the kiosk**: the biometric dataset exposed to the least-trusted client (the kiosk) is reduced to numeric vectors rather than raw images.
 - **No session store for chat**: keeps the backend stateless per request; durability lives entirely in the structured fact tables, not in a conversation/session table.
 - **No checkout flow**: occupancy is deliberately a rolling-window estimate (FR-37) rather than an exact live count, avoiding the added kiosk complexity of an exit step for no real payoff in an academic demo.

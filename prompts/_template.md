@@ -1,3 +1,9 @@
+Blocked by: [P-xx, P-yy | none]
+Covers: [FR-xx, RN-xx]
+MVP: [1-5]
+Artifacts: [main files or folders this prompt creates or changes]
+Evidence: [the test or manual check that proves the prompt was fulfilled]
+
 Task: implement [specific feature/rule, citing the FR/RN].
 
 Context:

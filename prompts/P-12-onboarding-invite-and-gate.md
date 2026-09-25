@@ -1,7 +1,7 @@
 Blocked by: P-05, P-09, P-11
 Covers: FR-10, FR-11
 MVP: 2
-Artifacts: apps/api/src/modules/onboarding/ (invite subscriber), env addition WEB_BASE_URL, the (member) layout redirect in apps/web
+Artifacts: apps/api/src/modules/onboarding/ (invite subscriber), the (member) layout redirect in apps/web
 Evidence: Vitest: activating a member sends exactly one e-mail containing the onboarding link, and a failing e-mail provider does not break activation; manual: a member without an onboarding submission is redirected to /onboarding
 
 Task: send the onboarding invite e-mail when a member is activated, and make the in-app onboarding page a guaranteed step.
@@ -14,9 +14,9 @@ Permitted scope:
 - Only the files in Artifacts. No new dependencies.
 
 Functional requirements:
-1. Subscribe to onMemberActivated and send an e-mail with a link to WEB_BASE_URL/onboarding through the e-mail adapter. A failure is logged at warn level and never blocks activation. In log mode the link appears in the API log, which is how the demo works without a provider account.
+1. Subscribe to onMemberActivated and send an e-mail with a link to WEB_ORIGIN/onboarding through the e-mail adapter (WEB_ORIGIN already holds the web app URL for CORS; no new variable). A failure is logged at warn level and never blocks activation. In log mode the link appears in the API log, which is how the demo works without a provider account.
 2. In the (member) layout, when onboarding.getStatus reports completed false, redirect every member route to /onboarding. The onboarding page itself and logout stay reachable.
-3. The link works for a member who is not logged in: it goes through /login and returns to /onboarding afterward.
+3. The link works for a member who is not logged in: the (member) guard already sends them to /login?next=/onboarding and the login page returns them there afterward (P-03); keep that path working with the redirect above.
 
 Acceptance criteria:
 - Exactly one invite per activation, containing the link.

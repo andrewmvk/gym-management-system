@@ -1,0 +1,25 @@
+{
+  "name": "cadence",
+  "private": true,
+  "packageManager": "pnpm@12.6.0",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "pnpm --parallel --filter @cadence/web --filter @cadence/api dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "db:up": "docker compose run -d --rm --name cadence-db -p 127.0.0.1:5432:5432 backend db-only && docker exec cadence-db timeout 60 sh -c \"until [ -f /tmp/cadence-db-ready ]; do sleep 0.5; done\" && echo database ready on 127.0.0.1:5432",
+    "db:down": "docker stop cadence-db",
+    "db:generate": "pnpm --filter @cadence/api db:generate",
+    "db:migrate": "pnpm --filter @cadence/api db:migrate",
+    "db:seed": "pnpm --filter @cadence/api db:seed",
+    "db:reset": "pnpm --filter @cadence/api db:reset",
+    "db:studio": "pnpm --filter @cadence/api db:studio"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

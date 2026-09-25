@@ -12,7 +12,7 @@ Context:
 - Callers turn a technical failure into their own state (pending_retry for aptitude and certificate, a retryable error for plan and chat). This module only reports it.
 
 Permitted scope:
-- Only files under apps/api/src/modules/ai/ and the new env vars (AI_MODE, AI_MOCK_APTITUDE, AI_MOCK_CERTIFICATE) in the env loader and .env.example.
+- Only files under apps/api/src/modules/ai/ and the new env vars (AI_MODE, AI_MOCK_APTITUDE, AI_MOCK_CERTIFICATE) in the env loader and .env.example. OPENROUTER_API_KEY and OPENROUTER_MODEL are already in the loader as optional (P-01); make them required unless AI_MODE is mock.
 - Use the global fetch. No new dependencies.
 
 Functional requirements:

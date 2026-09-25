@@ -17,7 +17,7 @@ Permitted scope:
 Functional requirements:
 1. lib/dates.ts with todayLocal() and helpers for local-day boundaries that accept an injected clock for tests.
 2. Procedures, all limited to the signed-in member through the ability: plans.getToday, plans.getByDate({ date }), plans.listDates({ from, to }) and plans.markExerciseCompleted({ planExerciseId, completed }). Every exercise in a response carries isPerformable, computed at read time.
-3. Page (member)/plan: today's plan with sets, reps, load and instructions; a completion checkbox with an optimistic update; unavailable exercises shown as disabled with an explanation; a badge when the plan status is trainer_edited; a history browser by date (read-only for past dates); an empty state with a button that calls plans.generateToday; explicit loading and error states; usable on a phone.
+3. Page (member)/plan: today's plan with sets, reps, load and instructions; a completion checkbox with an optimistic update; unavailable exercises shown as disabled with an explanation; a badge when the plan status is trainer_edited; a history browser by date (read-only for past dates); an empty state with a button that calls plans.generateToday; skeleton loading (a per-page skeleton inside GuardedContent, built from components' .Skeleton; rules/frontend.md "Loading states") and explicit error states; usable on a phone.
 
 Acceptance criteria:
 - A member cannot read or change another member's plan.

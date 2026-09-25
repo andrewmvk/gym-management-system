@@ -20,7 +20,7 @@ Functional requirements:
 2. turnstile service unlockTurnstile({ memberId }): read the config, build a POST from base_url, the api key header and field_mapping, time out after 5 seconds, and return { status: "success" | "failed", response, error? }. It never throws; an incomplete config returns failed with reason not_configured. Never log the api key.
 3. POST /kiosk/checkins guarded by requireKioskKey, body { memberId }: validate that the member exists and is cleared, call unlockTurnstile, and always insert one f_check_ins row with turnstile_status and turnstile_response. Respond with { checkInId, turnstileStatus } (the kiosk shows the staff notice, FR-34, in P-21).
 4. turnstile.getConfig (masked api key, last four characters only) and turnstile.updateConfig({ baseUrl, apiKey?, fieldMapping }) guarded by manage_turnstile_config, recording updated_by_user_id. A blank apiKey keeps the current one. Validate the URL and the mapping with zod. Store the key as is (data is mocked) and mention in the final response that the doc's "consider encrypting" remains open.
-5. Staff page (staff)/settings/turnstile: base URL, api key (password field showing the masked value), and a field-mapping JSON editor with validation. Explicit loading, error and success states.
+5. Staff page (staff)/settings/turnstile: base URL, api key (password field showing the masked value), and a field-mapping JSON editor with validation. Skeleton loading (a per-page skeleton inside GuardedContent, built from components' .Skeleton; rules/frontend.md "Loading states"), explicit error and success states.
 
 Acceptance criteria:
 - Success, non-2xx, timeout, network error and not_configured each create exactly one check-in row with the right tag.

@@ -20,6 +20,13 @@ Schema lives in `apps/api/src/db/schema/`, one file per table group (e.g. `users
 
 Every schema change goes through `drizzle-kit generate`, producing a committed migration file - never a manual `ALTER TABLE` applied outside that flow. The seed script (`apps/api/src/db/seed.ts`) is the only code path that creates the fixed demo trainer/admin `d_users` rows and grants their policies (FR-41); keep it safe to re-run in local dev without duplicating the fixed demo accounts, the policy catalog, or the exercise/equipment catalog.
 
+## Local databases
+
+There is no shared hosted database. Each developer runs PostgreSQL inside their own `backend` container (`pnpm db:up` starts only the database for `pnpm dev`; `docker compose up` runs the full stack). The port is published on `127.0.0.1` only. The same instance holds a separate test database for `TEST_DATABASE_URL`, so tests never touch dev data.
+
+- `pnpm db:studio` opens Drizzle Studio in the browser to inspect and edit the local database.
+- `pnpm db:reset` wipes the local database, migrates and seeds. Use it after switching to a git branch whose migrations don't match your local schema. Shared demo data comes from the seeds, never from copying someone's database.
+
 ## Retroactive corrections and mutable facts
 
 `f_training_plan_exercises` rows for a past date are updated directly, in place - there is no versioned/append-only history for this table (FR-23). `f_user_policy_on_user` works the same way: revoking or extending a grant updates its `expires_on` in place. Don't turn either into an append-only event log - a fact table in this schema is about grain and change-frequency, not immutability (`rules/naming-conventions.md`).

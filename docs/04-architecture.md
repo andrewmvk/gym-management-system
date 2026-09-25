@@ -4,6 +4,7 @@
 
 | Layer | Choice |
 |---|---|
+| Language and tooling | TypeScript 7 (the native compiler) in every workspace, pnpm workspaces |
 | Frontend framework | Next.js, TypeScript (`.tsx`) |
 | Styling / UI | Tailwind CSS + shadcn/ui |
 | Backend framework | Node.js + Express (tRPC HTTP adapter) |
@@ -95,6 +96,11 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | Variable | Used by | Purpose |
 |---|---|---|
 | `DATABASE_URL` | backend | Postgres connection string (Drizzle) |
+| `TEST_DATABASE_URL` | backend tests | Separate test database in the same local PostgreSQL, created by the backend entrypoint; tests truncate it freely |
+| `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | backend container | Credentials and database name the entrypoint initializes PostgreSQL with; compose builds the in-container `DATABASE_URL` from them |
+| `API_PORT` | backend | Port the API listens on (4000) |
+| `WEB_ORIGIN` | backend | The web app URL: the only origin CORS allows with credentials, and the base for links in e-mails |
+| `SEED_TRAINER_PASSWORD` / `SEED_ADMIN_PASSWORD` | backend (seed) | Passwords of the fixed demo trainer and admin accounts the seed creates |
 | `JWT_SECRET` | backend | Signing secret for auth JWTs |
 | `NODE_ENV` | backend | Gates the `Secure` cookie flag (production only) |
 | `OPENROUTER_API_KEY` | backend | AI provider auth |
@@ -123,12 +129,12 @@ Permissions are entirely data-driven - there is no `role` column anywhere. What 
 
 **Core (shared, `packages/shared/src/auth/`)**:
 - `types.ts` - the closed set of CASL actions (`create`/`read`/`update`/`delete`/`manage`) and subjects (`TrainingPlan`, `MedicalCertificate`, `Catalog`, `UserPolicyAssignment`, `MemberApp`, `StaffApp`, etc.) both apps build abilities against.
-- `abilities.tsx` - `defineAbilityFor(user)`, building a CASL `Ability` from a user's resolved policy grants (see [05-data-model.md](./05-data-model.md)'s `f_user_policy_on_user` note for the grant→rule translation).
+- `abilities.ts` - `defineAbilityFor(user, grants)`, building a CASL `Ability` from a user's resolved policy grants, plus `buildAbilityRules` (the serializable rules `auth.me` returns) and `createAppAbility(rules)` (rebuilds the ability from them) (see [05-data-model.md](./05-data-model.md)'s `f_user_policy_on_user` note for the grant→rule translation).
 - `constants/policies.ts` - well-known `d_user_policy.id` string constants (e.g. the ones that mark a user as "a member" for gating purposes, below), so no module hardcodes a raw policy-id string.
 - Split further by domain (`src/auth/aptitude/`, `src/auth/onboarding/`, `src/auth/catalog/`, …), mirroring the backend's domain modules (`rules/backend.md`), rather than one flat abilities file.
 
 **Backend (`apps/api`)**: `src/trpc/context.ts` builds the `Ability` once per request (right after JWT verification) from the requesting user's active grants. Routers check `ctx.ability.can(operation, resource)` before calling into the service - this is the only authorization gate; there is no role-based procedure builder.
 
-**Frontend (`apps/web`)**: `src/abilities.tsx` defines the ability React context (`AbilityContext`) and `can = createContextualCan(AbilityContext.Consumer)`. `AuthGuard.tsx` computes `defineAbilityFor(session.user)` once per session and provides it via `<AbilityContext.Provider>`. Components either render `<Can I="manage" a="TrainingPlan" />` or call `const ability = useAbility(AbilityContext); ability.can('manage', 'TrainingPlan')`.
+**Frontend (`apps/web`)**: `src/abilities.tsx` wraps `@casl/react` 7: it re-exports `AbilityProvider` and exposes a `Can` and a `useAppAbility()` typed to the shared `AppAbility`. `components/auth-guard.tsx` rebuilds the ability once per session from the rules `auth.me` returns (`createAppAbility(rules)`) and provides it via `<AbilityProvider>`. Components either render `<Can I="manage" a="TrainingPlan" />` or call `const ability = useAppAbility(); ability.can('manage', 'TrainingPlan')`.
 
 **The member gate, without a role field**: the aptitude/onboarding pipeline (FR-1–FR-14) and the `(member)` route group apply only to a user whose ability includes the member-designated permission(s) (e.g. `read_member_app`, granted the moment FR-9's clearance completes). A seeded trainer/admin account is granted staff-designated permissions (e.g. `read_staff_app`) instead, and is exempt from the member gate entirely - by construction, not by a special case checking who they are (FR-44).

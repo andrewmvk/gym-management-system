@@ -12,7 +12,7 @@ Context:
 - Embedding: the signup reference embedding is computed on the backend and the kiosk computes its probe in the browser, so both must use the same model and weights (docs/04-architecture.md §5). The real implementation comes in P-22; this prompt fixes the interface and the weights location.
 
 Permitted scope:
-- Only the files in Artifacts, the route registration in the Express host, and the env additions (EMAIL_MODE, EMAIL_FROM, FACE_EMBEDDING_MODE) in the env loader and .env.example.
+- Only the files in Artifacts, the route registration in the Express host, and the env additions (EMAIL_MODE, EMAIL_FROM, FACE_EMBEDDING_MODE) in the env loader and .env.example. RESEND_API_KEY is already in the loader as optional (P-01); make it required unless EMAIL_MODE is log.
 - Use the global fetch for the Resend REST API. No new dependencies.
 
 Functional requirements:

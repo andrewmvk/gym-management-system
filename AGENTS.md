@@ -6,14 +6,14 @@ This file is the always-loaded index. It stays short by design - code-level conv
 
 ## Stack
 
-Next.js (TS) + Tailwind + shadcn/ui frontend · Node/Express + tRPC backend · Drizzle + PostgreSQL · custom JWT (httpOnly cookie) · OpenRouter for all AI calls · Resend for email · face-api.js-style face recognition (backend for the signup embedding, browser at the kiosk) · Docker Compose with two containers (`frontend`, and `backend` running the API plus PostgreSQL).
+TypeScript 7, pnpm workspaces · Next.js + Tailwind + shadcn/ui frontend · Node/Express + tRPC backend · Drizzle + PostgreSQL · custom JWT (httpOnly cookie) · OpenRouter for all AI calls · Resend for email · face-api.js-style face recognition (backend for the signup embedding, browser at the kiosk) · Docker Compose with two containers (`frontend`, and `backend` running the API plus PostgreSQL).
 
 ## Repo layout
 
 ```
 apps/web/        Next.js frontend (member, trainer, admin, and kiosk routes)
 apps/api/         Express + tRPC backend
-packages/shared/  Shared tRPC AppRouter type, zod schemas, CASL ability builder (`src/auth/`), shared TS types
+packages/shared/  Shared zod schemas, CASL ability builder (`src/auth/`), shared TS types (the web app imports the tRPC AppRouter type from `@cadence/api`)
 docs/             Product/requirements/architecture/data-model docs (source of truth for scope)
 rules/            Code-level conventions for AI agents - see table below
 ```
@@ -34,11 +34,12 @@ Every change should respect these (from `PRODUCT.md`):
 |---|---|
 | [`rules/naming-conventions.md`](./rules/naming-conventions.md) | naming a file, component, variable, tRPC procedure, or branch/commit |
 | [`rules/error-handling.md`](./rules/error-handling.md) | handling an AI/turnstile failure, validation error, or surfacing an error to the UI |
-| [`rules/frontend.md`](./rules/frontend.md) | writing anything in `apps/web` - data fetching, forms, styling, routing |
+| [`rules/frontend.md`](./rules/frontend.md) | writing anything in `apps/web` - data fetching, loading states (Skeleton), forms, styling, routing |
 | [`rules/backend.md`](./rules/backend.md) | writing anything in `apps/api` - routers, services, AI calls, auth, uploads |
 | [`rules/database.md`](./rules/database.md) | touching Drizzle schema, migrations, or seed data |
 | [`rules/testing.md`](./rules/testing.md) | deciding whether/how to test something |
 | [`rules/git-conventions.md`](./rules/git-conventions.md) | branching or writing a commit message |
+| [`rules/imports.md`](./rules/imports.md) | always - writing any import (`@` aliases only, never relative paths) |
 | [`rules/code-comments.md`](./rules/code-comments.md) | always - writing any code |
 | [`rules/response-language.md`](./rules/response-language.md) | always - every response |
 | [`rules/punctuation.md`](./rules/punctuation.md) | always - writing any text |

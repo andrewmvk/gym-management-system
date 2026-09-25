@@ -16,7 +16,7 @@ Permitted scope:
 Functional requirements:
 1. Procedures guarded by manage_policy_assignments: policies.list (every d_user_policy row, and every user with their grants including effect, expiry, and whether each is currently active), policies.grant({ userId, policyId, effect?, expiresOn? }) as an upsert on the composite key, policies.revoke({ userId, policyId }) setting expires_on to now, and policies.extend({ userId, policyId, expiresOn | null }) where null means indefinite.
 2. No procedure deletes a policy or a grant row, and none inserts into d_users.
-3. Staff page (staff)/policies: a policy definitions table (operation, resource, scope) and a users table with their grants, plus grant, revoke and extend dialogs with confirmation. Explicit loading, error and empty states.
+3. Staff page (staff)/policies: a policy definitions table (operation, resource, scope) and a users table with their grants, plus grant, revoke and extend dialogs with confirmation. Skeleton loading (a per-page skeleton inside GuardedContent, built from components' .Skeleton; rules/frontend.md "Loading states"), explicit error and empty states.
 
 Acceptance criteria:
 - After grant, revoke, extend, and a denied override, defineAbilityFor gives the expected result for that user.

@@ -65,6 +65,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 - Each AI call is a **stateless request** built from context assembled server-side each time: the member's profile, onboarding data, structured history/fact log, and (for plan generation) the curated exercise/equipment catalog. There is no server-side conversation/session object for the chat - this matches FR-25/FR-26.
 - Chat responses are expected to return two things: the natural-language reply for the member, and any structured facts to persist (e.g. via a JSON-mode/function-calling style response) - this structured extraction is what feeds FR-27.
 - **Failure handling**: OpenRouter's free tier is rate-limited and can be unreliable. Any transient failure, timeout, or rate-limit response from a questionnaire/certificate evaluation call must be coded as `pending_retry` - a distinct technical state - never silently surfaced as a crash, and never coalesced into `cleared`/`not_cleared` (which would misrepresent a real clinical determination). The same failures on a chat/plan-generation call should surface as a normal "AI is temporarily unavailable, try again" error to the member rather than a raw exception.
+- **Single wrapper and mock mode**: every call goes through one module (`apps/api/src/modules/ai/`) that requests JSON output, validates it against the caller's zod schema, times out after 30 seconds, and retries once only on invalid output; it reports `unavailable` or `invalid_output` as data and each caller maps that to its own state. `AI_MODE=mock` skips the network and returns deterministic fixtures, with `AI_MOCK_APTITUDE`/`AI_MOCK_CERTIFICATE` selecting `cleared`, `not_cleared`, or `unavailable` so every signup path can be exercised by hand.
 
 ## 5. Face Recognition & Embedding Distribution
 
@@ -77,14 +78,15 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 ## 6. File Storage
 
 - Uploads (signup reference photo, exam attachments, medical certificates) are written by the backend to a mounted Docker volume (e.g. `/app/uploads`), namespaced by member id.
-- Only the relative path (or a served URL) is stored in Postgres; the backend serves/proxies file reads through an authenticated route rather than exposing the volume directly.
+- Uploads arrive as base64 inside tRPC inputs (signup happens before any login exists), validated by declared type, file signature, and size: JPEG/PNG up to 2 MB for the reference photo, JPEG/PNG up to 5 MB for certificates, JPEG/PNG/PDF up to 5 MB for exams. Only the procedures that carry files get a larger request body limit.
+- Only the relative path (or a served URL) is stored in Postgres; the backend serves/proxies file reads through an authenticated route rather than exposing the volume directly (`GET /files/*`): an owner reads their own exams, a holder of the certificate-review permission reads certificates, and reference photos are never served to anyone.
 - The computed face embedding (not the photo) is what's cached in Postgres and is the only biometric artifact ever served outward, to the kiosk endpoint above.
 
 ## 7. Email
 
 - Onboarding invite emails are sent via a real transactional email API (e.g. Resend) called from the backend once aptitude clearance completes.
 - Requires an API key stored as a backend environment variable; sender domain/config is out of scope of correctness concerns since this is a non-deployed academic project (a sandbox/testing sender is acceptable).
-- The onboarding page is also reachable directly inside the app (FR-11), so email deliverability isn't a hard dependency for completing onboarding.
+- The onboarding page is also reachable directly inside the app (FR-11), so email deliverability isn't a hard dependency for completing onboarding. The e-mail wrapper never throws, and `EMAIL_MODE=log` writes the recipient, subject, and text (with the link) to the API log instead of calling the provider.
 
 ## 8. Seed Data & Bootstrapping
 
@@ -103,9 +105,14 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | `SEED_TRAINER_PASSWORD` / `SEED_ADMIN_PASSWORD` | backend (seed) | Passwords of the fixed demo trainer and admin accounts the seed creates |
 | `JWT_SECRET` | backend | Signing secret for auth JWTs |
 | `NODE_ENV` | backend | Gates the `Secure` cookie flag (production only) |
-| `OPENROUTER_API_KEY` | backend | AI provider auth |
-| `OPENROUTER_MODEL` | backend | Selected free model id |
-| `RESEND_API_KEY` | backend | Email provider auth |
+| `AI_MODE` | backend | `live` calls OpenRouter; `mock` returns deterministic fixtures with no network call (default `mock`) |
+| `OPENROUTER_API_KEY` | backend | AI provider auth; required unless `AI_MODE` is `mock` |
+| `OPENROUTER_MODEL` | backend | Selected free model id; required unless `AI_MODE` is `mock` |
+| `AI_MOCK_APTITUDE` / `AI_MOCK_CERTIFICATE` | backend | Mock verdict for each signup evaluation: `cleared`, `not_cleared`, or `unavailable` (default `cleared`) |
+| `EMAIL_MODE` | backend | `resend` sends through the provider; `log` writes each e-mail to the API log (default `log`) |
+| `RESEND_API_KEY` | backend | Email provider auth; required unless `EMAIL_MODE` is `log` |
+| `EMAIL_FROM` | backend | Sender address (defaults to Resend's sandbox sender) |
+| `FACE_EMBEDDING_MODE` | backend | `stub` derives a deterministic 128-number vector from the photo bytes; `real` runs the face-api.js model from `packages/shared/face-models/` (default `stub`) |
 | `UPLOADS_DIR` | backend | Path inside container to the mounted uploads volume |
 | `KIOSK_API_KEY` | backend + kiosk client | Authenticates the kiosk's fetch of the face-embedding dataset |
 | `TURNSTILE_API_*` | backend (DB-backed, admin-editable) | Not a static env var - configured at runtime by whoever holds the turnstile-config permission and stored in the `d_turnstile_config` table, since it must be editable without a redeploy |

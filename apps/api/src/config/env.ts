@@ -5,28 +5,47 @@ import { z } from 'zod';
 // Host processes read the repo-root .env; inside the container the file is absent and compose injects the variables.
 config({ path: fileURLToPath(new URL('../../../../.env', import.meta.url)), quiet: true });
 
+// Resend's shared sandbox sender, accepted by any account without a verified domain.
+const DEFAULT_EMAIL_FROM = 'Cadence <onboarding@resend.dev>';
+
 const requiredText = z.string().trim().min(1, 'missing');
 const optionalText = z
   .string()
   .trim()
   .transform((value) => value || undefined)
   .optional();
+const mockVerdict = z.enum(['cleared', 'not_cleared', 'unavailable']);
 
-const EnvSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  API_PORT: z.coerce.number().int().positive().default(4000),
-  WEB_ORIGIN: requiredText.pipe(z.url()),
-  DATABASE_URL: requiredText.pipe(z.url()),
-  TEST_DATABASE_URL: optionalText.pipe(z.url().optional()),
-  SEED_TRAINER_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
-  SEED_ADMIN_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
-  JWT_SECRET: requiredText.pipe(z.string().min(32, 'must be at least 32 characters')),
-  KIOSK_API_KEY: requiredText.pipe(z.string().min(16, 'must be at least 16 characters')),
-  UPLOADS_DIR: requiredText,
-  OPENROUTER_API_KEY: optionalText,
-  OPENROUTER_MODEL: optionalText,
-  RESEND_API_KEY: optionalText,
-});
+const EnvSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    API_PORT: z.coerce.number().int().positive().default(4000),
+    WEB_ORIGIN: requiredText.pipe(z.url()),
+    DATABASE_URL: requiredText.pipe(z.url()),
+    TEST_DATABASE_URL: optionalText.pipe(z.url().optional()),
+    SEED_TRAINER_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
+    SEED_ADMIN_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
+    JWT_SECRET: requiredText.pipe(z.string().min(32, 'must be at least 32 characters')),
+    KIOSK_API_KEY: requiredText.pipe(z.string().min(16, 'must be at least 16 characters')),
+    UPLOADS_DIR: requiredText,
+    AI_MODE: z.enum(['live', 'mock']).default('mock'),
+    OPENROUTER_API_KEY: optionalText,
+    OPENROUTER_MODEL: optionalText,
+    AI_MOCK_APTITUDE: mockVerdict.default('cleared'),
+    AI_MOCK_CERTIFICATE: mockVerdict.default('cleared'),
+    EMAIL_MODE: z.enum(['resend', 'log']).default('log'),
+    RESEND_API_KEY: optionalText,
+    EMAIL_FROM: optionalText.transform((value) => value ?? DEFAULT_EMAIL_FROM),
+    FACE_EMBEDDING_MODE: z.enum(['stub', 'real']).default('stub'),
+  })
+  .superRefine((env, ctx) => {
+    const requireWhen = (isRequired: boolean, key: keyof typeof env, reason: string) => {
+      if (isRequired && !env[key]) ctx.addIssue({ code: 'custom', path: [key], message: `missing (${reason})` });
+    };
+    requireWhen(env.AI_MODE === 'live', 'OPENROUTER_API_KEY', 'required unless AI_MODE is mock');
+    requireWhen(env.AI_MODE === 'live', 'OPENROUTER_MODEL', 'required unless AI_MODE is mock');
+    requireWhen(env.EMAIL_MODE === 'resend', 'RESEND_API_KEY', 'required unless EMAIL_MODE is log');
+  });
 
 export type Env = z.infer<typeof EnvSchema>;
 

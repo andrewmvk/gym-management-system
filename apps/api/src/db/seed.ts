@@ -9,6 +9,7 @@ import { eq, sql } from 'drizzle-orm';
 import { env } from '@api/config/env';
 import { db as defaultDb, type Database, type Transaction } from '@api/db/client';
 import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
+import { seedCatalog } from '@api/db/seed-data/catalog';
 
 export const SEED_TRAINER_EMAIL = 'trainer@example.com';
 export const SEED_ADMIN_EMAIL = 'admin@example.com';
@@ -70,5 +71,7 @@ export async function seedBase(database: Database = defaultDb) {
       password: env.SEED_ADMIN_PASSWORD,
       policyIds: ADMIN_POLICY_IDS,
     });
+
+    await seedCatalog(tx);
   });
 }

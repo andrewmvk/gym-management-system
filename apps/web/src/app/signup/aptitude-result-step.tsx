@@ -8,17 +8,14 @@ import { useTRPC } from '@/lib/trpc';
 
 interface AptitudeResultStepProps {
   userId: string;
-  outcome: 'cleared' | 'certificate_required' | 'pending_retry';
+  outcome: 'certificate_required' | 'pending_retry';
   onRechecked: (outcome: 'cleared' | 'certificate_required' | 'pending_retry') => void;
 }
 
-// "cleared" and "certificate_required" continue into P-09 (password) and P-10 (certificate), which
-// don't exist yet - same placeholder pattern already used at the end of the P-07 photo step.
-const STATIC_MESSAGES: Record<'cleared' | 'certificate_required', { title: string; description: string }> = {
-  cleared: {
-    title: "You're cleared to train",
-    description: 'Your questionnaire was approved. The rest of the signup flow is coming soon.',
-  },
+// "certificate_required" continues into P-10 (certificate review), which doesn't exist yet - same
+// placeholder pattern already used at the end of the P-07 photo step. "cleared" is handled by the
+// caller instead (the password step, P-09), so it never reaches this component.
+const STATIC_MESSAGES: Record<'certificate_required', { title: string; description: string }> = {
   certificate_required: {
     title: 'A medical certificate is required',
     description: "Your questionnaire indicates you'll need to submit a medical certificate. That step is coming soon.",

@@ -32,7 +32,7 @@ Single gym, single physical location - no multi-tenancy in the data or auth mode
 
 ## Capabilities and Constraints
 
-Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-44) and `docs/03-features-and-flows.md`; durable constraints worth restating here:
+Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-46) and `docs/03-features-and-flows.md`; durable constraints worth restating here:
 
 - Signup gate: basic info + webcam reference photo (embedding computed server-side, raw photo never leaves the backend) → digital aptitude questionnaire → AI verdict (`cleared` / `not_cleared` / `pending_retry`) → medical certificate escalation if not cleared → every certificate result (all three states) routed to an Admin backstop queue regardless of AI confidence. No account/password/login exists before clearance; Admin override is the only recovery path for a wrongly-rejected member.
 - Onboarding (post-auth) feeds the first AI training plan; not one-time - can be extended later via chat.

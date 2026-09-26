@@ -41,6 +41,7 @@ describe('users and policies schema', () => {
         'birthdate',
         'created_at',
         'email',
+        'gender',
         'id',
         'membership_plan',
         'membership_status',

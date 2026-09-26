@@ -45,22 +45,26 @@ A prompt is a specification, not a contract. If the implementation has to deviat
 | [P-24](./P-24-member-metrics-and-membership.md) | Member metrics and membership | FR-36, FR-40 | 4 | P-14, P-20 | Heitor |
 | [P-25](./P-25-gym-info.md) | Gym info | FR-37, FR-38, FR-39 | 4 | P-06, P-13, P-14, P-20 | Heitor |
 | [P-26](./P-26-demo-data-readme-and-docs-sync.md) | Demo data, README and docs sync | the demo data described in docs/04-architecture.md §8, and the "Keeping docs in sync" rule in AGENTS.md | 5 | all other prompts | Heitor |
+| [P-27](./P-27-signup-gender-field.md) | Signup gender field (fixes P-07) | FR-45 | 2 | none | Heitor |
+| [P-28](./P-28-biometric-consent.md) | Biometric consent (fixes P-07) | FR-46, RN-12 | 2 | none | Heitor |
+
+`P-27` and `P-28` are correction prompts (`Fixes: P-07`, see `_template.md` and `docs/09-audit-log.md` findings 11-12): FR-45 and FR-46 didn't exist in the original 44 requirements, so these were added later rather than fitting into the original wave plan below.
 
 ## Distribution (requirements and stages)
 
-Total: 26 prompts covering all 44 functional requirements exactly once.
+Total: 28 prompts covering all 46 functional requirements exactly once (44 original + 2 added by `P-27`/`P-28`, see `docs/09-audit-log.md`).
 
 | Owner | Prompts | Functional requirements | Non-functional requirements (primary) |
 |---|---|---|---|
-| Andrew | 10 | 10 of 44 | NFR-1, NFR-3, NFR-5 |
-| Heitor | 16 | 34 of 44 | none as primary |
+| Andrew | 10 | 10 of 46 | NFR-1, NFR-3, NFR-5 |
+| Heitor | 18 | 36 of 46 | none as primary |
 
 NFR-1 (responsive UI) is listed once, on the foundation prompt P-03, but it applies to every screen of every prompt. NFR-2 has no dedicated work. NFR-4 and NFR-6 are explicit non-goals.
 
 | Stage | Andrew | Heitor | Total |
 |---|---|---|---|
 | MVP 1 | 3 | 1 | 4 |
-| MVP 2 | 2 | 7 | 9 |
+| MVP 2 | 2 | 9 | 11 |
 | MVP 3 | 4 | 5 | 9 |
 | MVP 4 | 1 | 2 | 3 |
 | MVP 5 | 0 | 1 | 1 |
@@ -75,7 +79,7 @@ A wave only needs prompts from earlier waves, so everything inside a wave can ru
 - **Wave 1**: P-02, P-04
 - **Wave 2**: P-03
 - **Wave 3**: P-05, P-06, P-23
-- **Wave 4**: P-07, P-11, P-19, P-22
+- **Wave 4**: P-07, P-11, P-19, P-22, P-27, P-28 (the last two only after P-07 lands, even though they list no formal `Blocked by`)
 - **Wave 5**: P-08, P-13, P-20
 - **Wave 6**: P-09, P-14, P-15, P-16, P-21
 - **Wave 7**: P-10, P-12, P-17, P-18, P-24, P-25

@@ -1,6 +1,6 @@
 # Cadence - AI Gym Management System - Agent Instructions
 
-Academic project (not deployed to real users) replacing a gym's fingerprint access control and manual trainer interviews with face-recognition check-in and an AI that builds/refines training plans from accumulated structured facts, not a single interview. Full product context: [`PRODUCT.md`](./PRODUCT.md). Full functional/technical detail: [`docs/`](./docs/) (`01-product-overview.md`, `02-requirements.md` with FR-1..FR-44, `03-features-and-flows.md`, `04-architecture.md`, `05-data-model.md`).
+Academic project (not deployed to real users) replacing a gym's fingerprint access control and manual trainer interviews with face-recognition check-in and an AI that builds/refines training plans from accumulated structured facts, not a single interview. Full product context: [`PRODUCT.md`](./PRODUCT.md). Full functional/technical detail: [`docs/`](./docs/) (`01-product-overview.md`, `02-requirements.md` with FR-1..FR-46, `03-features-and-flows.md`, `04-architecture.md`, `05-data-model.md`).
 
 This file is the always-loaded index. It stays short by design - code-level conventions live in `rules/`, linked below. Don't duplicate FR/architecture detail here; link to `docs/` instead.
 
@@ -54,5 +54,5 @@ Every change should respect these (from `PRODUCT.md`):
 
 ## Before you start
 
-- Don't invent scope beyond FR-1..FR-44 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
+- Don't invent scope beyond FR-1..FR-46 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
 - No code exists yet at the time this file was written - when scaffolding the repo, follow the layout above rather than improvising a different structure.

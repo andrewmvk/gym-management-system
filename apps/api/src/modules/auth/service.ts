@@ -1,10 +1,24 @@
-import { buildAbilityRules, defineAbilityFor, type AbilityRule, type AppAbility } from '@cadence/shared/auth';
+import { buildAbilityRules, defineAbilityFor, MEMBER_POLICY_IDS, type AbilityRule, type AppAbility } from '@cadence/shared/auth';
+import type { SetPasswordInput } from '@cadence/shared/schemas/auth';
+import { TRPCError } from '@trpc/server';
 import bcrypt from 'bcryptjs';
+import { db } from '@api/db/client';
 import type { User } from '@api/db/schema';
-import { findActiveGrants, findUserByEmail, findUserById } from '@api/modules/auth/repository';
+import { onMemberActivated } from '@api/modules/auth/member-activated';
+import {
+  activateMember as activateMemberRow,
+  findActiveGrants,
+  findUserByEmail,
+  findUserById,
+  grantPolicies,
+} from '@api/modules/auth/repository';
 
 // Compared against when the e-mail is unknown, so both failure paths spend the same bcrypt time.
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('cadence-timing-equalizer', 10);
+const BCRYPT_ROUNDS = 10;
+
+// FR-40 is mocked: there is no real membership catalog, so every activated member gets this one label.
+const DEFAULT_MEMBERSHIP_PLAN = 'Standard';
 
 export function toPublicUser(user: User) {
   return {
@@ -42,4 +56,29 @@ export async function loadSession(userId: string, now = new Date()): Promise<Ses
     ability: defineAbilityFor(user, grants, now),
     rules: buildAbilityRules(user, grants, now),
   };
+}
+
+// FR-9 / RN-03: only a cleared applicant with no password yet can activate. Rejected and still-pending
+// applicants, and a second call, are refused with a specific TRPCError rather than a domain status -
+// unlike pending_retry (P-08), there is no legitimate retry path for any of these.
+export async function activateMember(input: SetPasswordInput): Promise<User> {
+  const applicant = await findUserById(input.userId);
+  if (!applicant || applicant.aptitudeStatus !== 'cleared') {
+    throw new TRPCError({ code: 'FORBIDDEN', message: 'This account cannot be activated yet.' });
+  }
+  if (applicant.passwordHash) {
+    throw new TRPCError({ code: 'CONFLICT', message: 'This account is already activated.' });
+  }
+
+  const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
+
+  const user = await db.transaction(async (tx) => {
+    const activated = await activateMemberRow(input.userId, { passwordHash, membershipPlan: DEFAULT_MEMBERSHIP_PLAN }, tx);
+    await grantPolicies(input.userId, MEMBER_POLICY_IDS, tx);
+    return activated;
+  });
+
+  void onMemberActivated(user.id);
+
+  return user;
 }

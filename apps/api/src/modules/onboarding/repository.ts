@@ -1,0 +1,29 @@
+import type { ExamAttachmentPaths, Medications, PhysicalConditions } from '@cadence/shared/schemas/onboarding';
+import { desc, eq } from 'drizzle-orm';
+import { db, type DatabaseExecutor } from '@api/db/client';
+import { fOnboardingSubmissions, type OnboardingSubmission } from '@api/db/schema';
+
+export async function insertSubmission(
+  input: {
+    userId: string;
+    medications: Medications;
+    physicalConditions: PhysicalConditions;
+    goals: string;
+    examAttachmentPaths: ExamAttachmentPaths;
+  },
+  executor: DatabaseExecutor = db,
+): Promise<OnboardingSubmission> {
+  const [submission] = await executor.insert(fOnboardingSubmissions).values(input).returning();
+  return submission!;
+}
+
+export function findSubmissionsByUserId(
+  userId: string,
+  executor: DatabaseExecutor = db,
+): Promise<OnboardingSubmission[]> {
+  return executor
+    .select()
+    .from(fOnboardingSubmissions)
+    .where(eq(fOnboardingSubmissions.userId, userId))
+    .orderBy(desc(fOnboardingSubmissions.submittedAt));
+}

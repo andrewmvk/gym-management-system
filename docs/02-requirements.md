@@ -14,6 +14,8 @@ See [01-product-overview.md](./01-product-overview.md) for roles and context.
 - FR-7: An Admin can confirm or override a certificate's result. Overriding an AI `not_cleared` to `cleared` is the only recovery path available to a member the AI wrongly rejected, since no account exists yet and they cannot log in to contest it themselves.
 - FR-8: A member whose result is confirmed `not_cleared` (by AI or by Admin) cannot complete signup - no account/password is ever created for them. That e-mail stays permanently associated with the rejected record and can never be used to start a new signup.
 - FR-9: Once cleared (by AI or by Admin override), the member immediately sets a password and gains authenticated access to their account. Authentication is only available after this point - there is no login before aptitude clearance.
+- FR-45: During signup, the member may optionally report their gender, used only to inform AI-generated training plan recommendations. It is never required to complete signup.
+- FR-46: Before the backend computes a face embedding from the signup reference photo (FR-2), the member must give explicit, specific consent for biometric data processing (LGPD Art. 11 - a generic terms-of-use acceptance is not sufficient). Consent is recorded permanently - who, when, and which version of the consent text was shown - and an embedding is never computed without a recorded consent for that member.
 
 ### 1.2 Onboarding (post-authentication)
 - FR-10: Upon aptitude clearance, the system sends the member an email containing a link to the onboarding form.
@@ -88,6 +90,7 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - Real transactional email sending for the onboarding invite link (e.g. via Resend).
 - Basic mocked membership/billing status field per member.
 - Seeded, fixed-credential demo trainer/admin accounts.
+- Explicit, recorded LGPD consent for biometric processing before a face embedding is ever computed.
 
 ### Out of Scope
 - Real payment processing, invoicing, or subscription billing logic.

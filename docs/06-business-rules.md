@@ -2,7 +2,7 @@
 
 Unit 2 asks that we distinguish **functional requirement** ("what the system does"), **non-functional
 requirement** ("with what quality"), and **business rule** ("what domain condition must be honored").
-`docs/02-requirements.md` already numbers FR-1..FR-44 (functional) and NFR-1..NFR-6 (non-functional),
+`docs/02-requirements.md` already numbers FR-1..FR-46 (functional) and NFR-1..NFR-6 (non-functional),
 but several business rules are **embedded as prose inside the FRs**, without their own code. This
 document extracts the most important ones as RN-01..RN-11, in the format Unit 2 recommends (code,
 description, source requirement, verification criterion) - so each one becomes an isolated, testable
@@ -25,6 +25,7 @@ exercise.
 | RN-09 | A check-in is always recorded, with `turnstile_status` of `success` or `failed`, regardless of the outcome of the external turnstile call. | FR-33, FR-34 | Simulate a failure in the turnstile API and confirm the `f_check_ins` row is still created, tagged `failed`. |
 | RN-10 | A user's effective permission is the union of every non-expired `f_user_policy_on_user` row; a row with `effect = denied` always wins over a `granted` row for the same policy. | FR-42, docs/05-data-model.md | Granting and then denying the same policy to the same user must result in `ability.cannot(...)`. |
 | RN-11 | Trainer/admin accounts only ever exist via the seed script; no application code path can create one. | FR-41, FR-43 | There is no public "signup" mutation that writes a staff policy. |
+| RN-12 | A face embedding is never computed for a member without a prior recorded consent event. | FR-46, docs/05-data-model.md `f_consent_events` | Calling the embedding step without a `f_consent_events` row for that member must be refused, not silently proceed. |
 
 ## How to use this in prompts
 

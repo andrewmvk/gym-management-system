@@ -1,4 +1,5 @@
 Blocked by: [P-xx, P-yy | none]
+Fixes: [P-xx | none - only when this prompt corrects an already-executed prompt]
 Covers: [FR-xx, RN-xx]
 MVP: [1-5]
 Artifacts: [main files or folders this prompt creates or changes]

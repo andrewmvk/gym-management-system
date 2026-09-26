@@ -1,4 +1,4 @@
-import type { StartSignupInput } from '@cadence/shared/schemas/signup';
+import { CONSENT_VERSION, type RecordConsentInput, type StartSignupInput } from '@cadence/shared/schemas/signup';
 import { computeFaceEmbedding as defaultComputeFaceEmbedding, type ComputeFaceEmbedding } from '@api/lib/face-embedding';
 import { saveUpload } from '@api/lib/uploads';
 import * as repository from '@api/modules/aptitude/repository';
@@ -11,7 +11,14 @@ export type StartSignupResult =
   | { status: 'created'; userId: string; nextStep: 'photo' }
   | { status: 'resumed'; userId: string; nextStep: NextStep };
 
-export type SavePhotoResult = { status: 'ok' } | { status: 'photo_rejected'; reason: 'no_face' | 'multiple_faces' | 'unavailable' };
+export type SavePhotoResult =
+  | { status: 'ok' }
+  | { status: 'consent_required' }
+  | { status: 'photo_rejected'; reason: 'no_face' | 'multiple_faces' | 'unavailable' };
+
+// The only consent type this project defines today (FR-46). A constant, not a free string, so the
+// check in savePhoto and the write in recordConsent can never drift apart.
+const BIOMETRIC_CONSENT_TYPE = 'biometric_facial';
 
 function nextStepFor(user: { referenceFaceEmbedding: unknown }): NextStep {
   return user.referenceFaceEmbedding ? 'done' : 'photo';
@@ -37,13 +44,30 @@ export async function startSignup(input: StartSignupInput): Promise<StartSignupR
     name: input.name,
     phone: input.phone,
     birthdate: input.birthdate,
+    gender: input.gender,
   });
   return { status: 'resumed', userId: user.id, nextStep: nextStepFor(user) };
 }
 
-// FR-2: the embedding is computed on the backend from the uploaded photo. The raw photo is written to
-// disk either way (audit/recompute, docs/04-architecture.md §5); only a successful embedding is ever
-// written to d_users, and neither the embedding nor the photo path is ever returned to the caller.
+// FR-46 / RN-12: recorded before the photo step. A fresh row every time on purpose (f_consent_events
+// is append-only) - re-consenting later is a new proof, not an edit to the old one.
+export async function recordConsent(input: RecordConsentInput): Promise<{ status: 'ok' | 'unavailable' }> {
+  const user = await repository.findById(input.userId);
+  if (!user || user.aptitudeStatus !== 'pending') return { status: 'unavailable' };
+
+  await repository.insertConsentEvent({
+    userId: input.userId,
+    consentType: BIOMETRIC_CONSENT_TYPE,
+    consentVersion: input.consentVersion ?? CONSENT_VERSION,
+  });
+  return { status: 'ok' };
+}
+
+// FR-2: the embedding is computed on the backend from the uploaded photo. FR-46 / RN-12: never
+// computed without a prior recorded consent, checked here so a client cannot skip the consent screen
+// and reach this procedure directly. The raw photo is written to disk either way (audit/recompute,
+// docs/04-architecture.md §5); only a successful embedding is ever written to d_users, and neither the
+// embedding nor the photo path is ever returned to the caller.
 export async function savePhoto(
   input: { userId: string; imageBase64: string; mimeType: string },
   computeFaceEmbedding: ComputeFaceEmbedding = defaultComputeFaceEmbedding,
@@ -51,6 +75,10 @@ export async function savePhoto(
   const user = await repository.findById(input.userId);
   if (!user || user.aptitudeStatus !== 'pending') {
     return { status: 'photo_rejected', reason: 'unavailable' };
+  }
+
+  if (!(await repository.hasConsent(input.userId, BIOMETRIC_CONSENT_TYPE))) {
+    return { status: 'consent_required' };
   }
 
   const saved = await saveUpload({

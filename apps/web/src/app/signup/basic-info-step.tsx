@@ -10,7 +10,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useTRPC } from '@/lib/trpc';
+
+const GENDER_LABELS = {
+  female: 'Female',
+  male: 'Male',
+  prefer_not_to_say: 'Prefer not to say',
+} as const;
 
 interface BasicInfoStepProps {
   onResolved: (result: { userId: string; nextStep: 'photo' | 'done' }) => void;
@@ -20,7 +27,7 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
   const trpc = useTRPC();
   const form = useForm<StartSignupInput>({
     resolver: zodResolver(StartSignupInputSchema),
-    defaultValues: { name: '', phone: '', email: '', birthdate: '' },
+    defaultValues: { name: '', phone: '', email: '', birthdate: '', gender: undefined },
   });
 
   const startSignup = useMutation(
@@ -99,6 +106,27 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+            <Controller
+              name="gender"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="signup-gender">Gender (optional)</FieldLabel>
+                  <Select value={field.value ?? ''} onValueChange={(value) => field.onChange(value || undefined)}>
+                    <SelectTrigger id="signup-gender" className="w-full">
+                      <SelectValue placeholder="Prefer not to say" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(GENDER_LABELS).map(([value, label]) => (
+                        <SelectItem key={value} value={value}>
+                          {label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </Field>
               )}
             />

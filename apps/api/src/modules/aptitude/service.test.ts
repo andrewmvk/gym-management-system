@@ -3,7 +3,7 @@ import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
 import type { ComputeFaceEmbedding } from '@api/lib/face-embedding';
-import { savePhoto, startSignup } from '@api/modules/aptitude/service';
+import { recordConsent, savePhoto, startSignup } from '@api/modules/aptitude/service';
 import { resetTestDatabase } from '@api/test/database';
 
 const APPLICANT = {
@@ -77,11 +77,49 @@ describe('aptitude', () => {
     it('reports nextStep done once the photo step is already complete', async () => {
       const created = await startSignup(APPLICANT);
       const userId = (created as { userId: string }).userId;
+      await recordConsent({ userId, consentVersion: 'test-1' });
       await savePhoto({ userId, imageBase64: TINY_JPEG_BASE64, mimeType: 'image/jpeg' }, alwaysOk);
 
       const resumed = await startSignup(APPLICANT);
 
       expect(resumed).toMatchObject({ status: 'resumed', nextStep: 'done' });
+    });
+
+    it('persists an optional gender on creation', async () => {
+      const created = await startSignup({ ...APPLICANT, gender: 'female' });
+
+      const [user] = await db.select().from(dUsers).where(eq(dUsers.id, (created as { userId: string }).userId));
+      expect(user?.gender).toBe('female');
+    });
+
+    it('does not clear a previously recorded gender when resuming without resubmitting it', async () => {
+      const created = await startSignup({ ...APPLICANT, gender: 'male' });
+      const userId = (created as { userId: string }).userId;
+
+      await startSignup({ ...APPLICANT, name: 'Jamie R. Rivera' });
+
+      const [user] = await db.select().from(dUsers).where(eq(dUsers.id, userId));
+      expect(user?.gender).toBe('male');
+    });
+  });
+
+  describe('recordConsent', () => {
+    it('records a consent event for a pending applicant', async () => {
+      const created = await startSignup(APPLICANT);
+      const userId = (created as { userId: string }).userId;
+
+      const result = await recordConsent({ userId, consentVersion: 'test-1' });
+
+      expect(result).toEqual({ status: 'ok' });
+    });
+
+    it('refuses a userId that is not a pending applicant', async () => {
+      const result = await recordConsent({
+        userId: '00000000-0000-0000-0000-000000000000',
+        consentVersion: 'test-1',
+      });
+
+      expect(result).toEqual({ status: 'unavailable' });
     });
   });
 
@@ -91,8 +129,24 @@ describe('aptitude', () => {
       return (result as { userId: string }).userId;
     }
 
-    it('stores a 128-number embedding and the photo path on success, without returning either', async () => {
+    async function consentedApplicant() {
       const userId = await pendingApplicant();
+      await recordConsent({ userId, consentVersion: 'test-1' });
+      return userId;
+    }
+
+    it('refuses to process a photo without a prior recorded consent', async () => {
+      const userId = await pendingApplicant();
+
+      const result = await savePhoto({ userId, imageBase64: TINY_JPEG_BASE64, mimeType: 'image/jpeg' }, alwaysOk);
+
+      expect(result).toEqual({ status: 'consent_required' });
+      const [user] = await db.select().from(dUsers).where(eq(dUsers.id, userId));
+      expect(user?.referenceFaceEmbedding).toBeNull();
+    });
+
+    it('stores a 128-number embedding and the photo path on success, without returning either', async () => {
+      const userId = await consentedApplicant();
 
       const result = await savePhoto({ userId, imageBase64: TINY_JPEG_BASE64, mimeType: 'image/jpeg' }, alwaysOk);
 
@@ -104,7 +158,7 @@ describe('aptitude', () => {
     });
 
     it('reports photo_rejected on no_face without storing an embedding', async () => {
-      const userId = await pendingApplicant();
+      const userId = await consentedApplicant();
 
       const result = await savePhoto({ userId, imageBase64: TINY_JPEG_BASE64, mimeType: 'image/jpeg' }, alwaysNoFace);
 
@@ -114,7 +168,7 @@ describe('aptitude', () => {
     });
 
     it('reports photo_rejected on multiple_faces without storing an embedding', async () => {
-      const userId = await pendingApplicant();
+      const userId = await consentedApplicant();
 
       const result = await savePhoto(
         { userId, imageBase64: TINY_JPEG_BASE64, mimeType: 'image/jpeg' },

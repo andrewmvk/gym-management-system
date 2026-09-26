@@ -15,6 +15,7 @@ erDiagram
     D_USERS ||--o{ F_TRAINING_PLANS : has
     D_USERS ||--o{ F_CHECK_INS : has
     D_USERS ||--o{ F_PROFILE_EVENTS : accumulates
+    D_USERS ||--o{ F_CONSENT_EVENTS : gives
     F_TRAINING_PLANS ||--o{ F_TRAINING_PLAN_EXERCISES : contains
     F_TRAINING_PLANS ||--o{ F_PLAN_REVIEWS : "has (many contributors)"
     D_USERS ||--o{ F_PLAN_REVIEWS : writes
@@ -38,6 +39,7 @@ Single table for every person in the system - member, trainer, or admin alike. T
 | password_hash | text, nullable | Null until aptitude clearance (FR-9); no login possible before it's set |
 | name | text | |
 | birthdate | date, nullable | Only ever populated for a member |
+| gender | enum(`female`,`male`,`prefer_not_to_say`), nullable | Optional (FR-45); only ever populated for a member who chose to answer |
 | reference_photo_path | text, nullable | Server-side only (uploads volume); audit/recompute source, never served to the kiosk or any client. Only ever populated for a member |
 | reference_face_embedding | jsonb (float array), nullable | The only biometric artifact distributed outward, via the kiosk embeddings endpoint (FR-31). Only ever populated for a member |
 | aptitude_status | enum(`pending`,`cleared`,`rejected`), nullable | Final state after the questionnaire/certificate/admin-override flow resolves. Only ever populated for a member - a seeded trainer/admin account is never subject to this gate (FR-44). A `rejected` row is permanent (FR-8) - its e-mail can never be reused for a new signup |
@@ -47,6 +49,18 @@ Single table for every person in the system - member, trainer, or admin alike. T
 | updated_at | timestamp | |
 
 Trainer/admin rows are created only by the seed script (FR-41) - there is no application code path that inserts a `d_users` row and grants it staff-designated policies other than that seed, or the Admin policy-management feature (FR-43) acting on an *existing* row.
+
+### `f_consent_events`
+Records each LGPD consent a member has given (FR-46, RN-12). Append-only: a new consent (a re-worded
+policy, for example) is a new row, never an edit to an old one - the point is to be able to prove what
+was agreed to and when, not just what is true now.
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| user_id | uuid FK → d_users.id | |
+| consent_type | text | e.g. `biometric_facial` - the only type this project defines today |
+| consent_version | text | Identifies which wording of the consent text was shown |
+| consented_at | timestamp | |
 
 ### `d_user_policy`
 One row per granular, independently-grantable permission - the building block CASL abilities are constructed from. **Add-mostly**: policies are seeded/added over time; an existing one shouldn't be deleted once any `f_user_policy_on_user` row references it, for the same reason `d_exercises` is add-only.

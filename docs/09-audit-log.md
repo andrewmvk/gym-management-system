@@ -12,6 +12,9 @@ trail - the same reason `docs/08-traceability-matrix.md` exists for the Specifie
 | 4 | No resume flow defined for an incomplete signup (applicant closes the browser before finishing; no login is possible before the password is set) | `docs/02-requirements.md` FR-1..FR-9 | ✅ Resolved (2026-09-13) | Decided: resume by e-mail, looking up an existing incomplete row before creating a new one. FR-1 and `d_users.email` updated |
 | 5 | "Days trained"/"training frequency" in the metrics doesn't define whether it counts physical check-in or an exercise marked completed in the app - the two can diverge | `docs/05-data-model.md` §3, "Personal metrics" | ✅ Resolved (2026-09-13) | Decided: counts physical check-in only (`f_check_ins`), not exercises marked completed. FR-36 and data model §3 updated |
 
+| 11 | No gender/sex field anywhere in the spec - never asked for in the original grill-me session | `docs/02-requirements.md` (pre-FR-45) | ✅ Resolved (2026-09-26) | Decided: optional field, `female`/`male`/`prefer_not_to_say`, used only to inform AI plan recommendations. Added FR-45 and the `gender` column; implemented in `P-27` (fixes `P-07`) |
+| 12 | No LGPD consent flow for facial biometric capture, even though the system computes and stores a face embedding - LGPD Art. 11 requires specific, highlighted consent for sensitive/biometric data | `docs/02-requirements.md` FR-2, `docs/05-data-model.md` `d_users.reference_face_embedding` | ✅ Resolved (2026-09-26) | Decided: an explicit consent screen before photo capture, recorded permanently in a new `f_consent_events` table (who, when, which text version), embedding computation refused without it. Added FR-46 and RN-12; implemented in `P-28` (fixes `P-07`) |
+
 ## Implementation decisions made without prior review
 
 Findings 1-5 above are spec-level ambiguities, caught before any code existed. The entries below are a

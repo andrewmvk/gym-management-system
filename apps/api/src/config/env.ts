@@ -33,6 +33,9 @@ const EnvSchema = z
     OPENROUTER_MODEL: optionalText,
     AI_MOCK_APTITUDE: mockVerdict.default('cleared'),
     AI_MOCK_CERTIFICATE: mockVerdict.default('cleared'),
+    // Unset defaults to "placeholder" when AI_MODE is mock (the AI module's own plan fixture is
+    // deliberately empty, see mock-fixtures.ts) and to "ai" otherwise - see effectivePlanGenerator().
+    PLAN_GENERATOR: z.enum(['ai', 'placeholder']).optional(),
     EMAIL_MODE: z.enum(['resend', 'log']).default('log'),
     RESEND_API_KEY: optionalText,
     EMAIL_FROM: optionalText.transform((value) => value ?? DEFAULT_EMAIL_FROM),

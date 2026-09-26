@@ -9,3 +9,6 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 }
 process.env.NODE_ENV = 'test';
+// Deterministic and network-free regardless of the shared .env's AI_MODE: any test that wants the
+// real AI path for plan generation overrides it explicitly per call (plans/service.test.ts).
+process.env.PLAN_GENERATOR = 'placeholder';

@@ -61,6 +61,16 @@ async function adminId() {
   return admin!.id;
 }
 
+const APPLICANT_EMAIL = 'applicant@example.com';
+
+async function createApplicant(aptitudeStatus: 'pending' | 'cleared' | 'rejected') {
+  const [applicant] = await db
+    .insert(dUsers)
+    .values({ email: APPLICANT_EMAIL, name: 'Demo Applicant', aptitudeStatus })
+    .returning();
+  return applicant!;
+}
+
 describe('auth', () => {
   beforeEach(async () => {
     await resetTestDatabase();
@@ -189,6 +199,74 @@ describe('auth', () => {
       const { staffCaller } = await callerFor(signSessionToken(id));
 
       await expect(staffCaller.staffArea()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+  });
+
+  describe('setPassword', () => {
+    it('activates a cleared applicant: member policies, active membership, a session, and nextStep onboarding', async () => {
+      const applicant = await createApplicant('cleared');
+      const { caller, res } = await callerFor();
+
+      const result = await caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' });
+
+      expect(result?.nextStep).toBe('onboarding');
+      expect(result?.user.membershipStatus).toBe('active');
+      expect(res.cookie).toHaveBeenCalledWith(SESSION_COOKIE, expect.any(String), expect.any(Object));
+
+      const grants = await db
+        .select({ policyId: fUserPolicyOnUser.policyId })
+        .from(fUserPolicyOnUser)
+        .where(eq(fUserPolicyOnUser.userId, applicant.id));
+      expect(grants.map((g) => g.policyId).sort()).toEqual([...MEMBER_POLICY_IDS].sort());
+
+      const [user] = await db.select().from(dUsers).where(eq(dUsers.id, applicant.id));
+      expect(user?.passwordHash).not.toBeNull();
+      expect(user?.membershipPlan).toBeTruthy();
+    });
+
+    it('refuses a second call for an already-activated applicant', async () => {
+      const applicant = await createApplicant('cleared');
+      const { caller } = await callerFor();
+      await caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' });
+
+      await expect(
+        caller.auth.setPassword({ userId: applicant.id, password: 'another-password' }),
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
+    });
+
+    it('refuses a still-pending applicant', async () => {
+      const applicant = await createApplicant('pending');
+      const { caller } = await callerFor();
+
+      await expect(
+        caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('refuses a rejected applicant (RN-03)', async () => {
+      const applicant = await createApplicant('rejected');
+      const { caller } = await callerFor();
+
+      await expect(
+        caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('refuses an unknown userId', async () => {
+      const { caller } = await callerFor();
+
+      await expect(
+        caller.auth.setPassword({ userId: '00000000-0000-0000-0000-000000000000', password: 'a-strong-password' }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('refuses a password shorter than 8 characters', async () => {
+      const applicant = await createApplicant('cleared');
+      const { caller } = await callerFor();
+
+      await expect(caller.auth.setPassword({ userId: applicant.id, password: 'short' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
     });
   });
 

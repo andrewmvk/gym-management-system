@@ -6,3 +6,9 @@ export const LoginInputSchema = z.object({
 });
 
 export type LoginInput = z.input<typeof LoginInputSchema>;
+
+export const SetPasswordInputSchema = z.object({
+  userId: z.uuid(),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+});
+export type SetPasswordInput = z.input<typeof SetPasswordInputSchema>;

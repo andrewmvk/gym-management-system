@@ -9,6 +9,7 @@ import { useTRPC } from '@/lib/trpc';
 
 interface PhotoStepProps {
   userId: string;
+  onSaved: () => void;
 }
 
 const REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', string> = {
@@ -17,17 +18,16 @@ const REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', s
   unavailable: "We couldn't process that photo right now. Try again.",
 };
 
-export function PhotoStep({ userId }: PhotoStepProps) {
+export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
   const trpc = useTRPC();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [rejection, setRejection] = useState<string | null>(null);
-  const [done, setDone] = useState(false);
 
   useEffect(() => {
-    if (capturedImage || done) return;
+    if (capturedImage) return;
     let cancelled = false;
 
     navigator.mediaDevices
@@ -47,7 +47,7 @@ export function PhotoStep({ userId }: PhotoStepProps) {
       for (const track of streamRef.current?.getTracks() ?? []) track.stop();
       streamRef.current = null;
     };
-  }, [capturedImage, done]);
+  }, [capturedImage]);
 
   function capture() {
     const video = videoRef.current;
@@ -67,22 +67,11 @@ export function PhotoStep({ userId }: PhotoStepProps) {
           setRejection(REJECTION_MESSAGES[result.reason]);
           return;
         }
-        setDone(true);
+        onSaved();
       },
       onError: () => toast.error("We couldn't save your photo. Try again."),
     }),
   );
-
-  if (done) {
-    return (
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>Photo saved</CardTitle>
-          <CardDescription>Your reference photo was saved. The rest of the signup flow is coming soon.</CardDescription>
-        </CardHeader>
-      </Card>
-    );
-  }
 
   return (
     <Card className="w-full max-w-sm">

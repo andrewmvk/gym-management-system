@@ -12,6 +12,21 @@ trail - the same reason `docs/08-traceability-matrix.md` exists for the Specifie
 | 4 | No resume flow defined for an incomplete signup (applicant closes the browser before finishing; no login is possible before the password is set) | `docs/02-requirements.md` FR-1..FR-9 | ✅ Resolved (2026-09-13) | Decided: resume by e-mail, looking up an existing incomplete row before creating a new one. FR-1 and `d_users.email` updated |
 | 5 | "Days trained"/"training frequency" in the metrics doesn't define whether it counts physical check-in or an exercise marked completed in the app - the two can diverge | `docs/05-data-model.md` §3, "Personal metrics" | ✅ Resolved (2026-09-13) | Decided: counts physical check-in only (`f_check_ins`), not exercises marked completed. FR-36 and data model §3 updated |
 
+## Implementation decisions made without prior review
+
+Findings 1-5 above are spec-level ambiguities, caught before any code existed. The entries below are a
+different, later kind of gap: real interpretive calls made *while implementing* `P-06` and `P-07`, where
+the prompt left room for judgment and the agent decided alone instead of checking first. Recorded here
+so nothing stays silently baked into the code - review each and either confirm it or ask for a change.
+
+| # | Prompt | Decision made | Status |
+|---|---|---|---|
+| 6 | P-06 | Invented the content of all 25 seeded exercises and 12 equipment items (names, muscle groups, instructions) - the prompt only required the counts and the availability mix, not the actual content | ⏳ Pending your review |
+| 7 | P-06 | Added the shadcn `switch`, `badge`, and `checkbox` primitives to the frontend, reading "no new dependencies" in the prompt's permitted scope as about npm packages, not the project's own UI-kit generator | ⏳ Pending your review |
+| 8 | P-07 | Chose the exact response shape of `aptitude.startSignup` (`status: 'created' \| 'resumed' \| 'email_blocked' \| 'already_registered'`) - the prompt described the four outcomes in prose, not as a concrete type | ⏳ Pending your review |
+| 9 | P-07 | Invented the "coming soon" placeholder message shown to an applicant who resumes after the photo step is already done, since no later step exists yet to send them to | ⏳ Pending your review |
+| 10 | P-07 | Made an invalid/expired `userId` in `savePhoto` return the same generic `unavailable` reason as a real embedding failure, instead of a distinct error - a security/UX call to avoid telling a caller which case it is | ⏳ Pending your review |
+
 ## How to close the open items
 
 Items 2-5 aren't missing text - they are **decisions not yet made**. The right way to resolve them is

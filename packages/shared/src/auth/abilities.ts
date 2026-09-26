@@ -1,9 +1,14 @@
 import {
   createMongoAbility,
+  subject,
   type ForcedSubject,
   type MongoAbility,
   type RawRuleOf,
 } from '@casl/ability';
+
+// Re-exported so a self-scoped check (e.g. Onboarding, TrainingPlan) can attach the owner id without
+// apps/api needing @casl/ability as a direct dependency of its own.
+export { subject };
 import {
   ACTIONS,
   SUBJECTS,

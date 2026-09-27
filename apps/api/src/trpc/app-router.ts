@@ -4,6 +4,7 @@ import { authRouter } from '@api/modules/auth/router';
 import { catalogRouter } from '@api/modules/catalog/router';
 import { onboardingRouter } from '@api/modules/onboarding/router';
 import { plansRouter } from '@api/modules/plans/router';
+import { reviewsRouter } from '@api/modules/plans/reviews-router';
 import { systemRouter } from '@api/modules/system/router';
 import { router } from '@api/trpc/procedures';
 
@@ -14,6 +15,7 @@ export const appRouter = router({
   certificates: certificateRouter,
   onboarding: onboardingRouter,
   plans: plansRouter,
+  reviews: reviewsRouter,
   system: systemRouter,
 });
 

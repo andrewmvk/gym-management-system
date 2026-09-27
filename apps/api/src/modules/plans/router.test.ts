@@ -41,10 +41,11 @@ describe('plans router', () => {
     const member = await createMember();
     const caller = await callerFor(signSessionToken(member.id));
 
-    const plan = await caller.plans.generateToday({});
+    const result = await caller.plans.generateToday({});
 
-    expect(plan.userId).toBe(member.id);
-    expect(plan.exercises.length).toBeGreaterThan(0);
+    if (result.status !== 'ok') throw new Error(`Expected status "ok", got "${result.status}"`);
+    expect(result.plan.userId).toBe(member.id);
+    expect(result.plan.exercises.length).toBeGreaterThan(0);
   });
 
   it('refuses a signed-out caller', async () => {

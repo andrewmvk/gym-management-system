@@ -178,17 +178,28 @@ export interface GenerateForDateOverrides {
   generator?: PlanGeneratorMode;
 }
 
-// FR-15/FR-18: publishes immediately, no trainer approval step. RN-06: a trainer_edited plan is
-// refused unless confirmOverwrite is true - the confirmation UI/flow itself belongs to P-15.
+export type GenerateForDateResult =
+  | { status: 'ok'; plan: TrainingPlan & { exercises: TrainingPlanExercise[] } }
+  | { status: 'needs_confirmation'; editedBy: string; editedAt: Date };
+
+// FR-15/FR-18: publishes immediately, no trainer approval step. RN-06/FR-22 (completed in P-15): a
+// trainer_edited plan without confirmOverwrite is a normal, expected outcome - data, not a thrown
+// error - so a caller (the chat-triggered regeneration in P-17) can show the member a warning and ask
+// them to confirm, rather than catching an exception.
 export async function generateForDate(
   userId: string,
   planDate: string,
   confirmOverwrite = false,
   overrides: GenerateForDateOverrides = {},
-): Promise<TrainingPlan & { exercises: TrainingPlanExercise[] }> {
+): Promise<GenerateForDateResult> {
   const existing = await repository.findPlanByUserAndDate(userId, planDate);
   if (existing?.status === 'trainer_edited' && !confirmOverwrite) {
-    throw new TRPCError({ code: 'CONFLICT', message: 'This plan has trainer edits; confirm to overwrite it.' });
+    const editor = existing.lastEditedByUserId ? await findUserById(existing.lastEditedByUserId) : null;
+    return {
+      status: 'needs_confirmation',
+      editedBy: editor?.name ?? 'a trainer',
+      editedAt: existing.lastEditedAt ?? existing.aiGeneratedAt ?? new Date(),
+    };
   }
 
   const context = await assemblePlanContext(userId);
@@ -207,5 +218,6 @@ export async function generateForDate(
     exercises = generatePlaceholderExercises(context.availableExercises);
   }
 
-  return repository.replacePlan({ userId, planDate, exercises });
+  const plan = await repository.replacePlan({ userId, planDate, exercises });
+  return { status: 'ok', plan };
 }

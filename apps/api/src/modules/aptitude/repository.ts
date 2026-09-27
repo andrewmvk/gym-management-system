@@ -1,11 +1,20 @@
 import type { QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
-import { and, eq } from 'drizzle-orm';
+import { and, desc, eq } from 'drizzle-orm';
 import { db, type DatabaseExecutor } from '@api/db/client';
-import { dUsers, fAptitudeQuestionnaires, fConsentEvents, type AptitudeQuestionnaire, type User } from '@api/db/schema';
+import {
+  dUsers,
+  fAptitudeQuestionnaires,
+  fConsentEvents,
+  fMedicalCertificates,
+  type AptitudeQuestionnaire,
+  type MedicalCertificate,
+  type User,
+} from '@api/db/schema';
 
 type Gender = User['gender'];
 type AptitudeStatus = User['aptitudeStatus'];
 type AiResultValue = AptitudeQuestionnaire['aiResult'];
+type AdminOverrideResult = MedicalCertificate['adminOverrideResult'];
 
 export async function findByEmail(email: string, executor: DatabaseExecutor = db): Promise<User | null> {
   const [user] = await executor.select().from(dUsers).where(eq(dUsers.email, email));
@@ -109,4 +118,76 @@ export async function findQuestionnaireByUserId(
     .from(fAptitudeQuestionnaires)
     .where(eq(fAptitudeQuestionnaires.userId, userId));
   return row ?? null;
+}
+
+export async function insertCertificate(
+  input: { userId: string; filePath: string; aiResult: AiResultValue; aiNotes: string },
+  executor: DatabaseExecutor = db,
+): Promise<MedicalCertificate> {
+  const [row] = await executor.insert(fMedicalCertificates).values(input).returning();
+  return row!;
+}
+
+export async function findCertificateById(
+  id: string,
+  executor: DatabaseExecutor = db,
+): Promise<MedicalCertificate | null> {
+  const [row] = await executor.select().from(fMedicalCertificates).where(eq(fMedicalCertificates.id, id));
+  return row ?? null;
+}
+
+// Most recent certificate for the applicant, if any - used to resume the signup wizard and to gate
+// re-upload (FR-5's "under review" state once one already exists).
+export async function findLatestCertificateByUserId(
+  userId: string,
+  executor: DatabaseExecutor = db,
+): Promise<MedicalCertificate | null> {
+  const [row] = await executor
+    .select()
+    .from(fMedicalCertificates)
+    .where(eq(fMedicalCertificates.userId, userId))
+    .orderBy(desc(fMedicalCertificates.uploadedAt))
+    .limit(1);
+  return row ?? null;
+}
+
+export interface CertificateQueueRow extends MedicalCertificate {
+  applicantName: string;
+  applicantEmail: string;
+}
+
+// Unreviewed first (RN-02: everything must reach the queue, so nothing here skips it) - Postgres sorts
+// NULL first on DESC by default, and admin_reviewed_at is null exactly for unreviewed rows. Never
+// selects the applicant's reference_face_embedding or any other biometric column.
+export function findCertificateQueue(executor: DatabaseExecutor = db): Promise<CertificateQueueRow[]> {
+  return executor
+    .select({
+      id: fMedicalCertificates.id,
+      userId: fMedicalCertificates.userId,
+      filePath: fMedicalCertificates.filePath,
+      aiResult: fMedicalCertificates.aiResult,
+      aiNotes: fMedicalCertificates.aiNotes,
+      reviewedByUserId: fMedicalCertificates.reviewedByUserId,
+      adminReviewedAt: fMedicalCertificates.adminReviewedAt,
+      adminOverrideResult: fMedicalCertificates.adminOverrideResult,
+      uploadedAt: fMedicalCertificates.uploadedAt,
+      applicantName: dUsers.name,
+      applicantEmail: dUsers.email,
+    })
+    .from(fMedicalCertificates)
+    .innerJoin(dUsers, eq(dUsers.id, fMedicalCertificates.userId))
+    .orderBy(desc(fMedicalCertificates.adminReviewedAt), desc(fMedicalCertificates.uploadedAt));
+}
+
+export async function reviewCertificate(
+  id: string,
+  input: { reviewedByUserId: string; adminOverrideResult: AdminOverrideResult },
+  executor: DatabaseExecutor = db,
+): Promise<MedicalCertificate> {
+  const [row] = await executor
+    .update(fMedicalCertificates)
+    .set({ reviewedByUserId: input.reviewedByUserId, adminReviewedAt: new Date(), adminOverrideResult: input.adminOverrideResult })
+    .where(eq(fMedicalCertificates.id, id))
+    .returning();
+  return row!;
 }

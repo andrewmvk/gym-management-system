@@ -1,4 +1,5 @@
 import { aptitudeRouter } from '@api/modules/aptitude/router';
+import { certificateRouter } from '@api/modules/aptitude/certificate-router';
 import { authRouter } from '@api/modules/auth/router';
 import { catalogRouter } from '@api/modules/catalog/router';
 import { onboardingRouter } from '@api/modules/onboarding/router';
@@ -10,6 +11,7 @@ export const appRouter = router({
   aptitude: aptitudeRouter,
   auth: authRouter,
   catalog: catalogRouter,
+  certificates: certificateRouter,
   onboarding: onboardingRouter,
   plans: plansRouter,
   system: systemRouter,

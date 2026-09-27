@@ -193,23 +193,37 @@ export async function recheck(
 export type AptitudeStatusResult =
   | { status: 'unavailable' }
   | {
-      status: AptitudeOutcome | 'not_submitted';
+      status: 'not_submitted' | 'pending_retry' | 'certificate_required' | 'certificate_pending_review' | 'cleared' | 'rejected';
       questionnaireResult: 'cleared' | 'not_cleared' | 'pending_retry' | null;
-      certificateResult: null;
+      certificateResult: 'cleared' | 'not_cleared' | 'pending_retry' | null;
     };
 
-// So a returning applicant resumes in the right signup step. certificateResult is always null for now:
-// the certificates table belongs to P-10, which doesn't exist yet.
+// So a returning applicant resumes in the right signup step. d_users.aptitude_status is the source of
+// truth (cleared/rejected are both final, set by submitQuestionnaire or P-10's certificate review);
+// while still pending, the sub-state comes from the questionnaire and, once one exists, the certificate.
 export async function getAptitudeStatus(input: GetAptitudeStatusInput): Promise<AptitudeStatusResult> {
   const user = await repository.findById(input.userId);
   if (!user) return { status: 'unavailable' };
 
-  const questionnaire = await repository.findQuestionnaireByUserId(input.userId);
-  if (!questionnaire) return { status: 'not_submitted', questionnaireResult: null, certificateResult: null };
+  if (user.aptitudeStatus === 'rejected') {
+    return { status: 'rejected', questionnaireResult: null, certificateResult: null };
+  }
 
-  return {
-    status: deriveOutcome(questionnaire.aiResult),
-    questionnaireResult: questionnaire.aiResult,
-    certificateResult: null,
-  };
+  const questionnaire = await repository.findQuestionnaireByUserId(input.userId);
+
+  if (user.aptitudeStatus === 'cleared') {
+    return { status: 'cleared', questionnaireResult: questionnaire?.aiResult ?? null, certificateResult: null };
+  }
+
+  if (!questionnaire) return { status: 'not_submitted', questionnaireResult: null, certificateResult: null };
+  if (questionnaire.aiResult !== 'not_cleared') {
+    return { status: deriveOutcome(questionnaire.aiResult), questionnaireResult: questionnaire.aiResult, certificateResult: null };
+  }
+
+  // not_cleared: FR-5, a certificate is needed before this applicant can progress further.
+  const certificate = await repository.findLatestCertificateByUserId(input.userId);
+  if (!certificate) {
+    return { status: 'certificate_required', questionnaireResult: 'not_cleared', certificateResult: null };
+  }
+  return { status: 'certificate_pending_review', questionnaireResult: 'not_cleared', certificateResult: certificate.aiResult };
 }

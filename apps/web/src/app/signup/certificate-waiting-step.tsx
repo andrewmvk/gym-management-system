@@ -1,0 +1,53 @@
+'use client';
+
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useTRPCClient } from '@/lib/trpc';
+
+interface CertificateWaitingStepProps {
+  userId: string;
+  onStatusChanged: (status: 'cleared' | 'certificate_pending_review' | 'rejected') => void;
+}
+
+// There is no notification for this event: no account/session exists yet before clearance (FR-9), so
+// an admin's decision can't reach the applicant automatically. Checking status here is a manual re-poll
+// of aptitude.getStatus (there is no per-certificate "recheck" - only an admin decision changes this).
+export function CertificateWaitingStep({ userId, onStatusChanged }: CertificateWaitingStepProps) {
+  const trpcClient = useTRPCClient();
+  const [checking, setChecking] = useState(false);
+
+  async function checkStatus() {
+    setChecking(true);
+    try {
+      const result = await trpcClient.aptitude.getStatus.query({ userId });
+      if (result.status === 'cleared' || result.status === 'rejected' || result.status === 'certificate_pending_review') {
+        onStatusChanged(result.status);
+        return;
+      }
+      toast.message('Still under review. Check back later.');
+    } catch {
+      toast.error("We couldn't check your status. Try again.");
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <Card className="w-full max-w-sm">
+      <CardHeader>
+        <CardTitle>Your certificate is under review</CardTitle>
+        <CardDescription>
+          An admin needs to review your medical certificate before you can continue. This can take a while - come
+          back and check later.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <Button className="w-full" variant="outline" disabled={checking} onClick={() => void checkStatus()}>
+          {checking ? 'Checking...' : 'Check status'}
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}

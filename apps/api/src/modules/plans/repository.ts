@@ -1,6 +1,7 @@
-import { and, asc, desc, eq, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { db, type DatabaseExecutor } from '@api/db/client';
 import {
+  dExercises,
   fProfileEvents,
   fTrainingPlanExercises,
   fTrainingPlans,
@@ -39,6 +40,80 @@ export function findExercisesForPlan(trainingPlanId: string, executor: DatabaseE
     .from(fTrainingPlanExercises)
     .where(eq(fTrainingPlanExercises.trainingPlanId, trainingPlanId))
     .orderBy(asc(fTrainingPlanExercises.orderIndex));
+}
+
+export interface PlanExerciseDetail extends TrainingPlanExercise {
+  exerciseName: string;
+  muscleGroup: string;
+  instructions: string;
+}
+
+// Joined to d_exercises for display (name/instructions/muscle group) - isPerformable is computed by
+// the service layer from the catalog's current availability, not stored here.
+export function findExercisesForPlanWithDetails(
+  trainingPlanId: string,
+  executor: DatabaseExecutor = db,
+): Promise<PlanExerciseDetail[]> {
+  return executor
+    .select({
+      id: fTrainingPlanExercises.id,
+      trainingPlanId: fTrainingPlanExercises.trainingPlanId,
+      exerciseId: fTrainingPlanExercises.exerciseId,
+      sets: fTrainingPlanExercises.sets,
+      reps: fTrainingPlanExercises.reps,
+      load: fTrainingPlanExercises.load,
+      orderIndex: fTrainingPlanExercises.orderIndex,
+      completed: fTrainingPlanExercises.completed,
+      notes: fTrainingPlanExercises.notes,
+      exerciseName: dExercises.name,
+      muscleGroup: dExercises.muscleGroup,
+      instructions: dExercises.instructions,
+    })
+    .from(fTrainingPlanExercises)
+    .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
+    .where(eq(fTrainingPlanExercises.trainingPlanId, trainingPlanId))
+    .orderBy(asc(fTrainingPlanExercises.orderIndex));
+}
+
+export async function findPlanDatesInRange(
+  userId: string,
+  from: string,
+  to: string,
+  executor: DatabaseExecutor = db,
+): Promise<string[]> {
+  const rows = await executor
+    .select({ planDate: fTrainingPlans.planDate })
+    .from(fTrainingPlans)
+    .where(and(eq(fTrainingPlans.userId, userId), gte(fTrainingPlans.planDate, from), lte(fTrainingPlans.planDate, to)))
+    .orderBy(desc(fTrainingPlans.planDate));
+  return rows.map((row) => row.planDate);
+}
+
+// Looks up who actually owns the plan a given exercise row belongs to, since markExerciseCompleted's
+// planExerciseId is client-supplied and must never be trusted as "belongs to the caller" on its own.
+export async function findExerciseOwner(
+  planExerciseId: string,
+  executor: DatabaseExecutor = db,
+): Promise<{ userId: string; trainingPlanId: string } | null> {
+  const [row] = await executor
+    .select({ userId: fTrainingPlans.userId, trainingPlanId: fTrainingPlans.id })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .where(eq(fTrainingPlanExercises.id, planExerciseId));
+  return row ?? null;
+}
+
+export async function setExerciseCompleted(
+  planExerciseId: string,
+  completed: boolean,
+  executor: DatabaseExecutor = db,
+): Promise<TrainingPlanExercise> {
+  const [row] = await executor
+    .update(fTrainingPlanExercises)
+    .set({ completed })
+    .where(eq(fTrainingPlanExercises.id, planExerciseId))
+    .returning();
+  return row!;
 }
 
 export interface PlanExerciseInput {

@@ -3,16 +3,30 @@
 import { useEffect, useState } from 'react';
 import { AptitudeResultStep } from '@/app/signup/aptitude-result-step';
 import { BasicInfoStep } from '@/app/signup/basic-info-step';
+import { CertificateStep } from '@/app/signup/certificate-step';
+import { CertificateWaitingStep } from '@/app/signup/certificate-waiting-step';
 import { ConsentStep } from '@/app/signup/consent-step';
 import { PasswordStep } from '@/app/signup/password-step';
 import { PhotoStep } from '@/app/signup/photo-step';
 import { QuestionnaireStep } from '@/app/signup/questionnaire-step';
+import { RejectedStep } from '@/app/signup/rejected-step';
 import { useTRPCClient } from '@/lib/trpc';
 
 const STORAGE_KEY = 'cadence-signup-user-id';
 
-type AptitudeOutcome = 'cleared' | 'certificate_required' | 'pending_retry';
-type Step = 'basic-info' | 'consent' | 'photo' | 'questionnaire' | 'aptitude-result' | 'password';
+// The wider set getStatus can report on resume; submitQuestionnaire/recheck only ever return the first
+// three (a certificate can't exist yet at that point).
+type ResumeStatus = 'cleared' | 'certificate_required' | 'pending_retry' | 'certificate_pending_review' | 'rejected';
+type Step =
+  | 'basic-info'
+  | 'consent'
+  | 'photo'
+  | 'questionnaire'
+  | 'aptitude-result'
+  | 'certificate-upload'
+  | 'certificate-waiting'
+  | 'rejected'
+  | 'password';
 
 // The userId is kept in sessionStorage (not a cookie): there is no session before aptitude clearance
 // (FR-9), and this is just a capability letting the browser resume the wizard after a reload.
@@ -20,16 +34,12 @@ export function SignupWizard() {
   const trpcClient = useTRPCClient();
   const [step, setStep] = useState<Step>('basic-info');
   const [userId, setUserId] = useState<string | null>(null);
-  const [outcome, setOutcome] = useState<Exclude<AptitudeOutcome, 'cleared'> | null>(null);
 
-  // "cleared" goes straight to the password step (P-09); the other two outcomes render on
-  // aptitude-result instead.
-  function goToAptitudeStep(status: AptitudeOutcome) {
-    if (status === 'cleared') {
-      setStep('password');
-      return;
-    }
-    setOutcome(status);
+  function goToAptitudeStep(status: ResumeStatus) {
+    if (status === 'cleared') return setStep('password');
+    if (status === 'rejected') return setStep('rejected');
+    if (status === 'certificate_required') return setStep('certificate-upload');
+    if (status === 'certificate_pending_review') return setStep('certificate-waiting');
     setStep('aptitude-result');
   }
 
@@ -77,9 +87,16 @@ export function SignupWizard() {
   if (step === 'questionnaire' && userId) {
     return <QuestionnaireStep userId={userId} onResolved={(result) => goToAptitudeStep(result)} />;
   }
-  if (step === 'aptitude-result' && userId && outcome) {
-    return <AptitudeResultStep userId={userId} outcome={outcome} onRechecked={(result) => goToAptitudeStep(result)} />;
+  if (step === 'aptitude-result' && userId) {
+    return <AptitudeResultStep userId={userId} onRechecked={(result) => goToAptitudeStep(result)} />;
   }
+  if (step === 'certificate-upload' && userId) {
+    return <CertificateStep userId={userId} onUploaded={() => setStep('certificate-waiting')} />;
+  }
+  if (step === 'certificate-waiting' && userId) {
+    return <CertificateWaitingStep userId={userId} onStatusChanged={(result) => goToAptitudeStep(result)} />;
+  }
+  if (step === 'rejected') return <RejectedStep />;
   if (step === 'password' && userId) return <PasswordStep userId={userId} />;
   return null;
 }

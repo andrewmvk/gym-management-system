@@ -1,0 +1,154 @@
+import type { ProfileEventFact, ProfileEventType } from '@cadence/shared/schemas/profile-events';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { db, pool } from '@api/db/client';
+import { dUsers, fProfileEvents } from '@api/db/schema';
+import { seedBase } from '@api/db/seed';
+import type { ChatContext, EvaluateChat } from '@api/modules/chat/service';
+import { buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
+import { resetTestDatabase } from '@api/test/database';
+
+async function createMember() {
+  const [user] = await db
+    .insert(dUsers)
+    .values({ email: 'chat-member@example.com', name: 'Chat Test Member', birthdate: '1995-06-15' })
+    .returning();
+  return user!;
+}
+
+function factsFor(...eventTypes: ProfileEventType[]): ProfileEventFact[] {
+  return eventTypes.map((eventType) => ({ eventType, payload: { description: `a ${eventType} event` } }));
+}
+
+const alwaysFails: EvaluateChat = async () => ({ ok: false, reason: 'unavailable' });
+
+describe('chat', () => {
+  beforeEach(async () => {
+    await resetTestDatabase();
+    await seedBase();
+  });
+  afterAll(() => pool.end());
+
+  describe('sendMessage', () => {
+    it('stores a fact for each type the AI reports, of the right type', async () => {
+      const member = await createMember();
+      const evaluateChat: EvaluateChat = async () => ({
+        ok: true,
+        data: { reply: 'Noted, take it easy on that knee.', facts: factsFor('injury', 'medication_change') },
+      });
+
+      const result = await sendMessage(member.id, 'I hurt my knee and started a new medication.', { evaluateChat });
+
+      expect(result).toMatchObject({ reply: 'Noted, take it easy on that knee.', factsSaved: 2 });
+      const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
+      expect(rows.map((r) => r.eventType).sort()).toEqual(['injury', 'medication_change'].sort());
+      expect(rows.every((r) => (r.payload as { description: string }).description)).toBe(true);
+    });
+
+    it('truncates the stored source_message to 200 characters', async () => {
+      const member = await createMember();
+      const longMessage = 'a'.repeat(250);
+      const evaluateChat: EvaluateChat = async () => ({
+        ok: true,
+        data: { reply: 'Got it.', facts: factsFor('life_event') },
+      });
+
+      await sendMessage(member.id, longMessage, { evaluateChat });
+
+      const [row] = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
+      expect(row?.sourceMessage).toHaveLength(200);
+    });
+
+    it("includes an earlier message's facts in a second message's context", async () => {
+      const member = await createMember();
+      const prompts: string[] = [];
+      const evaluateChat: EvaluateChat = vi.fn(async (contextPrompt) => {
+        prompts.push(contextPrompt);
+        return { ok: true as const, data: { reply: 'Ok.', facts: factsFor('injury') } };
+      });
+
+      await sendMessage(member.id, 'I hurt my knee.', { evaluateChat });
+      await sendMessage(member.id, 'How should I adjust today?', { evaluateChat });
+
+      expect(prompts).toHaveLength(2);
+      expect(prompts[0]).not.toContain('a injury event');
+      expect(prompts[1]).toContain('injury');
+      expect(prompts[1]).toContain('a injury event');
+    });
+
+    it('throws INTERNAL_SERVER_ERROR on an AI failure and persists nothing', async () => {
+      const member = await createMember();
+
+      await expect(sendMessage(member.id, 'hello', { evaluateChat: alwaysFails })).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'AI is temporarily unavailable',
+      });
+
+      const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
+      expect(rows).toHaveLength(0);
+    });
+  });
+
+  describe('context builder (unit)', () => {
+    it('summarizes older events as a single-line count by type', () => {
+      const events = [
+        { eventType: 'injury' },
+        { eventType: 'injury' },
+        { eventType: 'life_event' },
+      ] as never;
+
+      expect(summarizeOlderEvents(events)).toBe('3 older events not shown in detail: 2 injury, 1 life_event.');
+    });
+
+    it('returns null when there are no older events', () => {
+      expect(summarizeOlderEvents([])).toBeNull();
+    });
+
+    it('includes profile, onboarding, plan, and event data in the prompt', () => {
+      const context: ChatContext = {
+        ageYears: 30,
+        gender: 'female',
+        onboardingSubmissions: [
+          { goals: 'Get stronger', medications: ['Ibuprofen'], physicalConditions: { conditions: ['asthma'], otherNotes: undefined } } as never,
+        ],
+        recentEvents: [{ eventType: 'skipped_exercise', payload: { description: 'skipped leg day' } } as never],
+        olderEventsSummary: '5 older events not shown in detail: 5 life_event.',
+        todayPlan: {
+          id: 'plan-1',
+          userId: 'user-1',
+          planDate: '2026-10-01',
+          status: 'ai_published',
+          exercises: [{ exerciseName: 'Barbell Back Squat', sets: 5, reps: 5, completed: false } as never],
+        } as never,
+      };
+
+      const prompt = buildChatUserPrompt(context, 'Should I train legs today?');
+
+      expect(prompt).toContain('Member age: 30');
+      expect(prompt).toContain('Member gender: female');
+      expect(prompt).toContain('Goals: Get stronger');
+      expect(prompt).toContain('Barbell Back Squat');
+      expect(prompt).toContain('skipped leg day');
+      expect(prompt).toContain('5 older events not shown in detail: 5 life_event.');
+      expect(prompt).toContain('Should I train legs today?');
+    });
+
+    it('reports no plan and no events gracefully', () => {
+      const context: ChatContext = {
+        ageYears: null,
+        gender: null,
+        onboardingSubmissions: [],
+        recentEvents: [],
+        olderEventsSummary: null,
+        todayPlan: null,
+      };
+
+      const prompt = buildChatUserPrompt(context, 'Hi');
+
+      expect(prompt).toContain('Member age: unknown');
+      expect(prompt).toContain('Member gender: unknown');
+      expect(prompt).toContain("Today's plan: none generated yet.");
+      expect(prompt).toContain('- none yet');
+    });
+  });
+});

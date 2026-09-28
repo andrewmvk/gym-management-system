@@ -2,6 +2,7 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 import { env } from '@api/config/env';
 import type { ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
+import { localDateString, todayLocal } from '@api/lib/dates';
 import { runStructured, type AiResult } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
@@ -15,24 +16,10 @@ const PLACEHOLDER_REPS = 10;
 const PLACEHOLDER_MIN_EXERCISES = 3;
 const PLACEHOLDER_MAX_EXERCISES = 5;
 
-function pad(value: number) {
-  return String(value).padStart(2, '0');
-}
-
-function dateString(date: Date): string {
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
-}
-
-// FR-39: the server's local system timezone, not UTC - there is no apps/api/src/lib/dates.ts yet
-// (that's P-14's artifact); this stays private to plans until then.
-export function todayDateString(now = new Date()): string {
-  return dateString(now);
-}
-
 function daysAgoDateString(days: number, now = new Date()): string {
   const past = new Date(now);
   past.setDate(past.getDate() - days);
-  return dateString(past);
+  return localDateString(past);
 }
 
 function computeAge(birthdate: string | null): number | null {
@@ -208,4 +195,81 @@ export async function generateForDate(
   }
 
   return repository.replacePlan({ userId, planDate, exercises });
+}
+
+export interface PlanExerciseView {
+  id: string;
+  exerciseId: string;
+  exerciseName: string;
+  muscleGroup: string;
+  instructions: string;
+  sets: number;
+  reps: number;
+  load: string | null;
+  notes: string | null;
+  completed: boolean;
+  orderIndex: number;
+  isPerformable: boolean;
+}
+
+export interface PlanView {
+  id: string;
+  userId: string;
+  planDate: string;
+  status: TrainingPlan['status'];
+  exercises: PlanExerciseView[];
+}
+
+// FR-17: isPerformable is computed fresh from the catalog's current availability on every read, never
+// stored - toggling a piece of equipment changes what a plan shows without touching the plan itself.
+async function toPlanView(plan: TrainingPlan): Promise<PlanView> {
+  const [exercises, catalog] = await Promise.all([
+    repository.findExercisesForPlanWithDetails(plan.id),
+    listExercises(),
+  ]);
+  const availableById = new Map(catalog.map((exercise) => [exercise.id, exercise.isAvailable]));
+
+  return {
+    id: plan.id,
+    userId: plan.userId,
+    planDate: plan.planDate,
+    status: plan.status,
+    exercises: exercises.map((exercise) => ({
+      id: exercise.id,
+      exerciseId: exercise.exerciseId,
+      exerciseName: exercise.exerciseName,
+      muscleGroup: exercise.muscleGroup,
+      instructions: exercise.instructions,
+      sets: exercise.sets,
+      reps: exercise.reps,
+      load: exercise.load,
+      notes: exercise.notes,
+      completed: exercise.completed,
+      orderIndex: exercise.orderIndex,
+      isPerformable: availableById.get(exercise.exerciseId) ?? false,
+    })),
+  };
+}
+
+export async function getPlanForDate(userId: string, planDate: string): Promise<PlanView | null> {
+  const plan = await repository.findPlanByUserAndDate(userId, planDate);
+  return plan ? toPlanView(plan) : null;
+}
+
+export async function getToday(userId: string): Promise<PlanView | null> {
+  return getPlanForDate(userId, todayLocal());
+}
+
+export function listPlanDates(userId: string, from: string, to: string): Promise<string[]> {
+  return repository.findPlanDatesInRange(userId, from, to);
+}
+
+// Thin wrapper so the router can resolve the real owner (never the caller's own claimed id) before
+// deciding whether ctx.ability allows the write - assertCan stays the router's job either way.
+export function getExerciseOwner(planExerciseId: string) {
+  return repository.findExerciseOwner(planExerciseId);
+}
+
+export function markExerciseCompleted(planExerciseId: string, completed: boolean) {
+  return repository.setExerciseCompleted(planExerciseId, completed);
 }

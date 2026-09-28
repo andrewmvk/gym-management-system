@@ -28,9 +28,9 @@ export type ProfileEventFact = z.infer<typeof ProfileEventFactSchema>;
 export const ChatSendInputSchema = z.object({ message: z.string().trim().min(1).max(2000) });
 export type ChatSendInput = z.infer<typeof ChatSendInputSchema>;
 
-// Placeholder shape only: P-16 accepts and forwards this field without acting on it. P-17 (chat plan
-// adjustment) will define and consume its real shape.
-const ChatAdjustmentSchema = z.object({ description: z.string() });
+// P-17: enough for the chat panel's "Apply to my plan for <date>" button to call chat.adjustPlan
+// directly with these two fields.
+const ChatAdjustmentSchema = z.object({ date: z.iso.date(), instruction: z.string() });
 
 export const ChatResponseSchema = z.object({
   reply: z.string(),

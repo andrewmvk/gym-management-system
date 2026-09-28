@@ -262,6 +262,23 @@ export async function insertReview(
   return row!;
 }
 
+export interface PlanExerciseForDate {
+  exerciseName: string;
+  muscleGroup: string;
+}
+
+// FR-29: selects only the exercise's own name/muscle group - no user_id or any other identifying
+// column ever leaves this query, so the aggregate it feeds can't leak a member's identity even by
+// mistake further up the call chain.
+export function findExercisesForDate(planDate: string, executor: DatabaseExecutor = db): Promise<PlanExerciseForDate[]> {
+  return executor
+    .select({ exerciseName: dExercises.name, muscleGroup: dExercises.muscleGroup })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
+    .where(eq(fTrainingPlans.planDate, planDate));
+}
+
 // A direct trainer edit (FR-19): replaces the exercise list, flips status to trainer_edited, and
 // records who/when - the AI-generation fields (ai_generated_at) are left untouched, since this isn't a
 // regeneration.

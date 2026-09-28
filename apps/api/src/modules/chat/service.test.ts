@@ -4,15 +4,13 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dExercises, dUsers, fProfileEvents, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
+import { todayLocal } from '@api/lib/dates';
 import type { AdjustPlanResult, ChatContext, EvaluateChat, EvaluateCorrection } from '@api/modules/chat/service';
 import { adjustPlan, buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
 import { resetTestDatabase } from '@api/test/database';
 
-async function createMember() {
-  const [user] = await db
-    .insert(dUsers)
-    .values({ email: 'chat-member@example.com', name: 'Chat Test Member', birthdate: '1995-06-15' })
-    .returning();
+async function createMember(email = 'chat-member@example.com') {
+  const [user] = await db.insert(dUsers).values({ email, name: 'Chat Test Member', birthdate: '1995-06-15' }).returning();
   return user!;
 }
 
@@ -112,6 +110,25 @@ describe('chat', () => {
 
       const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it("assembles a real context that surfaces the member's own injury next to today's plan, plus the cross-member aggregate (FR-28/FR-29)", async () => {
+      const member = await createMember();
+      const otherMember = await createMember('chat-other-member@example.com');
+      await db.insert(fProfileEvents).values({ userId: member.id, eventType: 'injury', payload: { description: 'sore left knee' }, sourceMessage: 'earlier' });
+      await createPastPlan(member.id, todayLocal(), ['Barbell Back Squat']);
+      await createPastPlan(otherMember.id, todayLocal(), ['Push-Up']);
+      let capturedPrompt = '';
+      const evaluateChat: EvaluateChat = async (contextPrompt) => {
+        capturedPrompt = contextPrompt;
+        return { ok: true, data: { reply: 'Ok.', facts: [] } };
+      };
+
+      await sendMessage(member.id, 'Is it safe to squat today?', { evaluateChat });
+
+      expect(capturedPrompt).toContain('sore left knee');
+      expect(capturedPrompt).toContain('Barbell Back Squat');
+      expect(capturedPrompt).toContain('Push-Up (1)');
     });
   });
 
@@ -241,7 +258,7 @@ describe('chat', () => {
       expect(summarizeOlderEvents([])).toBeNull();
     });
 
-    it('includes profile, onboarding, plan, and event data in the prompt', () => {
+    it('includes profile, onboarding, plan, risk, catalog, and aggregate data in the prompt', () => {
       const context: ChatContext = {
         ageYears: 30,
         gender: 'female',
@@ -249,6 +266,7 @@ describe('chat', () => {
           { goals: 'Get stronger', medications: ['Ibuprofen'], physicalConditions: { conditions: ['asthma'], otherNotes: undefined } } as never,
         ],
         recentEvents: [{ eventType: 'skipped_exercise', payload: { description: 'skipped leg day' } } as never],
+        activeHealthEvents: [{ eventType: 'injury', payload: { description: 'sore left knee' } } as never],
         olderEventsSummary: '5 older events not shown in detail: 5 life_event.',
         todayPlan: {
           id: 'plan-1',
@@ -257,6 +275,8 @@ describe('chat', () => {
           status: 'ai_published',
           exercises: [{ exerciseName: 'Barbell Back Squat', sets: 5, reps: 5, completed: false } as never],
         } as never,
+        availableExercises: [{ id: 'ex-1', name: 'Bodyweight Squat', muscleGroup: 'legs' }],
+        aggregate: { topExercises: [{ name: 'Push-Up', count: 4 }], topMuscleGroups: [{ name: 'legs', count: 6 }] },
       };
 
       const prompt = buildChatUserPrompt(context, 'Should I train legs today?');
@@ -266,6 +286,10 @@ describe('chat', () => {
       expect(prompt).toContain('Goals: Get stronger');
       expect(prompt).toContain('Barbell Back Squat');
       expect(prompt).toContain('skipped leg day');
+      expect(prompt).toContain('sore left knee');
+      expect(prompt).toContain('Bodyweight Squat');
+      expect(prompt).toContain('Push-Up (4)');
+      expect(prompt).toContain('legs (6)');
       expect(prompt).toContain('5 older events not shown in detail: 5 life_event.');
       expect(prompt).toContain('Should I train legs today?');
     });
@@ -276,8 +300,11 @@ describe('chat', () => {
         gender: null,
         onboardingSubmissions: [],
         recentEvents: [],
+        activeHealthEvents: [],
         olderEventsSummary: null,
         todayPlan: null,
+        availableExercises: [],
+        aggregate: { topExercises: [], topMuscleGroups: [] },
       };
 
       const prompt = buildChatUserPrompt(context, 'Hi');
@@ -285,7 +312,10 @@ describe('chat', () => {
       expect(prompt).toContain('Member age: unknown');
       expect(prompt).toContain('Member gender: unknown');
       expect(prompt).toContain("Today's plan: none generated yet.");
+      expect(prompt).toContain('- none reported');
       expect(prompt).toContain('- none yet');
+      expect(prompt).toContain('Top exercises: none yet');
+      expect(prompt).toContain('Top muscle groups: none yet');
     });
   });
 });

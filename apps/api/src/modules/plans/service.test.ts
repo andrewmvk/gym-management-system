@@ -1,18 +1,27 @@
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
-import { dExercises, dUsers, fTrainingPlans } from '@api/db/schema';
+import { dExercises, dUsers, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
+import { todayLocal } from '@api/lib/dates';
 import type { EvaluatePlan, GenerateForDateResult } from '@api/modules/plans/service';
-import { generateForDate } from '@api/modules/plans/service';
+import { generateForDate, getTodayAggregate } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 
-async function createMember() {
-  const [user] = await db
-    .insert(dUsers)
-    .values({ email: 'member@example.com', name: 'Plan Test Member', birthdate: '1995-06-15' })
-    .returning();
+async function createMember(email = 'member@example.com') {
+  const [user] = await db.insert(dUsers).values({ email, name: 'Plan Test Member', birthdate: '1995-06-15' }).returning();
   return user!;
+}
+
+async function createPlanWithExercises(userId: string, planDate: string, exerciseNames: readonly string[]) {
+  const [plan] = await db.insert(fTrainingPlans).values({ userId, planDate, status: 'ai_published', aiGeneratedAt: new Date() }).returning();
+  await Promise.all(
+    exerciseNames.map(async (name, index) => {
+      const exerciseId = await exerciseIdByName(name);
+      await db.insert(fTrainingPlanExercises).values({ trainingPlanId: plan!.id, exerciseId, sets: 3, reps: 10, orderIndex: index });
+    }),
+  );
+  return plan!;
 }
 
 async function exerciseIdByName(name: string) {
@@ -132,6 +141,69 @@ describe('plans', () => {
 
       const plan = expectOk(await generateForDate(member.id, '2026-10-01', true, { generator: 'placeholder' }));
       expect(plan.status).toBe('ai_published');
+    });
+  });
+
+  describe('getTodayAggregate', () => {
+    it('counts exercises and muscle groups across every member, with no identifying field', async () => {
+      const today = todayLocal();
+      const memberA = await createMember('aggregate-a@example.com');
+      const memberB = await createMember('aggregate-b@example.com');
+      const memberC = await createMember('aggregate-c@example.com');
+      await createPlanWithExercises(memberA.id, today, ['Barbell Back Squat', 'Push-Up']);
+      await createPlanWithExercises(memberB.id, today, ['Barbell Back Squat', 'Push-Up']);
+      await createPlanWithExercises(memberC.id, today, ['Push-Up', 'Plank']);
+      // A different date must never contribute to today's aggregate.
+      await createPlanWithExercises(memberA.id, '2020-01-01', ['Pull-Up']);
+
+      const aggregate = await getTodayAggregate();
+
+      expect(aggregate.topExercises).toEqual([
+        { name: 'Push-Up', count: 3 },
+        { name: 'Barbell Back Squat', count: 2 },
+        { name: 'Plank', count: 1 },
+      ]);
+      expect(aggregate.topMuscleGroups).toEqual([
+        { name: 'chest', count: 3 },
+        { name: 'legs', count: 2 },
+        { name: 'core', count: 1 },
+      ]);
+      expect(JSON.stringify(aggregate)).not.toContain(memberA.id);
+      expect(JSON.stringify(aggregate)).not.toContain('aggregate-a@example.com');
+    });
+
+    it('caps at the top 10 exercises and top 5 muscle groups', async () => {
+      const today = todayLocal();
+      const member = await createMember();
+      // 12 distinct exercises (caps topExercises at 10) spanning 7 distinct muscle groups (caps
+      // topMuscleGroups at 5), with legs given a clear lead so the top slot is deterministic.
+      const allExerciseNames = [
+        'Bodyweight Squat',
+        'Barbell Back Squat',
+        'Leg Press',
+        'Push-Up',
+        'Barbell Bench Press',
+        'Pull-Up',
+        'Bent-Over Barbell Row',
+        'Overhead Dumbbell Press',
+        'Diamond Push-Up',
+        'Plank',
+        'Bicycle Crunch',
+        'Treadmill Run',
+      ];
+      await createPlanWithExercises(member.id, today, allExerciseNames);
+
+      const aggregate = await getTodayAggregate();
+
+      expect(aggregate.topExercises).toHaveLength(10);
+      expect(aggregate.topMuscleGroups).toHaveLength(5);
+      expect(aggregate.topMuscleGroups[0]).toEqual({ name: 'legs', count: 3 });
+    });
+
+    it('returns empty lists when no plan exists for today', async () => {
+      const aggregate = await getTodayAggregate();
+
+      expect(aggregate).toEqual({ topExercises: [], topMuscleGroups: [] });
     });
   });
 });

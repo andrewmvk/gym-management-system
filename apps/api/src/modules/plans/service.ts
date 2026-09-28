@@ -285,3 +285,32 @@ export function getExerciseOwner(planExerciseId: string) {
 export function markExerciseCompleted(planExerciseId: string, completed: boolean) {
   return repository.setExerciseCompleted(planExerciseId, completed);
 }
+
+const TOP_EXERCISES_LIMIT = 10;
+const TOP_MUSCLE_GROUPS_LIMIT = 5;
+
+export interface AggregateCount {
+  name: string;
+  count: number;
+}
+
+export interface PlanAggregate {
+  topExercises: AggregateCount[];
+  topMuscleGroups: AggregateCount[];
+}
+
+function topCounts(values: readonly string[], limit: number): AggregateCount[] {
+  const counts = new Map<string, number>();
+  for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
+  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, count }));
+}
+
+// FR-29: an anonymized cross-member summary for "what is everyone doing today" - the underlying query
+// (findExercisesForDate) never selects a user id or name, so there is nothing to strip here, only to count.
+export async function getTodayAggregate(): Promise<PlanAggregate> {
+  const rows = await repository.findExercisesForDate(todayLocal());
+  return {
+    topExercises: topCounts(rows.map((row) => row.exerciseName), TOP_EXERCISES_LIMIT),
+    topMuscleGroups: topCounts(rows.map((row) => row.muscleGroup), TOP_MUSCLE_GROUPS_LIMIT),
+  };
+}

@@ -9,7 +9,7 @@ import { listExercises } from '@api/modules/catalog/service';
 import * as repository from '@api/modules/chat/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import * as plansRepository from '@api/modules/plans/repository';
-import { generateForDate, getToday } from '@api/modules/plans/service';
+import { generateForDate, getToday, getTodayAggregate, type PlanAggregate } from '@api/modules/plans/service';
 
 const RECENT_EVENTS_LIMIT = 50;
 const SOURCE_MESSAGE_EXCERPT_LENGTH = 200;
@@ -34,31 +34,60 @@ export function summarizeOlderEvents(events: readonly ProfileEvent[]): string | 
   return `${events.length} older events not shown in detail: ${byType}.`;
 }
 
+// No "resolved"/expiry concept exists on f_profile_events (docs/05-data-model.md), so "active" means
+// reported and still within the recent-events window, not a separately tracked status.
+const ACTIVE_HEALTH_EVENT_TYPES = new Set(['injury', 'medication_change']);
+
 export interface ChatContext {
   ageYears: number | null;
   gender: string | null;
   onboardingSubmissions: Awaited<ReturnType<typeof findSubmissionsByUserId>>;
   recentEvents: ProfileEvent[];
+  activeHealthEvents: ProfileEvent[];
   olderEventsSummary: string | null;
   todayPlan: Awaited<ReturnType<typeof getToday>>;
+  availableExercises: { id: string; name: string; muscleGroup: string }[];
+  aggregate: PlanAggregate;
 }
 
 async function assembleChatContext(userId: string): Promise<ChatContext> {
-  const [user, onboardingSubmissions, allEvents, todayPlan] = await Promise.all([
+  const [user, onboardingSubmissions, allEvents, todayPlan, catalog, aggregate] = await Promise.all([
     findUserById(userId),
     findSubmissionsByUserId(userId),
     plansRepository.findProfileEventsByUserId(userId),
     getToday(userId),
+    listExercises(),
+    getTodayAggregate(),
   ]);
+  const recentEvents = allEvents.slice(0, RECENT_EVENTS_LIMIT);
 
   return {
     ageYears: computeAge(user?.birthdate ?? null),
     gender: user?.gender ?? null,
     onboardingSubmissions,
-    recentEvents: allEvents.slice(0, RECENT_EVENTS_LIMIT),
+    recentEvents,
+    activeHealthEvents: recentEvents.filter((event) => ACTIVE_HEALTH_EVENT_TYPES.has(event.eventType)),
     olderEventsSummary: summarizeOlderEvents(allEvents.slice(RECENT_EVENTS_LIMIT)),
     todayPlan,
+    availableExercises: catalog.filter((exercise) => exercise.isAvailable),
+    aggregate,
   };
+}
+
+function buildAggregateLines(aggregate: PlanAggregate): string[] {
+  const lines: string[] = [];
+  lines.push("Today's aggregate across all members (anonymized, no member identity) - use this only if asked what other members are doing:");
+  lines.push(
+    aggregate.topExercises.length > 0
+      ? `- Top exercises: ${aggregate.topExercises.map((e) => `${e.name} (${e.count})`).join(', ')}`
+      : '- Top exercises: none yet',
+  );
+  lines.push(
+    aggregate.topMuscleGroups.length > 0
+      ? `- Top muscle groups: ${aggregate.topMuscleGroups.map((g) => `${g.name} (${g.count})`).join(', ')}`
+      : '- Top muscle groups: none yet',
+  );
+  return lines;
 }
 
 // FR-25: assembled fresh on every call, never from a stored conversation - AGENTS.md principle 2, the
@@ -86,6 +115,15 @@ export function buildChatUserPrompt(context: ChatContext, message: string): stri
     lines.push("Today's plan: none generated yet.");
   }
 
+  // FR-28: placed right next to today's plan so a risk (e.g. an old knee injury) is easy to weigh
+  // against today's actual exercises, rather than buried in the general history dump below.
+  lines.push('Active injuries and medication changes (weigh these against today\'s plan above):');
+  if (context.activeHealthEvents.length === 0) lines.push('- none reported');
+  for (const event of context.activeHealthEvents) lines.push(`- ${event.eventType}: ${JSON.stringify(event.payload)}`);
+
+  lines.push('Available exercise catalog - propose alternatives only from this list:');
+  for (const exercise of context.availableExercises) lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
+
   lines.push('Profile history, most recent first:');
   if (context.recentEvents.length === 0) lines.push('- none yet');
   for (const event of context.recentEvents) {
@@ -93,19 +131,23 @@ export function buildChatUserPrompt(context: ChatContext, message: string): stri
   }
   if (context.olderEventsSummary) lines.push(context.olderEventsSummary);
 
+  lines.push(...buildAggregateLines(context.aggregate));
+
   lines.push('Member message:');
   lines.push(message);
 
   return lines.join('\n');
 }
 
-// FR-25 to FR-27: this project's own wording, not a requirement quote.
+// FR-25 to FR-29: this project's own wording, not a requirement quote.
 const CHAT_SYSTEM_PROMPT =
   "You are a personal trainer AI assistant chatting with a gym member. Use the member's profile, " +
   "onboarding data, today's plan, and profile history to reply helpfully and safely. Extract any new, " +
   'durable facts the message reveals (injury, skipped exercise, medication change, life event, updated ' +
   'physical state, or a request to adjust their plan) as structured facts - never invent facts the ' +
-  'message does not support.';
+  "message does not support. Weigh the member's active injuries and medication changes against today's " +
+  'exercises: if one conflicts, warn about it and propose a safer alternative from the available ' +
+  "catalog. Only mention the cross-member aggregate if the member asks about what others are doing.";
 
 export type EvaluateChat = (contextPrompt: string) => Promise<AiResult<ChatResponse>>;
 
@@ -159,6 +201,7 @@ const PLAN_CORRECTION_SYSTEM_PROMPT =
 function buildCorrectionUserPrompt(
   currentExercises: readonly plansRepository.PlanExerciseDetail[],
   availableExercises: readonly { id: string; name: string; muscleGroup: string }[],
+  aggregate: PlanAggregate,
   instruction: string,
 ): string {
   const lines: string[] = [];
@@ -170,6 +213,8 @@ function buildCorrectionUserPrompt(
 
   lines.push('Available exercise catalog - choose exerciseId only from this list:');
   for (const exercise of availableExercises) lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
+
+  lines.push(...buildAggregateLines(aggregate));
 
   lines.push('Member correction request:');
   lines.push(instruction);
@@ -220,14 +265,15 @@ export async function adjustPlan(
     };
   }
 
-  const [currentExercises, catalog] = await Promise.all([
+  const [currentExercises, catalog, aggregate] = await Promise.all([
     plansRepository.findExercisesForPlanWithDetails(existing.id),
     listExercises(),
+    getTodayAggregate(),
   ]);
   const availableExercises = catalog.filter((exercise) => exercise.isAvailable);
 
   const evaluateCorrection = overrides.evaluateCorrection ?? defaultEvaluateCorrection;
-  const result = await evaluateCorrection(buildCorrectionUserPrompt(currentExercises, availableExercises, instruction));
+  const result = await evaluateCorrection(buildCorrectionUserPrompt(currentExercises, availableExercises, aggregate, instruction));
   if (!result.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
 
   const availableIds = new Set(availableExercises.map((exercise) => exercise.id));

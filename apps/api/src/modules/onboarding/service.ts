@@ -1,8 +1,9 @@
 import type { OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
+import { todayLocal } from '@api/lib/dates';
 import { logger } from '@api/lib/logger';
 import { saveUpload } from '@api/lib/uploads';
 import * as repository from '@api/modules/onboarding/repository';
-import { generateForDate, todayDateString } from '@api/modules/plans/service';
+import { generateForDate } from '@api/modules/plans/service';
 
 const log = logger.child({ module: 'onboarding' });
 
@@ -32,7 +33,7 @@ export async function submit(userId: string, input: OnboardingSubmitInput) {
   // FR-13: best effort only - a failure here never fails the onboarding submission itself. The member
   // can always retry via plans.generateToday (P-13).
   try {
-    await generateForDate(userId, todayDateString());
+    await generateForDate(userId, todayLocal());
   } catch (error) {
     log.warn({ error, userId }, 'best-effort plan generation after onboarding submission failed');
   }

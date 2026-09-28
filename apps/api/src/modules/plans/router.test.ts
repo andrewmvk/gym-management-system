@@ -12,10 +12,10 @@ import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
 
-async function createMember() {
+async function createMember(email = 'plan-member@example.com') {
   const [user] = await db
     .insert(dUsers)
-    .values({ email: 'plan-member@example.com', name: 'Plan Router Member', passwordHash: await bcrypt.hash('password123', 4) })
+    .values({ email, name: 'Plan Router Member', passwordHash: await bcrypt.hash('password123', 4) })
     .returning();
   await db
     .insert(fUserPolicyOnUser)
@@ -59,5 +59,89 @@ describe('plans router', () => {
     const caller = await callerFor(signSessionToken(admin!.id));
 
     await expect(caller.plans.generateToday({})).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+
+  describe('getToday / getByDate / listDates', () => {
+    it('returns null before any plan exists, then the plan with isPerformable exercises after generating', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+
+      expect(await caller.plans.getToday()).toBeNull();
+
+      const generated = await caller.plans.generateToday({});
+      const today = await caller.plans.getToday();
+      if (generated.status !== 'ok') throw new Error(`Expected status "ok", got "${generated.status}"`);
+
+      expect(today?.id).toBe(generated.plan.id);
+      expect(today?.exercises.length).toBeGreaterThan(0);
+      expect(today?.exercises.every((e) => e.isPerformable)).toBe(true);
+    });
+
+    it('returns null from getByDate for a date with no plan', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+
+      expect(await caller.plans.getByDate({ date: '2020-01-01' })).toBeNull();
+    });
+
+    it('lists plan dates within range and never another member’s', async () => {
+      const memberA = await createMember('plan-member-a@example.com');
+      const memberB = await createMember('plan-member-b@example.com');
+      const callerA = await callerFor(signSessionToken(memberA.id));
+      const callerB = await callerFor(signSessionToken(memberB.id));
+      const generated = await callerA.plans.generateToday({});
+      if (generated.status !== 'ok') throw new Error(`Expected status "ok", got "${generated.status}"`);
+
+      const datesA = await callerA.plans.listDates({ from: '2020-01-01', to: '2030-01-01' });
+      const datesB = await callerB.plans.listDates({ from: '2020-01-01', to: '2030-01-01' });
+
+      expect(datesA).toContain(generated.plan.planDate);
+      expect(datesB).toEqual([]);
+    });
+
+    it('never returns another member’s plan from getToday', async () => {
+      const memberA = await createMember('plan-member-a@example.com');
+      const memberB = await createMember('plan-member-b@example.com');
+      await (await callerFor(signSessionToken(memberA.id))).plans.generateToday({});
+
+      const todayForB = await (await callerFor(signSessionToken(memberB.id))).plans.getToday();
+
+      expect(todayForB).toBeNull();
+    });
+  });
+
+  describe('markExerciseCompleted', () => {
+    it('marks an exercise completed for its real owner', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+      const plan = await caller.plans.generateToday({});
+      if (plan.status !== 'ok') throw new Error(`Expected status "ok", got "${plan.status}"`);
+      const exerciseId = plan.plan.exercises[0]!.id;
+
+      const updated = await caller.plans.markExerciseCompleted({ planExerciseId: exerciseId, completed: true });
+
+      expect(updated.completed).toBe(true);
+    });
+
+    it('refuses to mark an exercise belonging to another member', async () => {
+      const memberA = await createMember('plan-member-a@example.com');
+      const memberB = await createMember('plan-member-b@example.com');
+      const planA = await (await callerFor(signSessionToken(memberA.id))).plans.generateToday({});
+      if (planA.status !== 'ok') throw new Error(`Expected status "ok", got "${planA.status}"`);
+      const callerB = await callerFor(signSessionToken(memberB.id));
+
+      await expect(
+        callerB.plans.markExerciseCompleted({ planExerciseId: planA.plan.exercises[0]!.id, completed: true }),
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+    });
+
+    it('refuses an unknown planExerciseId', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+
+      await expect(
+        caller.plans.markExerciseCompleted({ planExerciseId: '00000000-0000-0000-0000-000000000000', completed: true }),
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
   });
 });

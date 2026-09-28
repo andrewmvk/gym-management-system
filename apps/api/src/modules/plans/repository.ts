@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte } from 'drizzle-orm';
+import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 import { db, type DatabaseExecutor } from '@api/db/client';
 import {
   dExercises,
@@ -84,6 +84,47 @@ export function findExercisesForPlanWithDetails(
     .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
     .where(eq(fTrainingPlanExercises.trainingPlanId, trainingPlanId))
     .orderBy(asc(fTrainingPlanExercises.orderIndex));
+}
+
+export async function findPlanDatesInRange(
+  userId: string,
+  from: string,
+  to: string,
+  executor: DatabaseExecutor = db,
+): Promise<string[]> {
+  const rows = await executor
+    .select({ planDate: fTrainingPlans.planDate })
+    .from(fTrainingPlans)
+    .where(and(eq(fTrainingPlans.userId, userId), gte(fTrainingPlans.planDate, from), lte(fTrainingPlans.planDate, to)))
+    .orderBy(desc(fTrainingPlans.planDate));
+  return rows.map((row) => row.planDate);
+}
+
+// Looks up who actually owns the plan a given exercise row belongs to, since markExerciseCompleted's
+// planExerciseId is client-supplied and must never be trusted as "belongs to the caller" on its own.
+export async function findExerciseOwner(
+  planExerciseId: string,
+  executor: DatabaseExecutor = db,
+): Promise<{ userId: string; trainingPlanId: string } | null> {
+  const [row] = await executor
+    .select({ userId: fTrainingPlans.userId, trainingPlanId: fTrainingPlans.id })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .where(eq(fTrainingPlanExercises.id, planExerciseId));
+  return row ?? null;
+}
+
+export async function setExerciseCompleted(
+  planExerciseId: string,
+  completed: boolean,
+  executor: DatabaseExecutor = db,
+): Promise<TrainingPlanExercise> {
+  const [row] = await executor
+    .update(fTrainingPlanExercises)
+    .set({ completed })
+    .where(eq(fTrainingPlanExercises.id, planExerciseId))
+    .returning();
+  return row!;
 }
 
 // Regenerating a date replaces the plan row in place (unique (user_id, plan_date)) and its whole

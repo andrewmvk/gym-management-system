@@ -45,6 +45,14 @@ export function findExercisesForPlan(trainingPlanId: string, executor: DatabaseE
     .orderBy(asc(fTrainingPlanExercises.orderIndex));
 }
 
+export interface PlanExerciseInput {
+  exerciseId: string;
+  sets: number;
+  reps: number;
+  load?: string;
+  notes?: string;
+}
+
 export interface PlanExerciseDetail extends TrainingPlanExercise {
   exerciseName: string;
   muscleGroup: string;
@@ -118,14 +126,6 @@ export async function setExerciseCompleted(
     .where(eq(fTrainingPlanExercises.id, planExerciseId))
     .returning();
   return row!;
-}
-
-export interface PlanExerciseInput {
-  exerciseId: string;
-  sets: number;
-  reps: number;
-  load?: string;
-  notes?: string;
 }
 
 // Regenerating a date replaces the plan row in place (unique (user_id, plan_date)) and its whole

@@ -2,10 +2,10 @@ import type { ProfileEventFact, ProfileEventType } from '@cadence/shared/schemas
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, pool } from '@api/db/client';
-import { dUsers, fProfileEvents } from '@api/db/schema';
+import { dExercises, dUsers, fProfileEvents, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
-import type { ChatContext, EvaluateChat } from '@api/modules/chat/service';
-import { buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
+import type { AdjustPlanResult, ChatContext, EvaluateChat, EvaluateCorrection } from '@api/modules/chat/service';
+import { adjustPlan, buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
 import { resetTestDatabase } from '@api/test/database';
 
 async function createMember() {
@@ -21,6 +21,32 @@ function factsFor(...eventTypes: ProfileEventType[]): ProfileEventFact[] {
 }
 
 const alwaysFails: EvaluateChat = async () => ({ ok: false, reason: 'unavailable' });
+const alwaysFailsCorrection: EvaluateCorrection = async () => ({ ok: false, reason: 'unavailable' });
+
+async function exerciseIdByName(name: string) {
+  const [exercise] = await db.select({ id: dExercises.id }).from(dExercises).where(eq(dExercises.name, name));
+  return exercise!.id;
+}
+
+async function createPastPlan(userId: string, planDate: string, exerciseNames: readonly string[]) {
+  const [plan] = await db.insert(fTrainingPlans).values({ userId, planDate, status: 'ai_published', aiGeneratedAt: new Date() }).returning();
+  const rows = await Promise.all(
+    exerciseNames.map(async (name, index) => {
+      const exerciseId = await exerciseIdByName(name);
+      const [row] = await db
+        .insert(fTrainingPlanExercises)
+        .values({ trainingPlanId: plan!.id, exerciseId, sets: 3, reps: 10, orderIndex: index })
+        .returning();
+      return row!;
+    }),
+  );
+  return { plan: plan!, exercises: rows };
+}
+
+function expectOk(result: AdjustPlanResult) {
+  if (result.status !== 'ok') throw new Error(`Expected status "ok", got "${result.status}"`);
+  return result.plan;
+}
 
 describe('chat', () => {
   beforeEach(async () => {
@@ -86,6 +112,117 @@ describe('chat', () => {
 
       const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
       expect(rows).toHaveLength(0);
+    });
+  });
+
+  describe('adjustPlan', () => {
+    describe('today or a future date', () => {
+      it('regenerates the plan through the normal generation path', async () => {
+        const member = await createMember();
+
+        const plan = expectOk(await adjustPlan(member.id, '2026-10-01', 'make it easier today'));
+
+        expect(plan.exercises.length).toBeGreaterThan(0);
+      });
+
+      it('reports needs_confirmation for a trainer-edited plan and blocks the regeneration', async () => {
+        const member = await createMember();
+        const { plan } = await createPastPlan(member.id, '2026-10-01', ['Barbell Back Squat']);
+        await db
+          .update(fTrainingPlans)
+          .set({ status: 'trainer_edited', lastEditedByUserId: member.id, lastEditedAt: new Date('2026-09-20') })
+          .where(eq(fTrainingPlans.id, plan.id));
+
+        const result = await adjustPlan(member.id, '2026-10-01', 'swap squats for lunges');
+
+        expect(result).toMatchObject({ status: 'needs_confirmation', editedBy: 'Chat Test Member' });
+      });
+    });
+
+    describe('a past date', () => {
+      it('throws NOT_FOUND when no plan exists for that date', async () => {
+        const member = await createMember();
+
+        await expect(adjustPlan(member.id, '2020-01-01', 'I skipped this day')).rejects.toMatchObject({
+          code: 'NOT_FOUND',
+        });
+      });
+
+      it('applies the AI-corrected exercise list in place, keeping the same plan row', async () => {
+        const member = await createMember();
+        const { plan, exercises } = await createPastPlan(member.id, '2020-01-01', ['Barbell Back Squat']);
+        const lungeId = await exerciseIdByName('Walking Lunge');
+        const evaluateCorrection: EvaluateCorrection = async () => ({
+          ok: true,
+          data: {
+            exercises: [
+              { exerciseId: exercises[0]!.exerciseId, sets: 3, reps: 10, completed: true },
+              { exerciseId: lungeId, sets: 3, reps: 12, completed: false },
+            ],
+          },
+        });
+
+        const corrected = expectOk(await adjustPlan(member.id, '2020-01-01', 'I did squats but also added lunges', false, { evaluateCorrection }));
+
+        expect(corrected.id).toBe(plan.id);
+        const exerciseIds = corrected.exercises.map((e) => e.exerciseId).sort();
+        expect(exerciseIds).toEqual([exercises[0]!.exerciseId, lungeId].sort());
+        expect(corrected.exercises.find((e) => e.exerciseId === exercises[0]!.exerciseId)?.completed).toBe(true);
+        expect(corrected.exercises.find((e) => e.exerciseId === lungeId)?.completed).toBe(false);
+
+        const rows = await db.select().from(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
+        expect(rows).toHaveLength(2);
+      });
+
+      it("drops a corrected exercise the AI chose that isn't currently available", async () => {
+        const member = await createMember();
+        const { exercises } = await createPastPlan(member.id, '2020-01-01', ['Barbell Back Squat']);
+        const rowingId = await exerciseIdByName('Rowing Machine Sprint');
+        const evaluateCorrection: EvaluateCorrection = async () => ({
+          ok: true,
+          data: {
+            exercises: [
+              { exerciseId: exercises[0]!.exerciseId, sets: 3, reps: 10, completed: true },
+              { exerciseId: rowingId, sets: 3, reps: 10, completed: true },
+            ],
+          },
+        });
+
+        const corrected = expectOk(await adjustPlan(member.id, '2020-01-01', 'add rowing', false, { evaluateCorrection }));
+
+        expect(corrected.exercises.map((e) => e.exerciseId)).not.toContain(rowingId);
+      });
+
+      it('reports needs_confirmation for a trainer-edited plan and blocks the correction until confirmed', async () => {
+        const member = await createMember();
+        const { plan, exercises } = await createPastPlan(member.id, '2020-01-01', ['Barbell Back Squat']);
+        await db
+          .update(fTrainingPlans)
+          .set({ status: 'trainer_edited', lastEditedByUserId: member.id, lastEditedAt: new Date('2019-12-01') })
+          .where(eq(fTrainingPlans.id, plan.id));
+        const evaluateCorrection: EvaluateCorrection = async () => ({
+          ok: true,
+          data: { exercises: [{ exerciseId: exercises[0]!.exerciseId, sets: 3, reps: 10, completed: true }] },
+        });
+
+        const blocked = await adjustPlan(member.id, '2020-01-01', 'I did the squats', false, { evaluateCorrection });
+        expect(blocked).toMatchObject({ status: 'needs_confirmation', editedBy: 'Chat Test Member' });
+
+        const confirmed = expectOk(await adjustPlan(member.id, '2020-01-01', 'I did the squats', true, { evaluateCorrection }));
+        expect(confirmed.exercises[0]?.completed).toBe(true);
+      });
+
+      it('throws INTERNAL_SERVER_ERROR on an AI failure and changes nothing', async () => {
+        const member = await createMember();
+        const { plan } = await createPastPlan(member.id, '2020-01-01', ['Barbell Back Squat']);
+
+        await expect(
+          adjustPlan(member.id, '2020-01-01', 'I skipped this', false, { evaluateCorrection: alwaysFailsCorrection }),
+        ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
+
+        const rows = await db.select().from(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
+        expect(rows).toHaveLength(1);
+      });
     });
   });
 

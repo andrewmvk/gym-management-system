@@ -7,10 +7,16 @@ import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
 import { signSessionToken } from '@api/modules/auth/session';
+import type { GenerateForDateResult } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
+
+function expectOk(result: GenerateForDateResult) {
+  if (result.status !== 'ok') throw new Error(`Expected status "ok", got "${result.status}"`);
+  return result.plan;
+}
 
 async function createMember(email = 'plan-member@example.com') {
   const [user] = await db
@@ -41,10 +47,11 @@ describe('plans router', () => {
     const member = await createMember();
     const caller = await callerFor(signSessionToken(member.id));
 
-    const plan = await caller.plans.generateToday({});
+    const result = await caller.plans.generateToday({});
 
-    expect(plan.userId).toBe(member.id);
-    expect(plan.exercises.length).toBeGreaterThan(0);
+    if (result.status !== 'ok') throw new Error(`Expected status "ok", got "${result.status}"`);
+    expect(result.plan.userId).toBe(member.id);
+    expect(result.plan.exercises.length).toBeGreaterThan(0);
   });
 
   it('refuses a signed-out caller', async () => {
@@ -67,7 +74,7 @@ describe('plans router', () => {
 
       expect(await caller.plans.getToday()).toBeNull();
 
-      const generated = await caller.plans.generateToday({});
+      const generated = expectOk(await caller.plans.generateToday({}));
       const today = await caller.plans.getToday();
 
       expect(today?.id).toBe(generated.id);
@@ -87,7 +94,7 @@ describe('plans router', () => {
       const memberB = await createMember('plan-member-b@example.com');
       const callerA = await callerFor(signSessionToken(memberA.id));
       const callerB = await callerFor(signSessionToken(memberB.id));
-      const generated = await callerA.plans.generateToday({});
+      const generated = expectOk(await callerA.plans.generateToday({}));
 
       const datesA = await callerA.plans.listDates({ from: '2020-01-01', to: '2030-01-01' });
       const datesB = await callerB.plans.listDates({ from: '2020-01-01', to: '2030-01-01' });
@@ -111,7 +118,7 @@ describe('plans router', () => {
     it('marks an exercise completed for its real owner', async () => {
       const member = await createMember();
       const caller = await callerFor(signSessionToken(member.id));
-      const plan = await caller.plans.generateToday({});
+      const plan = expectOk(await caller.plans.generateToday({}));
       const exerciseId = plan.exercises[0]!.id;
 
       const updated = await caller.plans.markExerciseCompleted({ planExerciseId: exerciseId, completed: true });
@@ -122,7 +129,7 @@ describe('plans router', () => {
     it('refuses to mark an exercise belonging to another member', async () => {
       const memberA = await createMember('plan-member-a@example.com');
       const memberB = await createMember('plan-member-b@example.com');
-      const planA = await (await callerFor(signSessionToken(memberA.id))).plans.generateToday({});
+      const planA = expectOk(await (await callerFor(signSessionToken(memberA.id))).plans.generateToday({}));
       const callerB = await callerFor(signSessionToken(memberB.id));
 
       await expect(

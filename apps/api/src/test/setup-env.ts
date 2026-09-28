@@ -9,6 +9,8 @@ if (process.env.TEST_DATABASE_URL) {
   process.env.DATABASE_URL = process.env.TEST_DATABASE_URL;
 }
 process.env.NODE_ENV = 'test';
-// Deterministic and network-free regardless of the shared .env's AI_MODE: any test that wants the
-// real AI path for plan generation overrides it explicitly per call (plans/service.test.ts).
-process.env.PLAN_GENERATOR = 'placeholder';
+// Deterministic and network-free regardless of the shared .env's own AI_MODE (which may be "live" for
+// real local development): every test uses the AI mock switches instead. A test that specifically wants
+// to exercise the real AI call path injects its own evaluator/generator per call (aptitude and plans
+// services both support this) rather than relying on this default.
+process.env.AI_MODE = 'mock';

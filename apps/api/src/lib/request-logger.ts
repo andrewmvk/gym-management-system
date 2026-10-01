@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
-import type { RequestHandler } from 'express';
-import type {} from '@api/types/express';
 import { logger } from '@api/lib/logger';
+import type {} from '@api/types/express';
+import type { RequestHandler } from 'express';
 
 export const requestLogger: RequestHandler = (req, res, next) => {
   const requestId = randomUUID();

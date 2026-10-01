@@ -26,7 +26,9 @@ export function StepPanel({ title, description, icon: Icon, tone = 'default', ch
             <Icon className="size-5" />
           </span>
         )}
-        <h1 className="font-display text-2xl leading-none font-extrabold text-balance uppercase sm:text-3xl">{title}</h1>
+        <h1 className="font-display text-2xl leading-none font-extrabold text-balance uppercase sm:text-3xl">
+          {title}
+        </h1>
         {description && <p className="text-pretty text-muted-foreground">{description}</p>}
       </div>
       {children}

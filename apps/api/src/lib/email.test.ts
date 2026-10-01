@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmailSender } from '@api/lib/email';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 const API_KEY = 're_test_secret_key';
 const MESSAGE = {
@@ -33,7 +33,13 @@ describe('sendEmail', () => {
 
   it('posts the message to Resend with the configured sender', async () => {
     const fetchMock = vi.fn<typeof fetch>().mockResolvedValue(new Response('{"id":"1"}', { status: 200 }));
-    const send = createEmailSender({ mode: 'resend', apiKey: API_KEY, from: 'Cadence <a@b.dev>', fetch: fetchMock, log: logSpy() as never });
+    const send = createEmailSender({
+      mode: 'resend',
+      apiKey: API_KEY,
+      from: 'Cadence <a@b.dev>',
+      fetch: fetchMock,
+      log: logSpy() as never,
+    });
 
     await expect(send(MESSAGE)).resolves.toEqual({ ok: true });
 
@@ -48,7 +54,13 @@ describe('sendEmail', () => {
     ['a network error', () => Promise.reject(new TypeError('fetch failed'))],
   ])('returns ok false without throwing on %s and never logs the key', async (_, respond) => {
     const log = logSpy();
-    const send = createEmailSender({ mode: 'resend', apiKey: API_KEY, from: 'x@y.dev', fetch: vi.fn(respond) as never, log: log as never });
+    const send = createEmailSender({
+      mode: 'resend',
+      apiKey: API_KEY,
+      from: 'x@y.dev',
+      fetch: vi.fn(respond) as never,
+      log: log as never,
+    });
 
     await expect(send(MESSAGE)).resolves.toEqual({ ok: false });
     expect(log.warn).toHaveBeenCalledOnce();

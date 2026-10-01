@@ -88,7 +88,10 @@ export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
       description="Used for face recognition at check-in. Face the camera in good light, alone in the frame."
     >
       {rejection && (
-        <p role="alert" className="rounded-md border-2 border-dashed border-destructive/60 px-4 py-3 text-sm text-destructive">
+        <p
+          role="alert"
+          className="rounded-md border-2 border-dashed border-destructive/60 px-4 py-3 text-sm text-destructive"
+        >
           {rejection}
         </p>
       )}
@@ -104,7 +107,13 @@ export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
         <>
           <div className="relative overflow-hidden rounded-lg bg-kit">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video ref={videoRef} autoPlay playsInline muted className="aspect-square w-full -scale-x-100 object-cover" />
+            <video
+              ref={videoRef}
+              autoPlay
+              playsInline
+              muted
+              className="aspect-square w-full -scale-x-100 object-cover"
+            />
             <FrameGuide />
           </div>
           <Button size="lg" className="w-full" onClick={capture}>
@@ -117,7 +126,11 @@ export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
       {capturedImage && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={capturedImage} alt="Captured reference" className="aspect-square w-full -scale-x-100 rounded-lg object-cover" />
+          <img
+            src={capturedImage}
+            alt="Captured reference"
+            className="aspect-square w-full -scale-x-100 rounded-lg object-cover"
+          />
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" size="lg" onClick={() => setCapturedImage(null)} disabled={savePhoto.isPending}>
               <RotateCcwIcon data-icon="inline-start" />

@@ -89,11 +89,18 @@ export function PlanHistory() {
       </div>
 
       {!shownDate && (
-        <EmptyState icon={CalendarSearchIcon} title="Pick a day" description="The plan you had that day shows up here." />
+        <EmptyState
+          icon={CalendarSearchIcon}
+          title="Pick a day"
+          description="The plan you had that day shows up here."
+        />
       )}
       {shownDate &&
         planQuery.isPending &&
-        Array.from({ length: 3 }, (_, index) => <ExerciseRow.Skeleton key={index} />)}
+        Array.from({ length: 3 }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
+          <ExerciseRow.Skeleton key={index} />
+        ))}
       {shownDate && planQuery.isError && (
         <QueryError
           title="We couldn't load that plan"

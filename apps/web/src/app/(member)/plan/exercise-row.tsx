@@ -51,6 +51,7 @@ function ExerciseRowRoot({
         />
       ) : (
         <span
+          role="img"
           aria-label={completed ? 'Completed' : 'Not completed'}
           className={cn(
             'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm border-2',

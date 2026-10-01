@@ -1,14 +1,14 @@
-import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import { env } from '@api/config/env';
 import type { ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
 import { localDateString, todayLocal } from '@api/lib/dates';
-import { runStructured, type AiResult } from '@api/modules/ai';
+import { type AiResult, runStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
-import * as repository from '@api/modules/plans/repository';
 import type { PlanExerciseInput } from '@api/modules/plans/repository';
+import * as repository from '@api/modules/plans/repository';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 
 const RECENT_PLAN_WINDOW_DAYS = 14;
 const PLACEHOLDER_SETS = 3;
@@ -87,7 +87,9 @@ function buildPlanUserPrompt(context: PlanContext): string {
   }
 
   if (context.recentPlans.length > 0) {
-    lines.push(`Plan dates from the last ${RECENT_PLAN_WINDOW_DAYS} days: ${context.recentPlans.map((p) => p.planDate).join(', ')}`);
+    lines.push(
+      `Plan dates from the last ${RECENT_PLAN_WINDOW_DAYS} days: ${context.recentPlans.map((p) => p.planDate).join(', ')}`,
+    );
   }
 
   lines.push('Available exercise catalog - choose exerciseId only from this list:');
@@ -114,7 +116,12 @@ type PlanGeneration = z.infer<typeof PlanGenerationSchema>;
 export type EvaluatePlan = (contextPrompt: string) => Promise<AiResult<PlanGeneration>>;
 
 async function defaultEvaluatePlan(contextPrompt: string): Promise<AiResult<PlanGeneration>> {
-  return runStructured({ purpose: 'plan', system: PLAN_SYSTEM_PROMPT, user: contextPrompt, schema: PlanGenerationSchema });
+  return runStructured({
+    purpose: 'plan',
+    system: PLAN_SYSTEM_PROMPT,
+    user: contextPrompt,
+    schema: PlanGenerationSchema,
+  });
 }
 
 export type PlanGeneratorMode = 'ai' | 'placeholder';
@@ -302,7 +309,10 @@ export interface PlanAggregate {
 function topCounts(values: readonly string[], limit: number): AggregateCount[] {
   const counts = new Map<string, number>();
   for (const value of values) counts.set(value, (counts.get(value) ?? 0) + 1);
-  return [...counts.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit).map(([name, count]) => ({ name, count }));
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, limit)
+    .map(([name, count]) => ({ name, count }));
 }
 
 // FR-29: an anonymized cross-member summary for "what is everyone doing today" - the underlying query
@@ -310,7 +320,13 @@ function topCounts(values: readonly string[], limit: number): AggregateCount[] {
 export async function getTodayAggregate(): Promise<PlanAggregate> {
   const rows = await repository.findExercisesForDate(todayLocal());
   return {
-    topExercises: topCounts(rows.map((row) => row.exerciseName), TOP_EXERCISES_LIMIT),
-    topMuscleGroups: topCounts(rows.map((row) => row.muscleGroup), TOP_MUSCLE_GROUPS_LIMIT),
+    topExercises: topCounts(
+      rows.map((row) => row.exerciseName),
+      TOP_EXERCISES_LIMIT,
+    ),
+    topMuscleGroups: topCounts(
+      rows.map((row) => row.muscleGroup),
+      TOP_MUSCLE_GROUPS_LIMIT,
+    ),
   };
 }

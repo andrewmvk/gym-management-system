@@ -3,6 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, WrenchIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -28,6 +29,7 @@ function EquipmentListSkeleton() {
   return (
     <ul className="divide-y overflow-hidden rounded-lg border bg-card">
       {Array.from({ length: 5 }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
         <li key={index} className="flex min-h-15 items-center justify-between gap-4 px-5 sm:px-6">
           <Skeleton className="h-5 w-40" />
           <Skeleton className="h-6 w-11 rounded-full" />
@@ -60,7 +62,9 @@ function EquipmentToggle({ id, name, isAvailable }: { id: string; name: string; 
     >
       <span className="flex flex-col">
         <span className="font-semibold">{name}</span>
-        <span className="text-sm text-muted-foreground">{isAvailable ? 'Available on the floor' : 'Out of service'}</span>
+        <span className="text-sm text-muted-foreground">
+          {isAvailable ? 'Available on the floor' : 'Out of service'}
+        </span>
       </span>
       <Switch
         id={`equipment-${id}`}
@@ -98,14 +102,23 @@ function CreateEquipmentForm() {
         <CardDescription>Switching an item off makes exercises that rely only on it unavailable.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form noValidate className="flex flex-col gap-4" onSubmit={form.handleSubmit((values) => create.mutate(values))}>
+        <form
+          noValidate
+          className="flex flex-col gap-4"
+          onSubmit={form.handleSubmit((values) => create.mutate(values))}
+        >
           <Controller
             name="name"
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="equipment-name">Name</FieldLabel>
-                <Input {...field} id="equipment-name" placeholder="e.g. Battle ropes" aria-invalid={fieldState.invalid} />
+                <Input
+                  {...field}
+                  id="equipment-name"
+                  placeholder="e.g. Battle ropes"
+                  aria-invalid={fieldState.invalid}
+                />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}
@@ -126,7 +139,7 @@ function EquipmentSectionRoot() {
   const canManage = ability.can('manage', 'Catalog');
   const query = useQuery(trpc.catalog.listEquipment.queryOptions());
 
-  let list;
+  let list: ReactNode;
   if (query.isPending) {
     list = (
       <Deferred>
@@ -134,7 +147,13 @@ function EquipmentSectionRoot() {
       </Deferred>
     );
   } else if (query.isError) {
-    list = <QueryError title="We couldn't load the equipment" onRetry={() => query.refetch()} isRetrying={query.isRefetching} />;
+    list = (
+      <QueryError
+        title="We couldn't load the equipment"
+        onRetry={() => query.refetch()}
+        isRetrying={query.isRefetching}
+      />
+    );
   } else if (query.data.length === 0) {
     list = (
       <div className="rounded-lg border bg-card">
@@ -152,7 +171,9 @@ function EquipmentSectionRoot() {
           ) : (
             <li key={item.id} className="flex min-h-15 items-center justify-between gap-4 px-5 sm:px-6">
               <span className="font-semibold">{item.name}</span>
-              <Badge variant={item.isAvailable ? 'live' : 'unavailable'}>{item.isAvailable ? 'Available' : 'Unavailable'}</Badge>
+              <Badge variant={item.isAvailable ? 'live' : 'unavailable'}>
+                {item.isAvailable ? 'Available' : 'Unavailable'}
+              </Badge>
             </li>
           ),
         )}

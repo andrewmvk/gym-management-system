@@ -45,8 +45,16 @@ export function ConsentStep({ userId, onConsented }: ConsentStepProps) {
         reference photo of you. This template is sensitive personal data under Brazil&apos;s LGPD and is used only to
         verify your identity at check-in. The photo itself never leaves our server.
       </div>
-      <label className="flex items-start gap-3 rounded-md border px-4 py-3.5 text-sm transition-colors hover:bg-muted/60 has-data-checked:border-primary/50 has-data-checked:bg-accent/50">
-        <Checkbox checked={agreed} onCheckedChange={(checked) => setAgreed(checked === true)} className="mt-px" />
+      <label
+        htmlFor="biometric-consent"
+        className="flex items-start gap-3 rounded-md border px-4 py-3.5 text-sm transition-colors hover:bg-muted/60 has-data-checked:border-primary/50 has-data-checked:bg-accent/50"
+      >
+        <Checkbox
+          id="biometric-consent"
+          checked={agreed}
+          onCheckedChange={(checked) => setAgreed(checked === true)}
+          className="mt-px"
+        />
         <span>I consent to Cadence processing my facial biometric data for check-in identification.</span>
       </label>
       <Button

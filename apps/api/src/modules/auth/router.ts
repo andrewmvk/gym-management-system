@@ -1,8 +1,8 @@
+import { activateMember, loadSession, verifyCredentials } from '@api/modules/auth/service';
+import { clearSessionCookie, setSessionCookie } from '@api/modules/auth/session';
+import { publicProcedure, router } from '@api/trpc/procedures';
 import { LoginInputSchema, SetPasswordInputSchema } from '@cadence/shared/schemas/auth';
 import { TRPCError } from '@trpc/server';
-import { clearSessionCookie, setSessionCookie } from '@api/modules/auth/session';
-import { activateMember, loadSession, verifyCredentials } from '@api/modules/auth/service';
-import { publicProcedure, router } from '@api/trpc/procedures';
 
 export const authRouter = router({
   login: publicProcedure.input(LoginInputSchema).mutation(async ({ ctx, input }) => {

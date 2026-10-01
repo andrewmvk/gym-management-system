@@ -1,6 +1,6 @@
 'use client';
 
-import { use, type ReactNode } from 'react';
+import { type ReactNode, use } from 'react';
 import { SessionReadyContext } from '@/components/auth-guard';
 import { Deferred } from '@/components/deferred';
 

@@ -12,7 +12,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc';
 
 const TITLE = 'Overview';
-const DESCRIPTION = 'Plans publish on their own. This is where you look over them, and everything else the gym runs on.';
+const DESCRIPTION =
+  'Plans publish on their own. This is where you look over them, and everything else the gym runs on.';
 
 interface BoardRowProps {
   href: string;
@@ -113,6 +114,7 @@ function StaffHomeSkeleton() {
       <PageHeading title={TITLE} description={DESCRIPTION} />
       <ul className="divide-y overflow-hidden rounded-lg border bg-card">
         {Array.from({ length: 3 }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
           <li key={index} className="flex items-center gap-4 px-5 py-5 sm:gap-6 sm:px-6">
             <span className="flex w-16 justify-end sm:w-20">
               <Skeleton className="h-12 w-12 sm:h-15" />

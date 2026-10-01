@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { isExerciseAvailable } from '@api/modules/catalog/service';
+import { describe, expect, it } from 'vitest';
 
 describe('isExerciseAvailable (RN-04)', () => {
   it('is available when no equipment is linked', () => {

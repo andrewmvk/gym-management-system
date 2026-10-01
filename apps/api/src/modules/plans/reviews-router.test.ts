@@ -1,6 +1,3 @@
-import { MEMBER_POLICY_IDS, TRAINER_POLICY_IDS } from '@cadence/shared/auth';
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dUsers, fPlanReviews, fTrainingPlans, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
@@ -11,6 +8,9 @@ import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
+import { MEMBER_POLICY_IDS, TRAINER_POLICY_IDS } from '@cadence/shared/auth';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 async function callerFor(token?: string) {
   const req = { cookies: token ? { cadence_session: token } : {}, log: logger };
@@ -28,7 +28,10 @@ async function createMember(email = 'review-member@example.com') {
 }
 
 async function createTrainer(email: string) {
-  const [user] = await db.insert(dUsers).values({ email, name: `Trainer ${email}` }).returning();
+  const [user] = await db
+    .insert(dUsers)
+    .values({ email, name: `Trainer ${email}` })
+    .returning();
   await db
     .insert(fUserPolicyOnUser)
     .values(TRAINER_POLICY_IDS.map((policyId) => ({ userId: user!.id, policyId, effect: 'granted' as const })));
@@ -103,8 +106,12 @@ describe('reviews router', () => {
       const memberCaller = await callerFor(signSessionToken(member.id));
       const adminCaller = await callerFor(signSessionToken(await seededId(SEED_ADMIN_EMAIL)));
 
-      await expect(memberCaller.reviews.addNote({ planId: plan.id, note: 'hi' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
-      await expect(adminCaller.reviews.addNote({ planId: plan.id, note: 'hi' })).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(memberCaller.reviews.addNote({ planId: plan.id, note: 'hi' })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
+      await expect(adminCaller.reviews.addNote({ planId: plan.id, note: 'hi' })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
     });
 
     it('keeps notes from two different trainers, in order', async () => {
@@ -116,7 +123,11 @@ describe('reviews router', () => {
       await trainerOne.reviews.addNote({ planId: plan.id, note: 'Looks good overall.' });
       await trainerTwo.reviews.addNote({ planId: plan.id, note: 'Increase load next week.' });
 
-      const reviews = await db.select().from(fPlanReviews).where(eq(fPlanReviews.trainingPlanId, plan.id)).orderBy(fPlanReviews.createdAt);
+      const reviews = await db
+        .select()
+        .from(fPlanReviews)
+        .where(eq(fPlanReviews.trainingPlanId, plan.id))
+        .orderBy(fPlanReviews.createdAt);
       expect(reviews.map((r) => r.note)).toEqual(['Looks good overall.', 'Increase load next week.']);
     });
   });
@@ -150,7 +161,10 @@ describe('reviews router', () => {
       const catalog = (await caller.reviews.getPlan({ planId: plan.id })).catalog;
       const availableExercise = catalog.find((e) => e.isAvailable)!;
 
-      await caller.reviews.editPlan({ planId: plan.id, exercises: [{ exerciseId: availableExercise.id, sets: 3, reps: 12 }] });
+      await caller.reviews.editPlan({
+        planId: plan.id,
+        exercises: [{ exerciseId: availableExercise.id, sets: 3, reps: 12 }],
+      });
 
       const [review] = await db.select().from(fPlanReviews).where(eq(fPlanReviews.trainingPlanId, plan.id));
       expect(review?.note).toBeTruthy();
@@ -164,7 +178,10 @@ describe('reviews router', () => {
       const trainerCaller = await callerFor(signSessionToken(trainerId));
       const catalog = (await trainerCaller.reviews.getPlan({ planId: plan.id })).catalog;
       const availableExercise = catalog.find((e) => e.isAvailable)!;
-      await trainerCaller.reviews.editPlan({ planId: plan.id, exercises: [{ exerciseId: availableExercise.id, sets: 4, reps: 8 }] });
+      await trainerCaller.reviews.editPlan({
+        planId: plan.id,
+        exercises: [{ exerciseId: availableExercise.id, sets: 4, reps: 8 }],
+      });
 
       const blocked = await generateForDate(member.id, '2026-10-01', false, { generator: 'placeholder' });
       expect(blocked).toMatchObject({ status: 'needs_confirmation' });

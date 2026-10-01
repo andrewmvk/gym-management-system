@@ -1,7 +1,7 @@
 'use client';
 
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDays, isSameDay, startOfMonth, toIsoDate } from '@/lib/calendar-date';
@@ -75,11 +75,12 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
     const next = clamp(step(focused), min, max);
     shouldMoveFocus.current = true;
     setFocused(next);
-    if (next.getMonth() !== month.getMonth() || next.getFullYear() !== month.getFullYear()) setMonth(startOfMonth(next));
+    if (next.getMonth() !== month.getMonth() || next.getFullYear() !== month.getFullYear())
+      setMonth(startOfMonth(next));
   }
 
-  const firstYear = fromYear ?? (min?.getFullYear() ?? today.getFullYear() - 100);
-  const lastYear = toYear ?? (max?.getFullYear() ?? today.getFullYear() + 5);
+  const firstYear = fromYear ?? min?.getFullYear() ?? today.getFullYear() - 100;
+  const lastYear = toYear ?? max?.getFullYear() ?? today.getFullYear() + 5;
   const years = Array.from({ length: lastYear - firstYear + 1 }, (_, index) => lastYear - index);
   const previousMonth = new Date(month.getFullYear(), month.getMonth() - 1, 1);
   const nextMonth = new Date(month.getFullYear(), month.getMonth() + 1, 1);
@@ -104,6 +105,7 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
               </SelectTrigger>
               <SelectContent>
                 {Array.from({ length: 12 }, (_, index) => (
+                  // biome-ignore lint/suspicious/noArrayIndexKey: the index is the month number, a fixed 12-item list.
                   <SelectItem key={index} value={String(index)}>
                     {new Date(2023, index, 1).toLocaleDateString(undefined, { month: 'short' })}
                   </SelectItem>
@@ -159,7 +161,12 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
               data-date={toIsoDate(date)}
               aria-selected={isSelected}
               aria-current={isToday ? 'date' : undefined}
-              aria-label={date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+              aria-label={date.toLocaleDateString(undefined, {
+                weekday: 'long',
+                day: 'numeric',
+                month: 'long',
+                year: 'numeric',
+              })}
               tabIndex={isSameDay(date, focused) ? 0 : -1}
               disabled={isDisabled(date)}
               onClick={() => onSelect(date)}
@@ -167,7 +174,9 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
                 'numerals relative flex size-10 items-center justify-center rounded-sm text-base font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30',
                 isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
                 isOutside && !isSelected && 'text-muted-foreground/60',
-                isToday && !isSelected && 'text-primary after:absolute after:bottom-1.5 after:h-0.5 after:w-3 after:rounded-full after:bg-current',
+                isToday &&
+                  !isSelected &&
+                  'text-primary after:absolute after:bottom-1.5 after:h-0.5 after:w-3 after:rounded-full after:bg-current',
               )}
             >
               {date.getDate()}

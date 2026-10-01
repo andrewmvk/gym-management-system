@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarCheckIcon, MessageCircleIcon, SendHorizontalIcon, XIcon } from 'lucide-react';
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react';
+import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAppAbility } from '@/abilities';
 import {
@@ -26,6 +26,7 @@ interface PlanAdjustment {
 }
 
 interface ChatMessage {
+  id: string;
   role: 'member' | 'assistant';
   text: string;
   adjustment?: PlanAdjustment;
@@ -35,7 +36,7 @@ interface PendingConfirmation extends PlanAdjustment {
   editedBy: string;
 }
 
-const PROMPTS = ['My left knee hurts today', "I only have 30 minutes", 'I started a new medication'];
+const PROMPTS = ['My left knee hurts today', 'I only have 30 minutes', 'I started a new medication'];
 
 // FR-25/FR-26: messages live only in this component's state - no persisted thread, so a reload forgets
 // them. Durability lives entirely in the facts chat.send extracts server-side.
@@ -55,7 +56,7 @@ export function ChatPanel() {
       onSuccess: (result) =>
         setMessages((current) => [
           ...current,
-          { role: 'assistant', text: result.reply, adjustment: result.adjustment },
+          { id: crypto.randomUUID(), role: 'assistant', text: result.reply, adjustment: result.adjustment },
         ]),
       onError: () => toast.error("We couldn't get a reply. Try again."),
     }),
@@ -70,7 +71,11 @@ export function ChatPanel() {
     trpc.chat.adjustPlan.mutationOptions({
       onSuccess: (result, variables) => {
         if (result.status === 'needs_confirmation') {
-          setPendingConfirmation({ date: variables.date, instruction: variables.instruction, editedBy: result.editedBy });
+          setPendingConfirmation({
+            date: variables.date,
+            instruction: variables.instruction,
+            editedBy: result.editedBy,
+          });
           return;
         }
         invalidatePlanQueries();
@@ -80,6 +85,7 @@ export function ChatPanel() {
     }),
   );
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: messages and send.isPending are the triggers, not values read inside.
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, send.isPending]);
@@ -93,7 +99,7 @@ export function ChatPanel() {
   function sendMessage(text: string) {
     const message = text.trim();
     if (!message || send.isPending) return;
-    setMessages((current) => [...current, { role: 'member', text: message }]);
+    setMessages((current) => [...current, { id: crypto.randomUUID(), role: 'member', text: message }]);
     setDraft('');
     send.mutate({ message });
   }
@@ -113,7 +119,11 @@ export function ChatPanel() {
 
   function handleConfirm() {
     if (!pendingConfirmation) return;
-    adjustPlan.mutate({ date: pendingConfirmation.date, instruction: pendingConfirmation.instruction, confirmOverwrite: true });
+    adjustPlan.mutate({
+      date: pendingConfirmation.date,
+      instruction: pendingConfirmation.instruction,
+      confirmOverwrite: true,
+    });
     setPendingConfirmation(null);
   }
 
@@ -127,7 +137,9 @@ export function ChatPanel() {
           <div className="flex items-start gap-3 bg-kit px-5 pt-4 pb-3 text-kit-foreground">
             <div className="flex-1">
               <p className="font-display text-xl font-bold tracking-wide uppercase">AI coach</p>
-              <p className="text-xs text-kit-muted">What you share here is remembered for future plans. The chat itself isn&apos;t saved.</p>
+              <p className="text-xs text-kit-muted">
+                What you share here is remembered for future plans. The chat itself isn&apos;t saved.
+              </p>
             </div>
             <Button
               type="button"
@@ -144,7 +156,9 @@ export function ChatPanel() {
           <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" aria-live="polite">
             {messages.length === 0 && (
               <div className="flex flex-col gap-3 py-2">
-                <p className="text-sm text-muted-foreground">Ask about your plan, report an injury, or share an update.</p>
+                <p className="text-sm text-muted-foreground">
+                  Ask about your plan, report an injury, or share an update.
+                </p>
                 <div className="flex flex-wrap gap-2">
                   {PROMPTS.map((prompt) => (
                     <button
@@ -159,9 +173,9 @@ export function ChatPanel() {
                 </div>
               </div>
             )}
-            {messages.map((message, index) => (
+            {messages.map((message) => (
               <div
-                key={index}
+                key={message.id}
                 className={cn(
                   'flex max-w-5/6 flex-col gap-2 rounded-lg px-3.5 py-2.5 text-sm text-pretty whitespace-pre-wrap',
                   message.role === 'member'
@@ -186,7 +200,11 @@ export function ChatPanel() {
               </div>
             ))}
             {send.isPending && (
-              <div className="flex items-center gap-1 self-start rounded-lg rounded-bl-sm bg-muted px-3.5 py-3" aria-label="Coach is typing">
+              <div
+                role="status"
+                className="flex items-center gap-1 self-start rounded-lg rounded-bl-sm bg-muted px-3.5 py-3"
+                aria-label="Coach is typing"
+              >
                 {[0, 1, 2].map((dot) => (
                   <span
                     key={dot}
@@ -232,7 +250,10 @@ export function ChatPanel() {
         {open ? 'Close' : 'Coach'}
       </Button>
 
-      <AlertDialog open={pendingConfirmation !== null} onOpenChange={(isOpen) => !isOpen && setPendingConfirmation(null)}>
+      <AlertDialog
+        open={pendingConfirmation !== null}
+        onOpenChange={(isOpen) => !isOpen && setPendingConfirmation(null)}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>A trainer already adjusted this plan</AlertDialogTitle>

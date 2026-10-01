@@ -4,9 +4,6 @@ import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { MEMBER_POLICY_IDS } from '@cadence/shared/auth';
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { createApp } from '@api/app';
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
@@ -14,6 +11,9 @@ import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
 import { SESSION_COOKIE, signSessionToken } from '@api/modules/auth/session';
 import { resetTestDatabase } from '@api/test/database';
+import { MEMBER_POLICY_IDS } from '@cadence/shared/auth';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0]);
 

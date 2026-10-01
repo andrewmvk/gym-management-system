@@ -16,5 +16,5 @@ export function loginPathFor(returnTo: string) {
 
 // Only same-app paths are accepted, so a crafted ?next= can't send the user to another site.
 export function safeReturnPath(next: string | null): string | null {
-  return next && next.startsWith('/') && !next.startsWith('//') ? next : null;
+  return next?.startsWith('/') && !next.startsWith('//') ? next : null;
 }

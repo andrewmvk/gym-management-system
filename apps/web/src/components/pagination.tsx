@@ -19,7 +19,15 @@ function pageWindow(page: number, pageCount: number): (number | 'gap')[] {
   return sorted.flatMap((p, index) => (index > 0 && p - sorted[index - 1]! > 1 ? ['gap' as const, p] : [p]));
 }
 
-export function Pagination({ page, pageCount, pageSize, total, onPageChange, noun = 'items', className }: PaginationProps) {
+export function Pagination({
+  page,
+  pageCount,
+  pageSize,
+  total,
+  onPageChange,
+  noun = 'items',
+  className,
+}: PaginationProps) {
   if (total === 0) return null;
   const first = (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, total);
@@ -48,6 +56,7 @@ export function Pagination({ page, pageCount, pageSize, total, onPageChange, nou
           </Button>
           {pageWindow(page, pageCount).map((item, index) =>
             item === 'gap' ? (
+              // biome-ignore lint/suspicious/noArrayIndexKey: gaps have no identity, the window is recomputed on every render.
               <span key={`gap-${index}`} className="px-1 text-muted-foreground" aria-hidden>
                 ...
               </span>

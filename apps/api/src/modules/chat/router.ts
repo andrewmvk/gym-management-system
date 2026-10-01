@@ -1,8 +1,8 @@
+import * as service from '@api/modules/chat/service';
+import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 import { subject } from '@cadence/shared/auth';
 import { ChatSendInputSchema } from '@cadence/shared/schemas/profile-events';
 import { z } from 'zod';
-import * as service from '@api/modules/chat/service';
-import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 
 const AdjustPlanInputSchema = z.object({
   date: z.iso.date(),

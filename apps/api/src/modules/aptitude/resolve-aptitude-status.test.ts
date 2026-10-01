@@ -1,10 +1,10 @@
-import { describe, expect, it } from 'vitest';
 import {
-  resolveAptitudeStatus,
   type AdminResult,
   type AptitudeStatus,
+  resolveAptitudeStatus,
   type Verdict,
 } from '@api/modules/aptitude/resolve-aptitude-status';
+import { describe, expect, it } from 'vitest';
 
 const VERDICTS: (Verdict | null)[] = ['cleared', 'not_cleared', 'pending_retry', null];
 const ADMIN_RESULTS: (AdminResult | null)[] = ['cleared', 'not_cleared', null];
@@ -14,7 +14,9 @@ describe('resolveAptitudeStatus', () => {
     for (const questionnaireResult of VERDICTS) {
       for (const certificateResult of VERDICTS) {
         for (const adminResult of ADMIN_RESULTS) {
-          expect(resolveAptitudeStatus({ questionnaireResult, certificateResult, adminResult, hasPassword: true })).toBeNull();
+          expect(
+            resolveAptitudeStatus({ questionnaireResult, certificateResult, adminResult, hasPassword: true }),
+          ).toBeNull();
         }
       }
     }
@@ -54,7 +56,12 @@ describe('resolveAptitudeStatus', () => {
     for (const questionnaireResult of ['not_cleared', 'pending_retry', null] as const) {
       for (const certificateResult of VERDICTS) {
         expect(
-          resolveAptitudeStatus({ questionnaireResult, certificateResult, adminResult: 'not_cleared', hasPassword: false }),
+          resolveAptitudeStatus({
+            questionnaireResult,
+            certificateResult,
+            adminResult: 'not_cleared',
+            hasPassword: false,
+          }),
         ).toBe<AptitudeStatus>('rejected');
       }
     }

@@ -13,9 +13,7 @@ export function Brand({ className }: { className?: string }) {
   return (
     <span className={cn('inline-flex items-center gap-2', className)}>
       <BrandMark />
-      <span className="font-display text-2xl leading-none font-extrabold tracking-wider uppercase italic">
-        Cadence
-      </span>
+      <span className="font-display text-2xl leading-none font-extrabold tracking-wider uppercase italic">Cadence</span>
     </span>
   );
 }

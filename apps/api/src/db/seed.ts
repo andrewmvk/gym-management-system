@@ -1,15 +1,10 @@
-import {
-  ADMIN_POLICY_IDS,
-  POLICY_CATALOG,
-  TRAINER_POLICY_IDS,
-  type PolicyId,
-} from '@cadence/shared/auth';
-import bcrypt from 'bcryptjs';
-import { eq, sql } from 'drizzle-orm';
 import { env } from '@api/config/env';
-import { db as defaultDb, type Database, type Transaction } from '@api/db/client';
+import { type Database, db as defaultDb, type Transaction } from '@api/db/client';
 import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import { seedCatalog } from '@api/db/seed-data/catalog';
+import { ADMIN_POLICY_IDS, POLICY_CATALOG, type PolicyId, TRAINER_POLICY_IDS } from '@cadence/shared/auth';
+import bcrypt from 'bcryptjs';
+import { eq, sql } from 'drizzle-orm';
 
 export const SEED_TRAINER_EMAIL = 'trainer@example.com';
 export const SEED_ADMIN_EMAIL = 'admin@example.com';

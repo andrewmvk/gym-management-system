@@ -1,6 +1,6 @@
+import { dUsers } from '@api/db/schema/users';
 import type { ExamAttachmentPaths, Medications, PhysicalConditions } from '@cadence/shared/schemas/onboarding';
 import { jsonb, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { dUsers } from '@api/db/schema/users';
 
 // Append-friendly (FR-14): a member may add more onboarding info over time, so a new submission is
 // always a new row, never an update to a previous one.

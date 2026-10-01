@@ -1,9 +1,9 @@
-import type { OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
 import { todayLocal } from '@api/lib/dates';
 import { logger } from '@api/lib/logger';
 import { saveUpload } from '@api/lib/uploads';
 import * as repository from '@api/modules/onboarding/repository';
 import { generateForDate } from '@api/modules/plans/service';
+import type { OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
 
 const log = logger.child({ module: 'onboarding' });
 
@@ -18,7 +18,13 @@ export async function submit(userId: string, input: OnboardingSubmitInput) {
   const attachments = input.attachments ?? [];
   const saved = await Promise.all(
     attachments.map((attachment) =>
-      saveUpload({ ownerId: userId, kind: 'exam', filename: attachment.filename, mimeType: attachment.mimeType, base64: attachment.base64 }),
+      saveUpload({
+        ownerId: userId,
+        kind: 'exam',
+        filename: attachment.filename,
+        mimeType: attachment.mimeType,
+        base64: attachment.base64,
+      }),
     ),
   );
 

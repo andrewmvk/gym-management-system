@@ -1,7 +1,7 @@
+import { env } from '@api/config/env';
 import type { CookieOptions, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
-import { env } from '@api/config/env';
 
 export const SESSION_COOKIE = 'cadence_session';
 const SESSION_LIFETIME_SECONDS = 7 * 24 * 60 * 60;

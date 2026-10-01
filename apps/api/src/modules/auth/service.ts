@@ -1,7 +1,3 @@
-import { buildAbilityRules, defineAbilityFor, MEMBER_POLICY_IDS, type AbilityRule, type AppAbility } from '@cadence/shared/auth';
-import type { SetPasswordInput } from '@cadence/shared/schemas/auth';
-import { TRPCError } from '@trpc/server';
-import bcrypt from 'bcryptjs';
 import { db } from '@api/db/client';
 import type { User } from '@api/db/schema';
 import { onMemberActivated } from '@api/modules/auth/member-activated';
@@ -12,6 +8,16 @@ import {
   findUserById,
   grantPolicies,
 } from '@api/modules/auth/repository';
+import {
+  type AbilityRule,
+  type AppAbility,
+  buildAbilityRules,
+  defineAbilityFor,
+  MEMBER_POLICY_IDS,
+} from '@cadence/shared/auth';
+import type { SetPasswordInput } from '@cadence/shared/schemas/auth';
+import { TRPCError } from '@trpc/server';
+import bcrypt from 'bcryptjs';
 
 // Compared against when the e-mail is unknown, so both failure paths spend the same bcrypt time.
 const DUMMY_PASSWORD_HASH = bcrypt.hashSync('cadence-timing-equalizer', 10);
@@ -63,7 +69,7 @@ export async function loadSession(userId: string, now = new Date()): Promise<Ses
 // unlike pending_retry (P-08), there is no legitimate retry path for any of these.
 export async function activateMember(input: SetPasswordInput): Promise<User> {
   const applicant = await findUserById(input.userId);
-  if (!applicant || applicant.aptitudeStatus !== 'cleared') {
+  if (applicant?.aptitudeStatus !== 'cleared') {
     throw new TRPCError({ code: 'FORBIDDEN', message: 'This account cannot be activated yet.' });
   }
   if (applicant.passwordHash) {
@@ -73,7 +79,11 @@ export async function activateMember(input: SetPasswordInput): Promise<User> {
   const passwordHash = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
 
   const user = await db.transaction(async (tx) => {
-    const activated = await activateMemberRow(input.userId, { passwordHash, membershipPlan: DEFAULT_MEMBERSHIP_PLAN }, tx);
+    const activated = await activateMemberRow(
+      input.userId,
+      { passwordHash, membershipPlan: DEFAULT_MEMBERSHIP_PLAN },
+      tx,
+    );
     await grantPolicies(input.userId, MEMBER_POLICY_IDS, tx);
     return activated;
   });

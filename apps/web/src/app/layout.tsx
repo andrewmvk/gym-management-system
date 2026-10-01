@@ -30,8 +30,13 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
-    <html lang="en" className={`${barlow.variable} ${barlowCondensed.variable} h-full antialiased`} suppressHydrationWarning>
+    <html
+      lang="en"
+      className={`${barlow.variable} ${barlowCondensed.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
       <head>
+        {/* biome-ignore lint/security/noDangerouslySetInnerHtml: constant theme init script, no user input; must run before first paint. */}
         <script dangerouslySetInnerHTML={{ __html: THEME_INIT_SCRIPT }} />
       </head>
       <body className="flex min-h-full flex-col">

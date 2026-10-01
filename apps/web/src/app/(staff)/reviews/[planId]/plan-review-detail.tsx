@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquareIcon, PencilLineIcon, PlusIcon, Trash2Icon } from 'lucide-react';
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { Deferred } from '@/components/deferred';
 import { GuardedContent } from '@/components/guarded-content';
@@ -22,6 +22,8 @@ import { formatDateTime, formatPlanDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 
 interface EditableExercise {
+  // Client-only row identity: the same exercise can appear twice, and rows get removed mid-list.
+  key: string;
   exerciseId: string;
   sets: number;
   reps: number;
@@ -61,6 +63,7 @@ function DetailSkeleton() {
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {Array.from({ length: 4 }, (_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
               <Skeleton key={index} className="h-10 w-full" />
             ))}
           </CardContent>
@@ -97,7 +100,13 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
   useEffect(() => {
     if (planQuery.data && exercises === null) {
       setExercises(
-        planQuery.data.exercises.map((e) => ({ exerciseId: e.exerciseId, sets: e.sets, reps: e.reps, load: e.load ?? '' })),
+        planQuery.data.exercises.map((e) => ({
+          key: crypto.randomUUID(),
+          exerciseId: e.exerciseId,
+          sets: e.sets,
+          reps: e.reps,
+          load: e.load ?? '',
+        })),
       );
     }
   }, [planQuery.data, exercises]);
@@ -127,7 +136,9 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
   );
 
   function updateExercise(index: number, patch: Partial<EditableExercise>) {
-    setExercises((current) => current?.map((exercise, i) => (i === index ? { ...exercise, ...patch } : exercise)) ?? current);
+    setExercises(
+      (current) => current?.map((exercise, i) => (i === index ? { ...exercise, ...patch } : exercise)) ?? current,
+    );
   }
 
   function removeExercise(index: number) {
@@ -136,7 +147,10 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
 
   function addExercise() {
     if (!selectedExerciseId) return;
-    setExercises((current) => [...(current ?? []), { exerciseId: selectedExerciseId, sets: 3, reps: 10, load: '' }]);
+    setExercises((current) => [
+      ...(current ?? []),
+      { key: crypto.randomUUID(), exerciseId: selectedExerciseId, sets: 3, reps: 10, load: '' },
+    ]);
     setSelectedExerciseId('');
   }
 
@@ -152,7 +166,11 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
     content = (
       <PageContainer>
         <PageHeading title="Plan review" back={BACK} />
-        <QueryError title="We couldn't load this plan" onRetry={() => planQuery.refetch()} isRetrying={planQuery.isRefetching} />
+        <QueryError
+          title="We couldn't load this plan"
+          onRetry={() => planQuery.refetch()}
+          isRetrying={planQuery.isRefetching}
+        />
       </PageContainer>
     );
   } else {
@@ -167,7 +185,10 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
             description={
               <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
                 <span>
-                  Plan for <span className="font-semibold text-foreground">{formatPlanDate(plan.planDate, { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+                  Plan for{' '}
+                  <span className="font-semibold text-foreground">
+                    {formatPlanDate(plan.planDate, { weekday: 'long', day: 'numeric', month: 'long' })}
+                  </span>
                 </span>
                 <span className="text-muted-foreground">{plan.memberEmail}</span>
               </span>
@@ -182,7 +203,9 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
               <CardDescription>Changes publish to the member as soon as you save.</CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col py-2">
-              <div className={`${ROW_GRID} border-b py-2 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase sm:border-b-0`}>
+              <div
+                className={`${ROW_GRID} border-b py-2 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase sm:border-b-0`}
+              >
                 <span className={`${CELL.name} hidden sm:block`}>Exercise</span>
                 <span className={CELL.count}>Sets</span>
                 <span className={CELL.count}>Reps</span>
@@ -192,7 +215,7 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
               {exercises?.map((exercise, index) => {
                 const details = catalog.find((c) => c.id === exercise.exerciseId);
                 return (
-                  <div key={index} className={`${ROW_GRID} border-b py-3 last:border-b-0`}>
+                  <div key={exercise.key} className={`${ROW_GRID} border-b py-3 last:border-b-0`}>
                     <span className={`${CELL.name} flex min-w-0 items-center gap-2 font-semibold`}>
                       <span className="numerals text-lg text-muted-foreground">{index + 1}</span>
                       <span className="truncate">{details?.name ?? 'Unknown exercise'}</span>
@@ -274,7 +297,12 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
                   exercises &&
                   editPlan.mutate({
                     planId,
-                    exercises: exercises.map((e) => ({ ...e, load: e.load.trim() || undefined })),
+                    exercises: exercises.map(({ exerciseId, sets, reps, load }) => ({
+                      exerciseId,
+                      sets,
+                      reps,
+                      load: load.trim() || undefined,
+                    })),
                     note: editNote.trim() || undefined,
                   })
                 }
@@ -296,7 +324,11 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
                 {reviews.map((review) => (
                   <li key={review.id} className="flex gap-3 border-b py-4 last:border-b-0">
                     <span className="mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-sm bg-muted text-muted-foreground">
-                      {review.isEdit ? <PencilLineIcon className="size-3.5" /> : <MessageSquareIcon className="size-3.5" />}
+                      {review.isEdit ? (
+                        <PencilLineIcon className="size-3.5" />
+                      ) : (
+                        <MessageSquareIcon className="size-3.5" />
+                      )}
                     </span>
                     <div className="flex min-w-0 flex-col gap-1">
                       <p className="flex flex-wrap items-center gap-x-2 text-sm">

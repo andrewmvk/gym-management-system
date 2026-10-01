@@ -1,5 +1,5 @@
 import { env } from '@api/config/env';
-import { logger, type Logger } from '@api/lib/logger';
+import { type Logger, logger } from '@api/lib/logger';
 
 const RESEND_EMAILS_URL = 'https://api.resend.com/emails';
 const EMAIL_REQUEST_TIMEOUT_MS = 10_000;

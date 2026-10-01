@@ -1,6 +1,6 @@
+import type { Context } from '@api/trpc/context';
 import type { Action, AppAbility, AppSubject } from '@cadence/shared/auth';
 import { initTRPC, TRPCError } from '@trpc/server';
-import type { Context } from '@api/trpc/context';
 
 const t = initTRPC.context<Context>().create();
 

@@ -1,8 +1,8 @@
-import type { CertificateReviewInput, CertificateUploadInput } from '@cadence/shared/schemas/certificates';
 import { saveUpload } from '@api/lib/uploads';
-import { AiVerdictSchema, runStructured, type AiResult, type AiVerdict } from '@api/modules/ai';
+import { type AiResult, type AiVerdict, AiVerdictSchema, runStructured } from '@api/modules/ai';
 import * as repository from '@api/modules/aptitude/repository';
-import { resolveAptitudeStatus, type AdminResult } from '@api/modules/aptitude/resolve-aptitude-status';
+import { type AdminResult, resolveAptitudeStatus } from '@api/modules/aptitude/resolve-aptitude-status';
+import type { CertificateReviewInput, CertificateUploadInput } from '@cadence/shared/schemas/certificates';
 
 // FR-2 of this prompt's own review (see prompts/P-10, "the AI can't see the image" caveat): the AI
 // module only carries text, so this reviewer is only ever given the file's name and type, never its
@@ -40,7 +40,7 @@ export async function uploadCertificate(
   evaluateCertificate: EvaluateCertificate = defaultEvaluateCertificate,
 ): Promise<UploadCertificateResult> {
   const user = await repository.findById(input.userId);
-  if (!user || user.aptitudeStatus !== 'pending') return { status: 'unavailable' };
+  if (user?.aptitudeStatus !== 'pending') return { status: 'unavailable' };
 
   const questionnaire = await repository.findQuestionnaireByUserId(input.userId);
   if (!questionnaire || questionnaire.aiResult === 'cleared') return { status: 'unavailable' };
@@ -55,7 +55,9 @@ export async function uploadCertificate(
 
   const evaluation = await evaluateCertificate(input.filename, input.mimeType);
   const aiResult = evaluation.ok ? evaluation.data.verdict : 'pending_retry';
-  const aiNotes = evaluation.ok ? evaluation.data.notes : 'AI evaluation unavailable; an admin will review this certificate.';
+  const aiNotes = evaluation.ok
+    ? evaluation.data.notes
+    : 'AI evaluation unavailable; an admin will review this certificate.';
 
   await repository.insertCertificate({ userId: input.userId, filePath: saved.path, aiResult, aiNotes });
   return { status: 'ok' };
@@ -79,7 +81,11 @@ export async function listQueue(): Promise<CertificateQueueEntry[]> {
 }
 
 export type ReviewCertificateResult =
-  | { status: 'ok'; certificate: Awaited<ReturnType<typeof repository.reviewCertificate>>; aptitudeStatus: 'pending' | 'cleared' | 'rejected' | null }
+  | {
+      status: 'ok';
+      certificate: Awaited<ReturnType<typeof repository.reviewCertificate>>;
+      aptitudeStatus: 'pending' | 'cleared' | 'rejected' | null;
+    }
   | { status: 'not_found' }
   | { status: 'no_decision_to_confirm' };
 

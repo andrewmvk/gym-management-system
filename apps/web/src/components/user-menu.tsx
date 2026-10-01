@@ -67,7 +67,12 @@ function UserMenuRoot({ area }: { area: AppArea }) {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem variant="destructive" disabled={logout.isPending} className="cursor-pointer" onSelect={() => logout.mutate()}>
+        <DropdownMenuItem
+          variant="destructive"
+          disabled={logout.isPending}
+          className="cursor-pointer"
+          onSelect={() => logout.mutate()}
+        >
           <LogOutIcon className="text-destructive" />
           {logout.isPending ? 'Signing out...' : 'Sign out'}
         </DropdownMenuItem>

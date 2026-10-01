@@ -42,6 +42,7 @@ function CertificateQueueSkeleton() {
       <Skeleton className="h-10 w-full sm:w-96" />
       <ul className="divide-y overflow-hidden rounded-lg border bg-card">
         {Array.from({ length: 3 }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
           <CertificateRowSkeleton key={index} />
         ))}
       </ul>
@@ -61,7 +62,8 @@ function CertificateQueueRoot() {
   const review = useMutation(
     trpc.certificates.review.mutationOptions({
       onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.certificates.listQueue.queryKey() }),
-      onError: (error) => toast.error(error.data?.code === 'BAD_REQUEST' ? error.message : "We couldn't save that decision. Try again."),
+      onError: (error) =>
+        toast.error(error.data?.code === 'BAD_REQUEST' ? error.message : "We couldn't save that decision. Try again."),
     }),
   );
 
@@ -94,7 +96,11 @@ function CertificateQueueRoot() {
 
   if (queueQuery.isError) {
     return (
-      <QueryError title="We couldn't load the queue" onRetry={() => queueQuery.refetch()} isRetrying={queueQuery.isRefetching} />
+      <QueryError
+        title="We couldn't load the queue"
+        onRetry={() => queueQuery.refetch()}
+        isRetrying={queueQuery.isRefetching}
+      />
     );
   }
 
@@ -120,7 +126,9 @@ function CertificateQueueRoot() {
           <EmptyState
             icon={FileCheck2Icon}
             title={filter === 'open' ? 'All caught up' : 'Nothing here'}
-            description={filter === 'open' ? 'Every certificate has an admin decision.' : 'No certificates match this filter.'}
+            description={
+              filter === 'open' ? 'Every certificate has an admin decision.' : 'No certificates match this filter.'
+            }
           />
         </div>
       ) : (
@@ -138,7 +146,11 @@ function CertificateQueueRoot() {
                   className="group relative size-28 shrink-0 overflow-hidden rounded-md border bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={fileUrl} alt={`Certificate from ${entry.applicantName}`} className="size-full object-cover" />
+                  <img
+                    src={fileUrl}
+                    alt={`Certificate from ${entry.applicantName}`}
+                    className="size-full object-cover"
+                  />
                   <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                     <ExternalLinkIcon className="size-5" />
                     <span className="sr-only">Open full size</span>
@@ -161,7 +173,9 @@ function CertificateQueueRoot() {
                         </Badge>
                       ))}
                   </div>
-                  {entry.aiNotes && <p className="max-w-prose text-sm text-pretty text-muted-foreground">{entry.aiNotes}</p>}
+                  {entry.aiNotes && (
+                    <p className="max-w-prose text-sm text-pretty text-muted-foreground">{entry.aiNotes}</p>
+                  )}
                   {!isReviewed && (
                     <div className="mt-1 flex flex-wrap gap-2">
                       <Button
@@ -169,7 +183,11 @@ function CertificateQueueRoot() {
                         variant="outline"
                         disabled={entry.aiResult === 'pending_retry' || isPending}
                         onClick={() => review.mutate({ certificateId: entry.id, result: 'confirm' })}
-                        title={entry.aiResult === 'pending_retry' ? "The AI couldn't evaluate this one, so there's nothing to confirm." : undefined}
+                        title={
+                          entry.aiResult === 'pending_retry'
+                            ? "The AI couldn't evaluate this one, so there's nothing to confirm."
+                            : undefined
+                        }
                       >
                         Confirm AI
                       </Button>

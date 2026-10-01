@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { env } from '@api/config/env';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import { env } from '@api/config/env';
 
 export const UPLOAD_KINDS = ['reference_photo', 'exam', 'certificate'] as const;
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
@@ -28,7 +28,11 @@ export const MIME_TYPE_BY_EXTENSION: Record<string, MimeType> = Object.fromEntri
 );
 
 // Files travel as base64 inside tRPC inputs, so only these procedures get the larger body limit (see app.ts).
-export const FILE_UPLOAD_PROCEDURES: readonly string[] = ['aptitude.savePhoto', 'certificates.upload', 'onboarding.submit'];
+export const FILE_UPLOAD_PROCEDURES: readonly string[] = [
+  'aptitude.savePhoto',
+  'certificates.upload',
+  'onboarding.submit',
+];
 // Room for several 5 MB exam attachments in one onboarding submission after the ~4/3 base64 overhead.
 export const FILE_REQUEST_MAX_BYTES = 32 * MB;
 export const DEFAULT_REQUEST_MAX_BYTES = 1 * MB;
@@ -86,11 +90,14 @@ export async function saveUpload(input: SaveUploadInput, uploadsDir = env.UPLOAD
 
   const mimeType = input.mimeType as MimeType;
   if (!rules.mimeTypes.includes(mimeType)) {
-    reject(`This file type is not allowed. Accepted: ${rules.mimeTypes.map((type) => FILE_TYPES[type].extension).join(', ')}`);
+    reject(
+      `This file type is not allowed. Accepted: ${rules.mimeTypes.map((type) => FILE_TYPES[type].extension).join(', ')}`,
+    );
   }
 
   const base64 = input.base64.replace(/^data:[^;]+;base64,/, '').replace(/\s/g, '');
-  if (base64.length === 0 || base64.length % 4 !== 0 || !BASE64_PATTERN.test(base64)) reject('The file is not valid base64');
+  if (base64.length === 0 || base64.length % 4 !== 0 || !BASE64_PATTERN.test(base64))
+    reject('The file is not valid base64');
   // Checked on the encoded length first so an oversized payload is never decoded into memory.
   if (Math.floor((base64.length * 3) / 4) > rules.maxBytes + 2) reject(`The file exceeds ${rules.maxBytes / MB} MB`);
 

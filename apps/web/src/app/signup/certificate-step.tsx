@@ -56,7 +56,11 @@ export function CertificateStep({ userId, onUploaded }: CertificateStepProps) {
       {file ? (
         <figure className="flex flex-col gap-2">
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={file.base64} alt="Certificate preview" className="max-h-72 w-full rounded-lg border bg-muted object-contain" />
+          <img
+            src={file.base64}
+            alt="Certificate preview"
+            className="max-h-72 w-full rounded-lg border bg-muted object-contain"
+          />
           <figcaption className="flex items-center justify-between gap-2 text-sm">
             <span className="truncate text-muted-foreground">{file.filename}</span>
             <Button variant="link" size="sm" onClick={() => setFile(null)} disabled={upload.isPending}>
@@ -76,7 +80,9 @@ export function CertificateStep({ userId, onUploaded }: CertificateStepProps) {
         size="lg"
         className="w-full"
         disabled={!file || upload.isPending}
-        onClick={() => file && upload.mutate({ userId, filename: file.filename, mimeType: file.mimeType, base64: file.base64 })}
+        onClick={() =>
+          file && upload.mutate({ userId, filename: file.filename, mimeType: file.mimeType, base64: file.base64 })
+        }
       >
         {upload.isPending ? 'Uploading...' : 'Upload certificate'}
       </Button>

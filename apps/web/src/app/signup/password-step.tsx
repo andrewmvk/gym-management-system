@@ -3,11 +3,11 @@
 import { SetPasswordInputSchema } from '@cadence/shared/schemas/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { BadgeCheckIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
-import { BadgeCheckIcon } from 'lucide-react';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
@@ -62,7 +62,9 @@ export function PasswordStep({ userId }: PasswordStepProps) {
       <div>
         <form
           noValidate
-          onSubmit={form.handleSubmit((values) => setPassword.mutate({ userId: values.userId, password: values.password }))}
+          onSubmit={form.handleSubmit((values) =>
+            setPassword.mutate({ userId: values.userId, password: values.password }),
+          )}
         >
           <FieldGroup>
             <Controller

@@ -1,11 +1,11 @@
-import { aptitudeRouter } from '@api/modules/aptitude/router';
 import { certificateRouter } from '@api/modules/aptitude/certificate-router';
+import { aptitudeRouter } from '@api/modules/aptitude/router';
 import { authRouter } from '@api/modules/auth/router';
 import { catalogRouter } from '@api/modules/catalog/router';
 import { chatRouter } from '@api/modules/chat/router';
 import { onboardingRouter } from '@api/modules/onboarding/router';
-import { plansRouter } from '@api/modules/plans/router';
 import { reviewsRouter } from '@api/modules/plans/reviews-router';
+import { plansRouter } from '@api/modules/plans/router';
 import { systemRouter } from '@api/modules/system/router';
 import { router } from '@api/trpc/procedures';
 

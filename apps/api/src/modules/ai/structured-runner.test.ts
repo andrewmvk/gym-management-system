@@ -1,9 +1,9 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
-import { z } from 'zod';
 import { AI_REQUEST_TIMEOUT_MS } from '@api/modules/ai/client';
 import type { MockSwitches } from '@api/modules/ai/mock-fixtures';
 import { createAiRunner } from '@api/modules/ai/structured-runner';
-import { AiVerdictSchema, type AiPurpose } from '@api/modules/ai/types';
+import { type AiPurpose, AiVerdictSchema } from '@api/modules/ai/types';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 const API_KEY = 'sk-or-test-secret-key';
 const MODEL = 'test/free-model';
@@ -139,19 +139,22 @@ describe('runStructured in mock mode', () => {
     return { fetchSpy, runner };
   }
 
-  it.each(['aptitude', 'certificate'] as const)('honors each %s switch without touching the network', async (purpose) => {
-    for (const verdict of ['cleared', 'not_cleared'] as const) {
-      const { fetchSpy, runner } = mockRunner({ [purpose]: verdict });
-      const result = await runner.runStructured({ purpose, system: '', user: '', schema: AiVerdictSchema });
-      expect(result).toMatchObject({ ok: true, data: { verdict } });
-      expect(fetchSpy).not.toHaveBeenCalled();
-    }
+  it.each(['aptitude', 'certificate'] as const)(
+    'honors each %s switch without touching the network',
+    async (purpose) => {
+      for (const verdict of ['cleared', 'not_cleared'] as const) {
+        const { fetchSpy, runner } = mockRunner({ [purpose]: verdict });
+        const result = await runner.runStructured({ purpose, system: '', user: '', schema: AiVerdictSchema });
+        expect(result).toMatchObject({ ok: true, data: { verdict } });
+        expect(fetchSpy).not.toHaveBeenCalled();
+      }
 
-    const { fetchSpy, runner } = mockRunner({ [purpose]: 'unavailable' });
-    const result = await runner.runStructured({ purpose, system: '', user: '', schema: AiVerdictSchema });
-    expect(result).toEqual({ ok: false, reason: 'unavailable' });
-    expect(fetchSpy).not.toHaveBeenCalled();
-  });
+      const { fetchSpy, runner } = mockRunner({ [purpose]: 'unavailable' });
+      const result = await runner.runStructured({ purpose, system: '', user: '', schema: AiVerdictSchema });
+      expect(result).toEqual({ ok: false, reason: 'unavailable' });
+      expect(fetchSpy).not.toHaveBeenCalled();
+    },
+  );
 
   it('returns deterministic plan and chat fixtures', async () => {
     const { fetchSpy, runner } = mockRunner();

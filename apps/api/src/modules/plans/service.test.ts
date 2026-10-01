@@ -1,5 +1,3 @@
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dExercises, dUsers, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
@@ -7,18 +5,28 @@ import { todayLocal } from '@api/lib/dates';
 import type { EvaluatePlan, GenerateForDateResult } from '@api/modules/plans/service';
 import { generateForDate, getTodayAggregate } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 async function createMember(email = 'member@example.com') {
-  const [user] = await db.insert(dUsers).values({ email, name: 'Plan Test Member', birthdate: '1995-06-15' }).returning();
+  const [user] = await db
+    .insert(dUsers)
+    .values({ email, name: 'Plan Test Member', birthdate: '1995-06-15' })
+    .returning();
   return user!;
 }
 
 async function createPlanWithExercises(userId: string, planDate: string, exerciseNames: readonly string[]) {
-  const [plan] = await db.insert(fTrainingPlans).values({ userId, planDate, status: 'ai_published', aiGeneratedAt: new Date() }).returning();
+  const [plan] = await db
+    .insert(fTrainingPlans)
+    .values({ userId, planDate, status: 'ai_published', aiGeneratedAt: new Date() })
+    .returning();
   await Promise.all(
     exerciseNames.map(async (name, index) => {
       const exerciseId = await exerciseIdByName(name);
-      await db.insert(fTrainingPlanExercises).values({ trainingPlanId: plan!.id, exerciseId, sets: 3, reps: 10, orderIndex: index });
+      await db
+        .insert(fTrainingPlanExercises)
+        .values({ trainingPlanId: plan!.id, exerciseId, sets: 3, reps: 10, orderIndex: index });
     }),
   );
   return plan!;
@@ -75,10 +83,7 @@ describe('plans', () => {
       await generateForDate(member.id, '2026-10-01', false, { generator: 'placeholder' });
       await generateForDate(member.id, '2026-10-01', false, { generator: 'placeholder' });
 
-      const rows = await db
-        .select()
-        .from(fTrainingPlans)
-        .where(eq(fTrainingPlans.userId, member.id));
+      const rows = await db.select().from(fTrainingPlans).where(eq(fTrainingPlans.userId, member.id));
       expect(rows).toHaveLength(1);
       expect(rows[0]?.status).toBe('ai_published');
     });

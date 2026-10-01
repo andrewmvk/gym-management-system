@@ -1,7 +1,7 @@
+import { type DatabaseExecutor, db } from '@api/db/client';
+import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import type { PolicyId } from '@cadence/shared/auth';
 import { and, eq, gt, isNull, or } from 'drizzle-orm';
-import { db, type DatabaseExecutor } from '@api/db/client';
-import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
 
 export async function findUserByEmail(email: string, executor: DatabaseExecutor = db) {
   const [user] = await executor.select().from(dUsers).where(eq(dUsers.email, email));

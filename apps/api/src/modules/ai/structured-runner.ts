@@ -1,8 +1,8 @@
-import { z } from 'zod';
 import type { Logger } from '@api/lib/logger';
 import { requestCompletion } from '@api/modules/ai/client';
-import { mockFixtureFor, type MockSwitches } from '@api/modules/ai/mock-fixtures';
+import { type MockSwitches, mockFixtureFor } from '@api/modules/ai/mock-fixtures';
 import type { AiFailureReason, AiPurpose, AiResult, StructuredRequest } from '@api/modules/ai/types';
+import { z } from 'zod';
 
 export type AiRunnerConfig =
   | { mode: 'live'; apiKey: string; model: string; fetch?: typeof fetch; log: Pick<Logger, 'warn'> }

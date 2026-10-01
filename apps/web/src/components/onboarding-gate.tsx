@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { usePathname, useRouter } from 'next/navigation';
-import { use, useEffect, type ReactNode } from 'react';
+import { type ReactNode, use, useEffect } from 'react';
 import { SessionReadyContext } from '@/components/auth-guard';
 import { useTRPC } from '@/lib/trpc';
 

@@ -1,3 +1,7 @@
+import { db, pool } from '@api/db/client';
+import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
+import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
+import { resetTestDatabase } from '@api/test/database';
 import {
   ADMIN_POLICY_IDS,
   MEMBER_POLICY_IDS,
@@ -7,10 +11,6 @@ import {
 } from '@cadence/shared/auth';
 import { count, eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { db, pool } from '@api/db/client';
-import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
-import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
-import { resetTestDatabase } from '@api/test/database';
 
 async function rowCounts() {
   const [[policies], [users], [grants]] = await Promise.all([
@@ -88,10 +88,7 @@ describe('seedBase', () => {
   it('keeps later changes to a staff grant when re-run', async () => {
     await seedBase();
     const [admin] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_ADMIN_EMAIL));
-    await db
-      .update(fUserPolicyOnUser)
-      .set({ effect: 'denied' })
-      .where(eq(fUserPolicyOnUser.userId, admin!.id));
+    await db.update(fUserPolicyOnUser).set({ effect: 'denied' }).where(eq(fUserPolicyOnUser.userId, admin!.id));
 
     await seedBase();
 

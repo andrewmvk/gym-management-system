@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { endOfLocalDay, startOfLocalDay, todayLocal } from '@api/lib/dates';
+import { describe, expect, it } from 'vitest';
 
 describe('dates', () => {
   describe('todayLocal', () => {

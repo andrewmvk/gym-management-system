@@ -19,7 +19,9 @@ function PlanShell({ tally, aside, children }: { tally: ReactNode; aside?: React
     <section aria-label="Today's plan" className="overflow-hidden rounded-lg border bg-card">
       <div className="kit-corner flex items-end justify-between gap-4 bg-kit pt-4 pr-20 pb-3 pl-5 text-kit-foreground sm:pl-6">
         <div className="flex flex-col gap-1">
-          <p className="font-display text-sm font-semibold tracking-widest text-kit-muted uppercase">Today&apos;s plan</p>
+          <p className="font-display text-sm font-semibold tracking-widest text-kit-muted uppercase">
+            Today&apos;s plan
+          </p>
           {tally}
         </div>
         {aside && <div className="flex flex-col items-end gap-2 pb-1 text-right">{aside}</div>}
@@ -38,6 +40,7 @@ function ProgressSegments({ states }: { states: boolean[] }) {
     >
       {states.map((isDone, index) => (
         <span
+          // biome-ignore lint/suspicious/noArrayIndexKey: one fixed segment per exercise slot, never reordered.
           key={index}
           className={cn('h-2 -skew-x-12 rounded-xs transition-colors duration-500', isDone ? 'bg-primary' : 'bg-muted')}
         />
@@ -54,6 +57,7 @@ function TodayPlanSkeleton() {
         <Skeleton className="h-2 w-full" />
       </div>
       {Array.from({ length: 4 }, (_, index) => (
+        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
         <ExerciseRow.Skeleton key={index} />
       ))}
     </PlanShell>

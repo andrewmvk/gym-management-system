@@ -1,5 +1,4 @@
-import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
-import { db, type DatabaseExecutor } from '@api/db/client';
+import { type DatabaseExecutor, db } from '@api/db/client';
 import {
   dExercises,
   dUsers,
@@ -12,6 +11,7 @@ import {
   type TrainingPlan,
   type TrainingPlanExercise,
 } from '@api/db/schema';
+import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
 
 export async function findPlanByUserAndDate(
   userId: string,
@@ -34,7 +34,11 @@ export function findRecentPlans(userId: string, sinceDate: string, executor: Dat
 }
 
 export function findProfileEventsByUserId(userId: string, executor: DatabaseExecutor = db): Promise<ProfileEvent[]> {
-  return executor.select().from(fProfileEvents).where(eq(fProfileEvents.userId, userId)).orderBy(desc(fProfileEvents.createdAt));
+  return executor
+    .select()
+    .from(fProfileEvents)
+    .where(eq(fProfileEvents.userId, userId))
+    .orderBy(desc(fProfileEvents.createdAt));
 }
 
 export function findExercisesForPlan(trainingPlanId: string, executor: DatabaseExecutor = db) {
@@ -130,9 +134,11 @@ export async function setExerciseCompleted(
 
 // Regenerating a date replaces the plan row in place (unique (user_id, plan_date)) and its whole
 // exercise list, rather than accumulating rows - "regenerating a date twice leaves one plan row."
-export async function replacePlan(
-  input: { userId: string; planDate: string; exercises: PlanExerciseInput[] },
-): Promise<TrainingPlan & { exercises: TrainingPlanExercise[] }> {
+export async function replacePlan(input: {
+  userId: string;
+  planDate: string;
+  exercises: PlanExerciseInput[];
+}): Promise<TrainingPlan & { exercises: TrainingPlanExercise[] }> {
   return db.transaction(async (tx) => {
     const [plan] = await tx
       .insert(fTrainingPlans)
@@ -212,7 +218,10 @@ export interface PlanWithMember extends TrainingPlan {
   memberEmail: string;
 }
 
-export async function findPlanWithMember(planId: string, executor: DatabaseExecutor = db): Promise<PlanWithMember | null> {
+export async function findPlanWithMember(
+  planId: string,
+  executor: DatabaseExecutor = db,
+): Promise<PlanWithMember | null> {
   const [row] = await executor
     .select({
       id: fTrainingPlans.id,
@@ -270,7 +279,10 @@ export interface PlanExerciseForDate {
 // FR-29: selects only the exercise's own name/muscle group - no user_id or any other identifying
 // column ever leaves this query, so the aggregate it feeds can't leak a member's identity even by
 // mistake further up the call chain.
-export function findExercisesForDate(planDate: string, executor: DatabaseExecutor = db): Promise<PlanExerciseForDate[]> {
+export function findExercisesForDate(
+  planDate: string,
+  executor: DatabaseExecutor = db,
+): Promise<PlanExerciseForDate[]> {
   return executor
     .select({ exerciseName: dExercises.name, muscleGroup: dExercises.muscleGroup })
     .from(fTrainingPlanExercises)
@@ -282,10 +294,11 @@ export function findExercisesForDate(planDate: string, executor: DatabaseExecuto
 // A direct trainer edit (FR-19): replaces the exercise list, flips status to trainer_edited, and
 // records who/when - the AI-generation fields (ai_generated_at) are left untouched, since this isn't a
 // regeneration.
-export async function editPlanExercises(
-  input: { planId: string; exercises: PlanExerciseInput[]; editedByUserId: string },
-  executor: DatabaseExecutor = db,
-): Promise<TrainingPlan & { exercises: TrainingPlanExercise[] }> {
+export async function editPlanExercises(input: {
+  planId: string;
+  exercises: PlanExerciseInput[];
+  editedByUserId: string;
+}): Promise<TrainingPlan & { exercises: TrainingPlanExercise[] }> {
   return db.transaction(async (tx) => {
     const [plan] = await tx
       .update(fTrainingPlans)

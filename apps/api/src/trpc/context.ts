@@ -1,8 +1,8 @@
-import { createAppAbility } from '@cadence/shared/auth';
-import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
-import type {} from '@api/types/express';
 import { loadSession } from '@api/modules/auth/service';
 import { SESSION_COOKIE, verifySessionToken } from '@api/modules/auth/session';
+import type {} from '@api/types/express';
+import { createAppAbility } from '@cadence/shared/auth';
+import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 
 export async function createContext({ req, res }: CreateExpressContextOptions) {
   const token: unknown = req.cookies?.[SESSION_COOKIE];

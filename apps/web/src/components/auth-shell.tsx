@@ -19,7 +19,9 @@ export function AuthShell({ tagline, subline, footer, children }: AuthShellProps
             <Brand />
           </Link>
           <div className="flex flex-col gap-1.5">
-            <p className="font-display text-4xl leading-none font-extrabold text-balance uppercase sm:text-5xl">{tagline}</p>
+            <p className="font-display text-4xl leading-none font-extrabold text-balance uppercase sm:text-5xl">
+              {tagline}
+            </p>
             <p className="text-sm text-pretty text-kit-muted">{subline}</p>
           </div>
         </div>

@@ -1,21 +1,10 @@
-import {
-  createMongoAbility,
-  subject,
-  type ForcedSubject,
-  type MongoAbility,
-  type RawRuleOf,
-} from '@casl/ability';
+import { createMongoAbility, type ForcedSubject, type MongoAbility, type RawRuleOf, subject } from '@casl/ability';
 
 // Re-exported so a self-scoped check (e.g. Onboarding, TrainingPlan) can attach the owner id without
 // apps/api needing @casl/ability as a direct dependency of its own.
 export { subject };
-import {
-  ACTIONS,
-  SUBJECTS,
-  type Action,
-  type PolicyEffect,
-  type Subject,
-} from '@shared/auth/types';
+
+import { ACTIONS, type Action, type PolicyEffect, SUBJECTS, type Subject } from '@shared/auth/types';
 
 export type AppSubject = Subject | ForcedSubject<Subject>;
 export type AppAbility = MongoAbility<[Action, AppSubject]>;

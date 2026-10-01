@@ -1,9 +1,9 @@
-import { READ_CATALOG } from '@cadence/shared/auth';
-import { sql } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import { resetTestDatabase } from '@api/test/database';
+import { READ_CATALOG } from '@cadence/shared/auth';
+import { sql } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 const UNIQUE_VIOLATION = '23505';
 const FOREIGN_KEY_VIOLATION = '23503';
@@ -56,9 +56,7 @@ describe('users and policies schema', () => {
     expect(await columnsOf('d_user_policy')).toEqual(
       ['created_at', 'description', 'id', 'operation', 'resource', 'scope'].sort(),
     );
-    expect(await columnsOf('f_user_policy_on_user')).toEqual(
-      ['effect', 'expires_on', 'policy_id', 'user_id'].sort(),
-    );
+    expect(await columnsOf('f_user_policy_on_user')).toEqual(['effect', 'expires_on', 'policy_id', 'user_id'].sort());
   });
 
   it('rejects a duplicate e-mail', async () => {

@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ArrowRightIcon, BadgeCheckIcon, SparklesIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { OnboardingForm } from '@/app/(member)/onboarding/onboarding-form';
 import { Deferred } from '@/components/deferred';
 import { QueryError } from '@/components/query-error';
@@ -14,10 +14,22 @@ import { useTRPC } from '@/lib/trpc';
 
 type View = 'form' | 'summary' | 'submitted';
 
-function StatusPanel({ icon, title, description, actions }: { icon: ReactNode; title: string; description: string; actions?: ReactNode }) {
+function StatusPanel({
+  icon,
+  title,
+  description,
+  actions,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+  actions?: ReactNode;
+}) {
   return (
     <div className="flex flex-col gap-4 rounded-lg border bg-card p-5 sm:flex-row sm:items-center sm:p-6">
-      <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">{icon}</span>
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">
+        {icon}
+      </span>
       <div className="flex flex-1 flex-col gap-1">
         <p className="font-display text-xl font-bold tracking-wide uppercase">{title}</p>
         <p className="text-sm text-muted-foreground">{description}</p>

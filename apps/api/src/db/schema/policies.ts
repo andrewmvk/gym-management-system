@@ -1,6 +1,6 @@
+import { dUsers } from '@api/db/schema/users';
 import { POLICY_EFFECTS } from '@cadence/shared/auth';
 import { pgEnum, pgTable, primaryKey, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { dUsers } from '@api/db/schema/users';
 
 export const policyEffect = pgEnum('policy_effect', POLICY_EFFECTS);
 

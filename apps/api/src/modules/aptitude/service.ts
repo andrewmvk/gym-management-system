@@ -1,15 +1,18 @@
 import {
-  QUESTIONNAIRE_V1,
+  type ComputeFaceEmbedding,
+  computeFaceEmbedding as defaultComputeFaceEmbedding,
+} from '@api/lib/face-embedding';
+import { saveUpload } from '@api/lib/uploads';
+import { type AiResult, type AiVerdict, AiVerdictSchema, runStructured } from '@api/modules/ai';
+import * as repository from '@api/modules/aptitude/repository';
+import {
   type GetAptitudeStatusInput,
+  QUESTIONNAIRE_V1,
   type QuestionnaireAnswer,
   type RecheckInput,
   type SubmitQuestionnaireInput,
 } from '@cadence/shared/schemas/aptitude';
 import { CONSENT_VERSION, type RecordConsentInput, type StartSignupInput } from '@cadence/shared/schemas/signup';
-import { computeFaceEmbedding as defaultComputeFaceEmbedding, type ComputeFaceEmbedding } from '@api/lib/face-embedding';
-import { saveUpload } from '@api/lib/uploads';
-import { AiVerdictSchema, runStructured, type AiResult, type AiVerdict } from '@api/modules/ai';
-import * as repository from '@api/modules/aptitude/repository';
 
 type NextStep = 'photo' | 'done';
 
@@ -61,7 +64,7 @@ export async function startSignup(input: StartSignupInput): Promise<StartSignupR
 // is append-only) - re-consenting later is a new proof, not an edit to the old one.
 export async function recordConsent(input: RecordConsentInput): Promise<{ status: 'ok' | 'unavailable' }> {
   const user = await repository.findById(input.userId);
-  if (!user || user.aptitudeStatus !== 'pending') return { status: 'unavailable' };
+  if (user?.aptitudeStatus !== 'pending') return { status: 'unavailable' };
 
   await repository.insertConsentEvent({
     userId: input.userId,
@@ -81,7 +84,7 @@ export async function savePhoto(
   computeFaceEmbedding: ComputeFaceEmbedding = defaultComputeFaceEmbedding,
 ): Promise<SavePhotoResult> {
   const user = await repository.findById(input.userId);
-  if (!user || user.aptitudeStatus !== 'pending') {
+  if (user?.aptitudeStatus !== 'pending') {
     return { status: 'photo_rejected', reason: 'unavailable' };
   }
 
@@ -154,7 +157,7 @@ export async function submitQuestionnaire(
   evaluateAptitude: EvaluateAptitude = defaultEvaluateAptitude,
 ): Promise<SubmitQuestionnaireResult> {
   const user = await repository.findById(input.userId);
-  if (!user || user.aptitudeStatus !== 'pending') return { status: 'unavailable' };
+  if (user?.aptitudeStatus !== 'pending') return { status: 'unavailable' };
 
   const evaluation = await evaluateAptitude(input.answers);
   const aiResult = evaluation.ok ? evaluation.data.verdict : 'pending_retry';
@@ -175,10 +178,10 @@ export async function recheck(
   evaluateAptitude: EvaluateAptitude = defaultEvaluateAptitude,
 ): Promise<RecheckResult> {
   const user = await repository.findById(input.userId);
-  if (!user || user.aptitudeStatus !== 'pending') return { status: 'unavailable' };
+  if (user?.aptitudeStatus !== 'pending') return { status: 'unavailable' };
 
   const questionnaire = await repository.findQuestionnaireByUserId(input.userId);
-  if (!questionnaire || questionnaire.aiResult !== 'pending_retry') return { status: 'not_pending_retry' };
+  if (questionnaire?.aiResult !== 'pending_retry') return { status: 'not_pending_retry' };
 
   const evaluation = await evaluateAptitude(questionnaire.answers);
   const aiResult = evaluation.ok ? evaluation.data.verdict : 'pending_retry';
@@ -193,7 +196,13 @@ export async function recheck(
 export type AptitudeStatusResult =
   | { status: 'unavailable' }
   | {
-      status: 'not_submitted' | 'pending_retry' | 'certificate_required' | 'certificate_pending_review' | 'cleared' | 'rejected';
+      status:
+        | 'not_submitted'
+        | 'pending_retry'
+        | 'certificate_required'
+        | 'certificate_pending_review'
+        | 'cleared'
+        | 'rejected';
       questionnaireResult: 'cleared' | 'not_cleared' | 'pending_retry' | null;
       certificateResult: 'cleared' | 'not_cleared' | 'pending_retry' | null;
     };
@@ -217,7 +226,11 @@ export async function getAptitudeStatus(input: GetAptitudeStatusInput): Promise<
 
   if (!questionnaire) return { status: 'not_submitted', questionnaireResult: null, certificateResult: null };
   if (questionnaire.aiResult !== 'not_cleared') {
-    return { status: deriveOutcome(questionnaire.aiResult), questionnaireResult: questionnaire.aiResult, certificateResult: null };
+    return {
+      status: deriveOutcome(questionnaire.aiResult),
+      questionnaireResult: questionnaire.aiResult,
+      certificateResult: null,
+    };
   }
 
   // not_cleared: FR-5, a certificate is needed before this applicant can progress further.
@@ -225,5 +238,9 @@ export async function getAptitudeStatus(input: GetAptitudeStatusInput): Promise<
   if (!certificate) {
     return { status: 'certificate_required', questionnaireResult: 'not_cleared', certificateResult: null };
   }
-  return { status: 'certificate_pending_review', questionnaireResult: 'not_cleared', certificateResult: certificate.aiResult };
+  return {
+    status: 'certificate_pending_review',
+    questionnaireResult: 'not_cleared',
+    certificateResult: certificate.aiResult,
+  };
 }

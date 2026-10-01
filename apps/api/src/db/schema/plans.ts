@@ -1,6 +1,6 @@
-import { boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid, date } from 'drizzle-orm/pg-core';
 import { dExercises } from '@api/db/schema/catalog';
 import { dUsers } from '@api/db/schema/users';
+import { boolean, date, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
 
 export const planStatus = pgEnum('plan_status', ['ai_published', 'trainer_edited']);
 

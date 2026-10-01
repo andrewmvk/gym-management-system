@@ -1,9 +1,9 @@
-import { count, eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dExerciseEquipment, dExercises, dGymEquipment } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
 import { resetTestDatabase } from '@api/test/database';
+import { count, eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 async function rowCounts() {
   const [[exercises], [equipment], [links]] = await Promise.all([

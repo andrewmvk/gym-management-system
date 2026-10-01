@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DumbbellIcon, PlusIcon, SearchXIcon } from 'lucide-react';
-import { useState } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -53,6 +53,7 @@ function ExerciseTableSkeleton() {
       <ExerciseTableHead />
       <TableBody>
         {Array.from({ length: 6 }, (_, index) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
           <TableRow key={index}>
             <TableCell>
               <Skeleton className="h-5 w-44" />
@@ -106,7 +107,12 @@ function CreateExerciseForm() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="exercise-name">Name</FieldLabel>
-                  <Input {...field} id="exercise-name" placeholder="e.g. Incline dumbbell press" aria-invalid={fieldState.invalid} />
+                  <Input
+                    {...field}
+                    id="exercise-name"
+                    placeholder="e.g. Incline dumbbell press"
+                    aria-invalid={fieldState.invalid}
+                  />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -117,7 +123,12 @@ function CreateExerciseForm() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="exercise-muscle-group">Muscle group</FieldLabel>
-                  <Input {...field} id="exercise-muscle-group" placeholder="e.g. Chest" aria-invalid={fieldState.invalid} />
+                  <Input
+                    {...field}
+                    id="exercise-muscle-group"
+                    placeholder="e.g. Chest"
+                    aria-invalid={fieldState.invalid}
+                  />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -128,7 +139,12 @@ function CreateExerciseForm() {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="exercise-instructions">Instructions</FieldLabel>
-                  <Textarea {...field} id="exercise-instructions" className="min-h-16" aria-invalid={fieldState.invalid} />
+                  <Textarea
+                    {...field}
+                    id="exercise-instructions"
+                    className="min-h-16"
+                    aria-invalid={fieldState.invalid}
+                  />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
@@ -144,6 +160,7 @@ function CreateExerciseForm() {
                   {equipmentQuery.isPending && (
                     <Deferred>
                       {Array.from({ length: 3 }, (_, index) => (
+                        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
                         <Skeleton key={index} className="h-5 w-32" />
                       ))}
                     </Deferred>
@@ -163,7 +180,9 @@ function CreateExerciseForm() {
                             id={`exercise-equipment-${item.id}`}
                             checked={field.value.includes(item.id)}
                             onCheckedChange={(checked) =>
-                              field.onChange(checked ? [...field.value, item.id] : field.value.filter((id) => id !== item.id))
+                              field.onChange(
+                                checked ? [...field.value, item.id] : field.value.filter((id) => id !== item.id),
+                              )
                             }
                           />
                           <span className="truncate">{item.name}</span>
@@ -205,11 +224,12 @@ function ExerciseSectionRoot() {
 
   const term = search.trim().toLowerCase();
   const filtered = (query.data ?? []).filter(
-    (exercise) => !term || exercise.name.toLowerCase().includes(term) || exercise.muscleGroup.toLowerCase().includes(term),
+    (exercise) =>
+      !term || exercise.name.toLowerCase().includes(term) || exercise.muscleGroup.toLowerCase().includes(term),
   );
   const pagination = usePagination(filtered, PAGE_SIZE);
 
-  let list;
+  let list: ReactNode;
   if (query.isPending) {
     list = (
       <Deferred>
@@ -217,7 +237,13 @@ function ExerciseSectionRoot() {
       </Deferred>
     );
   } else if (query.isError) {
-    list = <QueryError title="We couldn't load the exercises" onRetry={() => query.refetch()} isRetrying={query.isRefetching} />;
+    list = (
+      <QueryError
+        title="We couldn't load the exercises"
+        onRetry={() => query.refetch()}
+        isRetrying={query.isRefetching}
+      />
+    );
   } else if (query.data.length === 0) {
     list = (
       <div className="rounded-lg border bg-card">

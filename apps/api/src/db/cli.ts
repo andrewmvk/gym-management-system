@@ -1,8 +1,8 @@
-import { sql } from 'drizzle-orm';
 import { env } from '@api/config/env';
 import { db, pool, runMigrations } from '@api/db/client';
 import { seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
+import { sql } from 'drizzle-orm';
 
 const COMMANDS = {
   migrate: async () => {

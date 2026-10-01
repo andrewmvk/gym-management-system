@@ -1,6 +1,6 @@
 import { subject } from '@casl/ability';
-import { describe, expect, it } from 'vitest';
 import { defineAbilityFor, type PolicyGrant } from '@shared/auth/abilities';
+import { describe, expect, it } from 'vitest';
 
 const user = { id: 'user-1' };
 const now = new Date('2026-09-25T12:00:00Z');

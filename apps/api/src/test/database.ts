@@ -1,6 +1,6 @@
-import { sql } from 'drizzle-orm';
 import { env } from '@api/config/env';
 import { db } from '@api/db/client';
+import { sql } from 'drizzle-orm';
 
 export async function resetTestDatabase() {
   if (!env.TEST_DATABASE_URL || env.DATABASE_URL !== env.TEST_DATABASE_URL) {

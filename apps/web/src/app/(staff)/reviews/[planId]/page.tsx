@@ -1,4 +1,4 @@
-import { PlanReviewDetail } from './plan-review-detail';
+import { PlanReviewDetail } from '@/app/(staff)/reviews/[planId]/plan-review-detail';
 
 export default async function ReviewDetailPage({ params }: { params: Promise<{ planId: string }> }) {
   const { planId } = await params;

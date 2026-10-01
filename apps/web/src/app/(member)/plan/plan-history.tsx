@@ -1,70 +1,139 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
+import { CalendarSearchIcon, CalendarX2Icon } from 'lucide-react';
 import { useState } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
+import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
+import { DatePicker } from '@/components/date-picker';
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { Badge } from '@/components/ui/badge';
+import { useLaggedValue } from '@/hooks/use-lagged-value';
+import { toIsoDate } from '@/lib/calendar-date';
 import { useTRPC } from '@/lib/trpc';
-import { ExerciseRow } from './exercise-row';
+import { cn } from '@/lib/utils';
+
+function lastDays(count: number) {
+  return Array.from({ length: count }, (_, index) => {
+    const date = new Date();
+    date.setDate(date.getDate() - (index + 1));
+    return date;
+  }).reverse();
+}
 
 // Always read-only, regardless of which date is picked - history is for browsing, not editing.
 export function PlanHistory() {
   const trpc = useTRPC();
   const [selectedDate, setSelectedDate] = useState('');
+  const recentDays = lastDays(7);
 
-  const planQuery = useQuery({
-    ...trpc.plans.getByDate.queryOptions({ date: selectedDate || '1970-01-01' }),
-    enabled: selectedDate.length > 0,
+  const planQueryFor = (date: string) => ({
+    ...trpc.plans.getByDate.queryOptions({ date: date || '1970-01-01' }),
+    enabled: date.length > 0,
   });
 
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>History</CardTitle>
-        <CardDescription>Browse a past plan by date.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        <Field>
-          <FieldLabel htmlFor="plan-history-date">Date</FieldLabel>
-          <Input
-            id="plan-history-date"
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-          />
-        </Field>
+  // The day chips react instantly to selectedDate, but the result area keeps showing the previous day
+  // (shownDate, already cached) until the new day loads, so a fast load swaps content in one step.
+  const selectedQuery = useQuery(planQueryFor(selectedDate));
+  const shownDate = useLaggedValue(selectedDate, selectedDate.length > 0 && selectedQuery.isPending);
+  const planQuery = useQuery(planQueryFor(shownDate));
 
-        {selectedDate && planQuery.isPending && (
+  return (
+    <section aria-label="Plan history" className="overflow-hidden rounded-lg border bg-card">
+      <div className="flex flex-col gap-4 border-b px-5 py-5 sm:px-6">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            {Array.from({ length: 3 }, (_, index) => (
-              <ExerciseRow.Skeleton key={index} />
-            ))}
+            <h2 className="font-display text-xl font-bold tracking-wide uppercase">Past plans</h2>
+            <p className="text-sm text-muted-foreground">Pick a day from the last week, or any date.</p>
           </div>
-        )}
-        {selectedDate && planQuery.isError && <p className="text-sm text-destructive">We couldn&apos;t load that plan.</p>}
-        {selectedDate && planQuery.isSuccess && planQuery.data === null && (
-          <p className="text-sm text-muted-foreground">No plan for this date.</p>
-        )}
-        {selectedDate && planQuery.data && (
-          <div>
-            {planQuery.data.exercises.map((exercise) => (
-              <ExerciseRow
-                key={exercise.id}
-                name={exercise.exerciseName}
-                muscleGroup={exercise.muscleGroup}
-                instructions={exercise.instructions}
-                sets={exercise.sets}
-                reps={exercise.reps}
-                load={exercise.load}
-                notes={exercise.notes}
-                completed={exercise.completed}
-                isPerformable={exercise.isPerformable}
-              />
-            ))}
+          <DatePicker
+            aria-label="Plan date"
+            placeholder="Any date"
+            max={toIsoDate(new Date())}
+            value={selectedDate}
+            onChange={setSelectedDate}
+            isClearable
+            className="sm:w-48"
+          />
+        </div>
+        <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1">
+          {recentDays.map((date) => {
+            const iso = toIsoDate(date);
+            const isSelected = iso === selectedDate;
+            return (
+              <button
+                key={iso}
+                type="button"
+                aria-pressed={isSelected}
+                onClick={() => setSelectedDate(iso)}
+                className={cn(
+                  'flex min-w-14 flex-1 flex-col items-center rounded-md border px-2 py-2 transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
+                  isSelected
+                    ? 'border-primary bg-primary text-primary-foreground'
+                    : 'border-input hover:border-foreground/35 hover:bg-muted',
+                )}
+              >
+                <span
+                  className={cn(
+                    'font-display text-xs font-semibold tracking-widest uppercase',
+                    isSelected ? 'text-primary-foreground/80' : 'text-muted-foreground',
+                  )}
+                >
+                  {date.toLocaleDateString(undefined, { weekday: 'short' })}
+                </span>
+                <span className="numerals text-2xl leading-none font-bold">{date.getDate()}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {!shownDate && (
+        <EmptyState icon={CalendarSearchIcon} title="Pick a day" description="The plan you had that day shows up here." />
+      )}
+      {shownDate &&
+        planQuery.isPending &&
+        Array.from({ length: 3 }, (_, index) => <ExerciseRow.Skeleton key={index} />)}
+      {shownDate && planQuery.isError && (
+        <QueryError
+          title="We couldn't load that plan"
+          onRetry={() => planQuery.refetch()}
+          isRetrying={planQuery.isRefetching}
+          className="m-5 sm:m-6"
+        />
+      )}
+      {shownDate && planQuery.isSuccess && planQuery.data === null && (
+        <EmptyState icon={CalendarX2Icon} title="Rest day" description="There's no plan for this date." />
+      )}
+      {shownDate && planQuery.data && (
+        <div>
+          <div className="flex items-center justify-between gap-2 px-5 pt-4 sm:px-6">
+            <p className="text-sm text-muted-foreground">
+              <span className="numerals text-base font-bold text-foreground">
+                {planQuery.data.exercises.filter((exercise) => exercise.completed).length}/
+                {planQuery.data.exercises.length}
+              </span>{' '}
+              completed
+            </p>
+            {planQuery.data.status === 'trainer_edited' && <Badge variant="tape">Edited by a trainer</Badge>}
           </div>
-        )}
-      </CardContent>
-    </Card>
+          {planQuery.data.exercises.map((exercise, index) => (
+            <ExerciseRow
+              key={exercise.id}
+              index={index}
+              name={exercise.exerciseName}
+              muscleGroup={exercise.muscleGroup}
+              instructions={exercise.instructions}
+              sets={exercise.sets}
+              reps={exercise.reps}
+              load={exercise.load}
+              notes={exercise.notes}
+              completed={exercise.completed}
+              isPerformable={exercise.isPerformable}
+            />
+          ))}
+        </div>
+      )}
+    </section>
   );
 }

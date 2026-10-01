@@ -1,22 +1,11 @@
-import { cva, type VariantProps } from 'class-variance-authority';
 import type { ReactNode } from 'react';
 import { cn } from '@/lib/utils';
 
-const pageContainerVariants = cva('mx-auto flex w-full flex-col gap-2 px-4 py-8 sm:px-6', {
-  variants: {
-    width: {
-      narrow: 'max-w-3xl',
-      wide: 'max-w-5xl',
-    },
-  },
-  defaultVariants: { width: 'narrow' },
-});
-
-interface PageContainerProps extends VariantProps<typeof pageContainerVariants> {
-  className?: string;
-  children: ReactNode;
-}
-
-export function PageContainer({ width, className, children }: PageContainerProps) {
-  return <main className={cn(pageContainerVariants({ width }), className)}>{children}</main>;
+// Every page uses the same width as the header, so moving between pages never changes the frame.
+export function PageContainer({ className, children }: { className?: string; children: ReactNode }) {
+  return (
+    <main className={cn('mx-auto flex w-full max-w-6xl flex-1 flex-col gap-8 px-4 pt-8 pb-24 sm:px-6 sm:pt-10', className)}>
+      {children}
+    </main>
+  );
 }

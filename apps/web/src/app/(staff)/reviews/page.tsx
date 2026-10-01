@@ -1,14 +1,17 @@
 'use client';
 
+import { ReviewsQueue } from '@/app/(staff)/reviews/reviews-queue';
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
-import { ReviewsQueue } from './reviews-queue';
+
+const TITLE = 'Plan reviews';
+const DESCRIPTION = "Every member's plan is already live. Any trainer can comment on it or edit it here.";
 
 function ReviewsSkeleton() {
   return (
-    <PageContainer width="wide">
-      <PageHeading.Skeleton />
+    <PageContainer>
+      <PageHeading title={TITLE} description={DESCRIPTION} />
       <ReviewsQueue.Skeleton />
     </PageContainer>
   );
@@ -17,8 +20,8 @@ function ReviewsSkeleton() {
 export default function ReviewsPage() {
   return (
     <GuardedContent skeleton={<ReviewsSkeleton />}>
-      <PageContainer width="wide">
-        <PageHeading title="Plan reviews" description="Any trainer can review or edit any member's plan." />
+      <PageContainer>
+        <PageHeading title={TITLE} description={DESCRIPTION} />
         <ReviewsQueue />
       </PageContainer>
     </GuardedContent>

@@ -2,6 +2,7 @@
 
 import { use, type ReactNode } from 'react';
 import { SessionReadyContext } from '@/components/auth-guard';
+import { Deferred } from '@/components/deferred';
 
 interface GuardedContentProps {
   skeleton: ReactNode;
@@ -10,5 +11,5 @@ interface GuardedContentProps {
 
 // Children aren't mounted until the session is confirmed, so their data queries never run unauthenticated.
 export function GuardedContent({ skeleton, children }: GuardedContentProps) {
-  return use(SessionReadyContext) ? children : skeleton;
+  return use(SessionReadyContext) ? children : <Deferred>{skeleton}</Deferred>;
 }

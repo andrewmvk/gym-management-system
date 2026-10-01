@@ -1,10 +1,11 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
+import { CameraIcon, CameraOffIcon, RotateCcwIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
+import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc';
 
 interface PhotoStepProps {
@@ -17,6 +18,14 @@ const REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', s
   multiple_faces: 'More than one face was detected. Make sure you are alone in the frame, then try again.',
   unavailable: "We couldn't process that photo right now. Try again.",
 };
+
+function FrameGuide() {
+  return (
+    <div aria-hidden className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <div className="h-3/4 w-7/12 rounded-full border-2 border-dashed border-white/75" />
+    </div>
+  );
+}
 
 export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
   const trpc = useTRPC();
@@ -74,42 +83,56 @@ export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
   );
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Take a reference photo</CardTitle>
-        <CardDescription>This is used for face recognition at check-in. Only the backend ever sees it.</CardDescription>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {cameraError && <p className="text-sm text-destructive">{cameraError}</p>}
-        {rejection && <p className="text-sm text-destructive">{rejection}</p>}
+    <StepPanel
+      title="Reference photo"
+      description="Used for face recognition at check-in. Face the camera in good light, alone in the frame."
+    >
+      {rejection && (
+        <p role="alert" className="rounded-md border-2 border-dashed border-destructive/60 px-4 py-3 text-sm text-destructive">
+          {rejection}
+        </p>
+      )}
 
-        {!capturedImage && !cameraError && (
-          <>
+      {cameraError && (
+        <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-destructive/50 p-6 text-center">
+          <CameraOffIcon className="size-8 text-destructive" />
+          <p className="max-w-xs text-sm text-muted-foreground">{cameraError}</p>
+        </div>
+      )}
+
+      {!capturedImage && !cameraError && (
+        <>
+          <div className="relative overflow-hidden rounded-lg bg-kit">
             {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video ref={videoRef} autoPlay playsInline muted className="aspect-square w-full rounded-lg bg-muted object-cover" />
-            <Button onClick={capture}>Capture photo</Button>
-          </>
-        )}
+            <video ref={videoRef} autoPlay playsInline muted className="aspect-square w-full -scale-x-100 object-cover" />
+            <FrameGuide />
+          </div>
+          <Button size="lg" className="w-full" onClick={capture}>
+            <CameraIcon data-icon="inline-start" />
+            Capture photo
+          </Button>
+        </>
+      )}
 
-        {capturedImage && (
-          <>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={capturedImage} alt="Captured reference" className="aspect-square w-full rounded-lg object-cover" />
-            <div className="flex gap-2">
-              <Button variant="outline" className="flex-1" onClick={() => setCapturedImage(null)} disabled={savePhoto.isPending}>
-                Retake
-              </Button>
-              <Button
-                className="flex-1"
-                disabled={savePhoto.isPending}
-                onClick={() => savePhoto.mutate({ userId, imageBase64: capturedImage, mimeType: 'image/jpeg' })}
-              >
-                {savePhoto.isPending ? 'Saving...' : 'Use this photo'}
-              </Button>
-            </div>
-          </>
-        )}
-      </CardContent>
-    </Card>
+      {capturedImage && (
+        <>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src={capturedImage} alt="Captured reference" className="aspect-square w-full -scale-x-100 rounded-lg object-cover" />
+          <div className="grid grid-cols-2 gap-2">
+            <Button variant="outline" size="lg" onClick={() => setCapturedImage(null)} disabled={savePhoto.isPending}>
+              <RotateCcwIcon data-icon="inline-start" />
+              Retake
+            </Button>
+            <Button
+              size="lg"
+              disabled={savePhoto.isPending}
+              onClick={() => savePhoto.mutate({ userId, imageBase64: capturedImage, mimeType: 'image/jpeg' })}
+            >
+              {savePhoto.isPending ? 'Saving...' : 'Use this photo'}
+            </Button>
+          </div>
+        </>
+      )}
+    </StepPanel>
   );
 }

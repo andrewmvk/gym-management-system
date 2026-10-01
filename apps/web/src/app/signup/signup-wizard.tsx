@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { AptitudeResultStep } from '@/app/signup/aptitude-result-step';
 import { BasicInfoStep } from '@/app/signup/basic-info-step';
 import { CertificateStep } from '@/app/signup/certificate-step';
@@ -10,6 +10,7 @@ import { PasswordStep } from '@/app/signup/password-step';
 import { PhotoStep } from '@/app/signup/photo-step';
 import { QuestionnaireStep } from '@/app/signup/questionnaire-step';
 import { RejectedStep } from '@/app/signup/rejected-step';
+import { Stepper } from '@/components/stepper';
 import { useTRPCClient } from '@/lib/trpc';
 
 const STORAGE_KEY = 'cadence-signup-user-id';
@@ -27,6 +28,20 @@ type Step =
   | 'certificate-waiting'
   | 'rejected'
   | 'password';
+
+const STATIONS = ['Details', 'Consent', 'Photo', 'Health check', 'Password'] as const;
+
+const STATION_OF_STEP: Record<Step, number> = {
+  'basic-info': 0,
+  consent: 1,
+  photo: 2,
+  questionnaire: 3,
+  'aptitude-result': 3,
+  'certificate-upload': 3,
+  'certificate-waiting': 3,
+  rejected: 3,
+  password: 4,
+};
 
 // The userId is kept in sessionStorage (not a cookie): there is no session before aptitude clearance
 // (FR-9), and this is just a capability letting the browser resume the wizard after a reload.
@@ -81,22 +96,25 @@ export function SignupWizard() {
     });
   }
 
-  if (step === 'basic-info') return <BasicInfoStep onResolved={handleResolved} />;
-  if (step === 'consent' && userId) return <ConsentStep userId={userId} onConsented={() => setStep('photo')} />;
-  if (step === 'photo' && userId) return <PhotoStep userId={userId} onSaved={() => setStep('questionnaire')} />;
-  if (step === 'questionnaire' && userId) {
-    return <QuestionnaireStep userId={userId} onResolved={(result) => goToAptitudeStep(result)} />;
-  }
-  if (step === 'aptitude-result' && userId) {
-    return <AptitudeResultStep userId={userId} onRechecked={(result) => goToAptitudeStep(result)} />;
-  }
-  if (step === 'certificate-upload' && userId) {
-    return <CertificateStep userId={userId} onUploaded={() => setStep('certificate-waiting')} />;
-  }
-  if (step === 'certificate-waiting' && userId) {
-    return <CertificateWaitingStep userId={userId} onStatusChanged={(result) => goToAptitudeStep(result)} />;
-  }
-  if (step === 'rejected') return <RejectedStep />;
-  if (step === 'password' && userId) return <PasswordStep userId={userId} />;
-  return null;
+  let content: ReactNode = null;
+  if (step === 'basic-info') content = <BasicInfoStep onResolved={handleResolved} />;
+  else if (step === 'consent' && userId) content = <ConsentStep userId={userId} onConsented={() => setStep('photo')} />;
+  else if (step === 'photo' && userId) content = <PhotoStep userId={userId} onSaved={() => setStep('questionnaire')} />;
+  else if (step === 'questionnaire' && userId) {
+    content = <QuestionnaireStep userId={userId} onResolved={(result) => goToAptitudeStep(result)} />;
+  } else if (step === 'aptitude-result' && userId) {
+    content = <AptitudeResultStep userId={userId} onRechecked={(result) => goToAptitudeStep(result)} />;
+  } else if (step === 'certificate-upload' && userId) {
+    content = <CertificateStep userId={userId} onUploaded={() => setStep('certificate-waiting')} />;
+  } else if (step === 'certificate-waiting' && userId) {
+    content = <CertificateWaitingStep userId={userId} onStatusChanged={(result) => goToAptitudeStep(result)} />;
+  } else if (step === 'rejected') content = <RejectedStep />;
+  else if (step === 'password' && userId) content = <PasswordStep userId={userId} />;
+
+  return (
+    <div className="flex flex-col gap-8">
+      <Stepper steps={STATIONS} current={STATION_OF_STEP[step]} />
+      {content}
+    </div>
+  );
 }

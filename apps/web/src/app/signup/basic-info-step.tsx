@@ -3,14 +3,15 @@
 import { StartSignupInputSchema, type StartSignupInput } from '@cadence/shared/schemas/signup';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
-import Link from 'next/link';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
+import { DatePicker } from '@/components/date-picker';
+import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { toIsoDate } from '@/lib/calendar-date';
 import { useTRPC } from '@/lib/trpc';
 
 const GENDER_LABELS = {
@@ -51,25 +52,32 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
   );
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Join Cadence</CardTitle>
-        <CardDescription>Start with your basic information. We&apos;ll ask for a reference photo next.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form noValidate onSubmit={form.handleSubmit((values) => startSignup.mutate(values))}>
-          <FieldGroup>
-            <Controller
-              name="name"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="signup-name">Full name</FieldLabel>
-                  <Input {...field} id="signup-name" autoComplete="name" aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
+    <StepPanel title="About you" description="Start with your basic information. We'll ask for a reference photo next.">
+      <form noValidate onSubmit={form.handleSubmit((values) => startSignup.mutate(values))}>
+        <FieldGroup>
+          <Controller
+            name="name"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="signup-name">Full name</FieldLabel>
+                <Input {...field} id="signup-name" autoComplete="name" aria-invalid={fieldState.invalid} />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+          <Controller
+            name="email"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="signup-email">E-mail</FieldLabel>
+                <Input {...field} id="signup-email" type="email" autoComplete="email" aria-invalid={fieldState.invalid} />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+          <div className="grid gap-5 sm:grid-cols-2">
             <Controller
               name="phone"
               control={form.control}
@@ -82,63 +90,54 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
               )}
             />
             <Controller
-              name="email"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="signup-email">E-mail</FieldLabel>
-                  <Input {...field} id="signup-email" type="email" autoComplete="email" aria-invalid={fieldState.invalid} />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
               name="birthdate"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="signup-birthdate">Birthdate</FieldLabel>
-                  <Input
-                    {...field}
+                  <DatePicker
                     id="signup-birthdate"
-                    type="date"
-                    autoComplete="bday"
+                    value={field.value}
+                    onChange={field.onChange}
+                    onBlur={field.onBlur}
+                    placeholder="Select a date"
+                    max={toIsoDate(new Date())}
+                    captionLayout="dropdown"
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
               )}
             />
-            <Controller
-              name="gender"
-              control={form.control}
-              render={({ field }) => (
-                <Field>
-                  <FieldLabel htmlFor="signup-gender">Gender (optional)</FieldLabel>
-                  <Select value={field.value ?? ''} onValueChange={(value) => field.onChange(value || undefined)}>
-                    <SelectTrigger id="signup-gender" className="w-full">
-                      <SelectValue placeholder="Prefer not to say" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(GENDER_LABELS).map(([value, label]) => (
-                        <SelectItem key={value} value={value}>
-                          {label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </Field>
-              )}
-            />
-            <Button type="submit" className="w-full" disabled={startSignup.isPending}>
-              {startSignup.isPending ? 'Continuing...' : 'Continue'}
-            </Button>
-            <p className="text-center text-sm text-muted-foreground">
-              Already have an account? <Link href="/login" className="underline underline-offset-4">Sign in</Link>
-            </p>
-          </FieldGroup>
-        </form>
-      </CardContent>
-    </Card>
+          </div>
+          <Controller
+            name="gender"
+            control={form.control}
+            render={({ field }) => (
+              <Field>
+                <FieldLabel htmlFor="signup-gender">
+                  Gender <span className="font-normal text-muted-foreground">(optional)</span>
+                </FieldLabel>
+                <Select value={field.value ?? ''} onValueChange={(value) => field.onChange(value || undefined)}>
+                  <SelectTrigger id="signup-gender" className="w-full">
+                    <SelectValue placeholder="Prefer not to say" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Object.entries(GENDER_LABELS).map(([value, label]) => (
+                      <SelectItem key={value} value={value}>
+                        {label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </Field>
+            )}
+          />
+          <Button type="submit" size="lg" className="mt-4 w-full" disabled={startSignup.isPending}>
+            {startSignup.isPending ? 'Continuing...' : 'Continue'}
+          </Button>
+        </FieldGroup>
+      </form>
+    </StepPanel>
   );
 }

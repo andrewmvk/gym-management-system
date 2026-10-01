@@ -1,0 +1,170 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-01T12:00:00Z",
+  "title": "Design System: Cadence",
+  "extensions": {
+    "colorMeta": {
+      "kit-cobalt": {
+        "role": "primary",
+        "displayName": "Kit Cobalt",
+        "canonical": "oklch(0.5 0.25 266)",
+        "dark": "oklch(0.72 0.15 266)",
+        "tonalRamp": ["oklch(0.18 0.09 266)", "oklch(0.28 0.15 266)", "oklch(0.38 0.2 266)", "oklch(0.5 0.25 266)", "oklch(0.62 0.2 266)", "oklch(0.72 0.15 266)", "oklch(0.84 0.08 266)", "oklch(0.94 0.03 266)"]
+      },
+      "stripe-cobalt": { "role": "primary", "displayName": "Stripe Cobalt", "canonical": "oklch(0.56 0.24 266)", "dark": "oklch(0.62 0.21 266)" },
+      "pace-tape": {
+        "role": "secondary",
+        "displayName": "Pace Tape",
+        "canonical": "oklch(0.87 0.165 92)",
+        "dark": "oklch(0.86 0.16 92)",
+        "tonalRamp": ["oklch(0.2 0.03 80)", "oklch(0.35 0.07 85)", "oklch(0.5 0.11 88)", "oklch(0.65 0.14 90)", "oklch(0.78 0.16 91)", "oklch(0.87 0.165 92)", "oklch(0.92 0.11 93)", "oklch(0.96 0.05 95)"]
+      },
+      "locker-ink": {
+        "role": "neutral",
+        "displayName": "Locker Ink",
+        "canonical": "oklch(0.18 0.014 265)",
+        "dark": "oklch(0.12 0.01 265)",
+        "tonalRamp": ["oklch(0.12 0.01 265)", "oklch(0.18 0.014 265)", "oklch(0.27 0.014 265)", "oklch(0.46 0.016 265)", "oklch(0.74 0.012 265)", "oklch(0.83 0.008 265)", "oklch(0.89 0.006 265)", "oklch(0.945 0.005 265)"]
+      },
+      "chalk": { "role": "neutral", "displayName": "Chalk", "canonical": "oklch(0.974 0.003 95)", "dark": "oklch(0.16 0.012 265)" },
+      "card-white": { "role": "neutral", "displayName": "Card White", "canonical": "oklch(1 0 0)", "dark": "oklch(0.2 0.014 265)" },
+      "bench-gray": { "role": "neutral", "displayName": "Bench Gray", "canonical": "oklch(0.945 0.005 265)", "dark": "oklch(0.24 0.013 265)" },
+      "bench-gray-text": { "role": "neutral", "displayName": "Bench Gray Text", "canonical": "oklch(0.46 0.016 265)", "dark": "oklch(0.73 0.012 265)" },
+      "cobalt-wash": { "role": "neutral", "displayName": "Cobalt Wash", "canonical": "oklch(0.94 0.03 266)", "dark": "oklch(0.28 0.05 266)" },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "oklch(0.89 0.006 265)", "dark": "oklch(1 0 0 / 10%)" },
+      "field-stroke": { "role": "neutral", "displayName": "Field Stroke", "canonical": "oklch(0.83 0.008 265)", "dark": "oklch(1 0 0 / 18%)" },
+      "cleared-green": { "role": "tertiary", "displayName": "Cleared Green", "canonical": "oklch(0.5 0.13 155)", "dark": "oklch(0.74 0.14 155)" },
+      "stop-red": { "role": "tertiary", "displayName": "Stop Red", "canonical": "oklch(0.54 0.21 27)", "dark": "oklch(0.7 0.18 25)" }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Landing headline only." },
+      "headline": { "displayName": "Headline", "purpose": "One page title per page; auth taglines." },
+      "title": { "displayName": "Title", "purpose": "Card, section, empty-state and dialog titles." },
+      "numerals": { "displayName": "Numerals", "purpose": "Sets x reps, tallies, counts, calendar days, pagination." },
+      "body": { "displayName": "Body", "purpose": "Prose, descriptions, table cells." },
+      "label": { "displayName": "Label", "purpose": "Table headers, tags, eyebrow lines, badges." },
+      "control": { "displayName": "Control", "purpose": "Buttons, tab triggers, segmented filters." }
+    },
+    "shadows": [
+      { "name": "raised", "value": "0 1px 2px oklch(0 0 0 / 0.16)", "purpose": "Primary buttons and the active segment of a segmented filter." },
+      { "name": "popover", "value": "0 12px 32px -12px oklch(0 0 0 / 0.35)", "purpose": "Dropdown menus, selects, date picker, toasts." },
+      { "name": "overlay", "value": "0 24px 64px -16px oklch(0 0 0 / 0.42)", "purpose": "Sheets, alert dialogs, the coach chat panel." },
+      { "name": "showcase", "value": "0 24px 48px -24px oklch(0.2 0.05 266 / 0.4)", "purpose": "Auth card and landing sample plan." },
+      { "name": "fab", "value": "0 12px 32px -8px oklch(0.3 0.2 266 / 0.55)", "purpose": "The floating Coach button." },
+      { "name": "baseline", "value": "inset 0 -1px 0 var(--border)", "purpose": "Tabs list baseline." }
+    ],
+    "motion": [
+      { "name": "ease-out-expo", "value": "cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "Signature easing: the strike-wipe on completed exercises, nav underline growth, sheet slide-in." },
+      { "name": "strike-wipe", "value": "transform 420ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The line drawn through a completed exercise name." },
+      { "name": "control-state", "value": "150ms", "purpose": "Button background, border and color transitions." },
+      { "name": "loading-ui-delay", "value": "200ms", "purpose": "Skeletons and parameter-change swaps wait this long so fast loads never flash." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one action per view: uppercase condensed on Kit Cobalt.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Build my plan</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 40px; padding: 0 16px; border: 1px solid transparent; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 1rem; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms, border-color 150ms, color 150ms, transform 150ms; } .ds-btn:active { transform: translateY(1px); } .ds-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.5 0.25 266) 45%, transparent); } .ds-btn-primary { background: oklch(0.5 0.25 266); color: oklch(0.99 0.003 95); box-shadow: 0 1px 2px oklch(0 0 0 / 0.16); } .ds-btn-primary:hover { background: color-mix(in oklch, oklch(0.5 0.25 266), black 12%); }"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Secondary actions next to a primary.",
+      "html": "<button class=\"ds-btn ds-btn-outline\">Add an update</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 16px; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 1rem; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms, border-color 150ms; } .ds-btn-outline { background: oklch(1 0 0); color: oklch(0.18 0.014 265); border: 1px solid oklch(0.83 0.008 265); } .ds-btn-outline:hover { background: oklch(0.945 0.005 265); border-color: color-mix(in oklch, oklch(0.18 0.014 265) 35%, transparent); } .ds-btn-outline:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.5 0.25 266) 45%, transparent); }"
+    },
+    {
+      "name": "Tape Button",
+      "kind": "button",
+      "refersTo": "button-tape",
+      "description": "Attention action: the public Join button, Apply to plan in chat.",
+      "html": "<button class=\"ds-btn ds-btn-tape\">Join</button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; justify-content: center; height: 40px; padding: 0 16px; border: none; border-radius: 6px; font-family: 'Barlow Condensed', sans-serif; font-weight: 600; font-size: 1rem; letter-spacing: 0.05em; text-transform: uppercase; cursor: pointer; transition: background-color 150ms; } .ds-btn-tape { background: oklch(0.87 0.165 92); color: oklch(0.2 0.03 80); } .ds-btn-tape:hover { background: color-mix(in oklch, oklch(0.87 0.165 92), black 8%); }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "40px field with a cobalt focus ring.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">E-mail</span><input class=\"ds-input\" placeholder=\"you@example.com\" /></label>",
+      "css": ".ds-field { display: flex; flex-direction: column; gap: 8px; font-family: 'Barlow', sans-serif; } .ds-field-label { font-size: 0.875rem; font-weight: 500; color: oklch(0.18 0.014 265); } .ds-input { height: 40px; padding: 4px 12px; background: oklch(1 0 0); color: oklch(0.18 0.014 265); border: 1px solid oklch(0.83 0.008 265); border-radius: 6px; font: inherit; font-size: 0.875rem; outline: none; transition: border-color 150ms, box-shadow 150ms; } .ds-input::placeholder { color: oklch(0.46 0.016 265); } .ds-input:hover { border-color: color-mix(in oklch, oklch(0.18 0.014 265) 30%, transparent); } .ds-input:focus-visible { border-color: oklch(0.5 0.25 266); box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.5 0.25 266) 25%, transparent); }"
+    },
+    {
+      "name": "App Header",
+      "kind": "nav",
+      "refersTo": "header",
+      "description": "Sticky Locker Ink bar; the active link carries a Pace Tape underline.",
+      "html": "<nav class=\"ds-header\"><span class=\"ds-brand\"><svg viewBox=\"0 0 24 24\" width=\"24\" height=\"24\"><path d=\"M8.5 3h5L8 21H3z\" fill=\"oklch(0.56 0.24 266)\"/><path d=\"M16.5 3h5L16 21h-5z\" fill=\"oklch(0.87 0.165 92)\"/></svg>Cadence</span><a class=\"ds-nav-link ds-nav-active\" href=\"#\">Home</a><a class=\"ds-nav-link\" href=\"#\">My plan</a><a class=\"ds-nav-link\" href=\"#\">Health profile</a></nav>",
+      "css": ".ds-header { display: flex; align-items: stretch; height: 64px; padding: 0 24px; background: oklch(0.18 0.014 265); color: oklch(0.974 0.003 95); } .ds-brand { display: inline-flex; align-items: center; gap: 8px; margin-right: 24px; font-family: 'Barlow Condensed', sans-serif; font-size: 1.5rem; font-weight: 800; font-style: italic; letter-spacing: 0.05em; text-transform: uppercase; } .ds-nav-link { position: relative; display: flex; align-items: center; padding: 0 14px; font-family: 'Barlow Condensed', sans-serif; font-size: 1rem; font-weight: 600; letter-spacing: 0.05em; text-transform: uppercase; text-decoration: none; color: oklch(0.74 0.012 265); transition: color 150ms; } .ds-nav-link:hover { color: oklch(0.974 0.003 95); } .ds-nav-link::after { content: ''; position: absolute; left: 14px; right: 14px; bottom: 0; height: 3px; background: oklch(0.87 0.165 92); transform: scaleX(0); transform-origin: left; transition: transform 300ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-nav-active { color: oklch(0.974 0.003 95); } .ds-nav-active::after { transform: scaleX(1); }"
+    },
+    {
+      "name": "Status Badges",
+      "kind": "chip",
+      "refersTo": "badge-live",
+      "description": "State by form: solid settled, dashed pending or failed, struck unavailable, tape for edits.",
+      "html": "<div class=\"ds-badges\"><span class=\"ds-badge ds-badge-live\">AI: cleared</span><span class=\"ds-badge ds-badge-negative\">AI: not cleared</span><span class=\"ds-badge ds-badge-retry\">AI: couldn't evaluate</span><span class=\"ds-badge ds-badge-pending\">Pending</span><span class=\"ds-badge ds-badge-unavailable\">Unavailable</span><span class=\"ds-badge ds-badge-tape\">Trainer edited</span></div>",
+      "css": ".ds-badges { display: flex; flex-wrap: wrap; gap: 8px; } .ds-badge { display: inline-flex; align-items: center; height: 24px; padding: 0 8px; border: 1px solid transparent; border-radius: 4px; font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; white-space: nowrap; } .ds-badge-live { background: oklch(0.5 0.13 155); color: oklch(0.99 0.003 95); } .ds-badge-negative { background: oklch(0.54 0.21 27); color: oklch(0.99 0.003 95); } .ds-badge-retry { border: 1px dashed oklch(0.54 0.21 27); color: oklch(0.54 0.21 27); } .ds-badge-pending { border: 1px dashed color-mix(in oklch, oklch(0.18 0.014 265) 40%, transparent); color: oklch(0.18 0.014 265); } .ds-badge-unavailable { border-color: oklch(0.83 0.008 265); color: oklch(0.46 0.016 265); text-decoration: line-through; } .ds-badge-tape { background: oklch(0.87 0.165 92); color: oklch(0.2 0.03 80); }"
+    },
+    {
+      "name": "Kit Panel",
+      "kind": "custom",
+      "refersTo": "kit-panel",
+      "description": "Signature ink panel with a tabular tally and the angled sleeve stripes in the top-right corner.",
+      "html": "<div class=\"ds-kit-panel\"><span class=\"ds-kit-eyebrow\">Today's plan</span><span class=\"ds-kit-tally\">2<span class=\"ds-kit-muted\">/5</span></span></div>",
+      "css": ".ds-kit-panel { position: relative; isolation: isolate; overflow: hidden; display: flex; flex-direction: column; gap: 4px; padding: 16px 80px 12px 24px; border-radius: 8px; background: oklch(0.18 0.014 265); color: oklch(0.974 0.003 95); } .ds-kit-panel::after { content: ''; position: absolute; z-index: -1; top: 0; right: 0; width: 6rem; height: 100%; background: linear-gradient(107deg, transparent 0 40%, oklch(0.56 0.24 266) 41% 53%, transparent 54% 63%, oklch(0.87 0.165 92) 64% 76%, transparent 77%); } .ds-kit-eyebrow { font-family: 'Barlow Condensed', sans-serif; font-size: 0.875rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.74 0.012 265); } .ds-kit-tally { font-family: 'Barlow Condensed', sans-serif; font-size: 3rem; line-height: 1; font-weight: 800; font-variant-numeric: tabular-nums lining-nums; } .ds-kit-muted { color: oklch(0.74 0.012 265); }"
+    },
+    {
+      "name": "Exercise Row",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "Plan row with numerals; checking it strikes the name left to right.",
+      "html": "<label class=\"ds-row\"><input type=\"checkbox\" class=\"ds-check\" checked /><span class=\"ds-row-index\">1</span><span class=\"ds-row-body\"><span class=\"ds-row-name\">Goblet squat</span><span class=\"ds-row-group\">Legs</span></span><span class=\"ds-row-numbers\">4<span class=\"ds-row-x\">&times;</span>8<span class=\"ds-row-load\">16 kg</span></span></label>",
+      "css": ".ds-row { display: flex; align-items: flex-start; gap: 16px; padding: 16px 24px; background: oklch(1 0 0); border: 1px solid oklch(0.89 0.006 265); border-radius: 8px; font-family: 'Barlow', sans-serif; cursor: pointer; } .ds-check { width: 24px; height: 24px; margin: 2px 0 0; accent-color: oklch(0.5 0.25 266); } .ds-row-index { width: 24px; font-family: 'Barlow Condensed', sans-serif; font-size: 1.25rem; font-weight: 700; color: oklch(0.46 0.016 265); } .ds-row-body { display: flex; flex: 1; flex-direction: column; } .ds-row-name { position: relative; width: fit-content; font-weight: 600; color: oklch(0.18 0.014 265); } .ds-row-name::after { content: ''; position: absolute; left: 0; right: 0; top: 55%; height: 2px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-row:has(.ds-check:checked) .ds-row-name { color: oklch(0.46 0.016 265); } .ds-row:has(.ds-check:checked) .ds-row-name::after { transform: scaleX(1); } .ds-row-group { font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.46 0.016 265); } .ds-row-numbers { text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 1.875rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; color: oklch(0.18 0.014 265); } .ds-row-x { padding: 0 2px; color: oklch(0.46 0.016 265); } .ds-row-load { display: block; margin-top: 4px; font-size: 0.875rem; font-weight: 600; color: oklch(0.46 0.016 265); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Club Kit",
+    "overview": "Cadence is the gym's club, and every screen wears its kit. The system borrows from athletic department identity programs: one team color (Kit Cobalt), dark Locker Ink panels against Chalk ground, and a flash of Pace Tape yellow wherever something needs a second look. Headings, labels, buttons and every number are set in a condensed athletic face, uppercase, so a plan reads like a jersey numeral: 3 × 10 @ 20 kg, legible from across the gym floor.\n\nIt is an Operate system, so expression never beats the task. Reading fields stay achromatic and calm; color is spent on actions, live state, and the kit elements that tell you you're in Cadence (the ink header, the brand mark's two slanted bars, and the angled sleeve stripes cut into the corner of ink panels). Density is moderate: generous card padding, clear rows, one strong number per row. Light and dark themes ship together and follow the system preference by default.\n\nConfirmed rejections: the neon-on-black fitness app, the white SaaS card grid, and full-width double stripes (the earlier \"tape under the header\" read as an esports site and was removed).",
+    "keyCharacteristics": [
+      "Condensed uppercase display type and tabular numerals carry the energy; the body face stays quiet.",
+      "One team color (Kit Cobalt) for actions and live state; Pace Tape only for attention.",
+      "Locker Ink panels for kit moments: the header, today's plan header, the auth card top, the kiosk.",
+      "Status is carried by form as well as hue: solid, dashed, struck.",
+      "Tight, confident corners (4 to 8px), flat surfaces, shadows only for things that float."
+    ],
+    "rules": [
+      { "name": "The Team Color Rule", "body": "Kit Cobalt marks what you can do or what is live. If an element is neither an action nor live state, it doesn't get cobalt.", "section": "colors" },
+      { "name": "The Tape Means Look Rule", "body": "Pace Tape is reserved for \"notice this\": edits by someone else, where you are in a sequence, who you are. Never use it for a primary action inside the app.", "section": "colors" },
+      { "name": "The Achromatic Reading Field Rule", "body": "Paragraphs, tables and forms sit on Chalk or Card White with ink and gray text. Color lives at the edges: badges, buttons, kit panels.", "section": "colors" },
+      { "name": "The Jersey Number Rule", "body": "Any count, measure or date component the user scans is set as numerals (condensed, tabular). Never set sets/reps/load in the body face.", "section": "typography" },
+      { "name": "The Scale-Only Rule", "body": "Sizes, tracking and leading come from the Tailwind scale (`text-xs`, `tracking-widest`, `leading-none`), never bracket values. One-off sizes are how a system stops looking like one.", "section": "typography" },
+      { "name": "The Float-Only Shadow Rule", "body": "If it doesn't float, it doesn't cast. A card on the page uses a border, never a shadow.", "section": "elevation" }
+    ],
+    "dos": [
+      "**Do** set every scannable number (sets, reps, counts, days) in Barlow Condensed with tabular figures.",
+      "**Do** keep page titles one per page, Headline size, uppercase, with the description in body gray underneath.",
+      "**Do** use the shared tokens for depth and hover (`shadow-popover`, `bg-primary-hover`); add a new token in `globals.css` if the system genuinely needs one.",
+      "**Do** give every state its own form: solid for settled, dashed for pending or failed, struck for unavailable.",
+      "**Do** keep every page in the same 72rem container as the header.",
+      "**Do** design both themes at once; every color is a role token that `.dark` redefines."
+    ],
+    "donts": [
+      "**Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.",
+      "**Don't** use bracket values for size, tracking, leading, radius or borders (`text-[10px]`, `tracking-[0.04em]`); use the Tailwind scale.",
+      "**Don't** show a technical failure (`pending_retry`, a failed turnstile call) with the solid red \"not cleared\" form.",
+      "**Don't** put a shadow on a card that sits on the page.",
+      "**Don't** use Pace Tape for a primary in-app action, or Kit Cobalt for decoration.",
+      "**Don't** show the app header on sign-in or sign-up, or a theme toggle there; those pages follow the system theme.",
+      "**Don't** use spinners or \"Loading...\" text for data; use matching skeletons behind the 200ms delay."
+    ]
+  }
+}

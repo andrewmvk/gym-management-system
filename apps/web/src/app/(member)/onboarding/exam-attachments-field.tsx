@@ -1,6 +1,7 @@
 'use client';
 
-import { Button } from '@/components/ui/button';
+import { FileIcon, XIcon } from 'lucide-react';
+import { FileDropzone } from '@/components/file-dropzone';
 import { Field, FieldLabel } from '@/components/ui/field';
 
 export interface Attachment {
@@ -24,10 +25,10 @@ function readAsBase64(file: File): Promise<string> {
 }
 
 export function ExamAttachmentsField({ values, onChange }: ExamAttachmentsFieldProps) {
-  async function handleFiles(fileList: FileList | null) {
-    if (!fileList) return;
+  async function handleFiles(files: File[]) {
+    if (files.length === 0) return;
     const added = await Promise.all(
-      Array.from(fileList).map(async (file) => ({
+      files.map(async (file) => ({
         filename: file.name,
         mimeType: file.type,
         base64: await readAsBase64(file),
@@ -38,33 +39,30 @@ export function ExamAttachmentsField({ values, onChange }: ExamAttachmentsFieldP
 
   return (
     <Field>
-      <FieldLabel htmlFor="onboarding-attachments">Exam attachments (image or PDF, optional)</FieldLabel>
-      <input
+      <FieldLabel htmlFor="onboarding-attachments">
+        Exam results <span className="font-normal text-muted-foreground">(optional)</span>
+      </FieldLabel>
+      <FileDropzone
         id="onboarding-attachments"
-        type="file"
-        multiple
         accept="image/jpeg,image/png,application/pdf"
-        onChange={(e) => {
-          void handleFiles(e.target.files);
-          e.target.value = '';
-        }}
+        multiple
+        hint="Images or PDFs of recent medical exams"
+        onFiles={(files) => void handleFiles(files)}
       />
       {values.length > 0 && (
-        <ul className="flex flex-col gap-1">
+        <ul className="flex flex-col divide-y rounded-md border">
           {values.map((attachment, index) => (
-            <li
-              key={`${attachment.filename}-${index}`}
-              className="flex items-center justify-between gap-2 rounded-md border px-3 py-1.5 text-sm"
-            >
-              <span className="truncate">{attachment.filename}</span>
-              <Button
+            <li key={`${attachment.filename}-${index}`} className="flex items-center gap-3 py-1.5 pr-1.5 pl-3 text-sm">
+              <FileIcon className="size-4 shrink-0 text-muted-foreground" />
+              <span className="min-w-0 flex-1 truncate">{attachment.filename}</span>
+              <button
                 type="button"
-                variant="ghost"
-                size="sm"
+                aria-label={`Remove ${attachment.filename}`}
+                className="flex size-8 items-center justify-center rounded-sm text-muted-foreground outline-none hover:bg-muted hover:text-destructive focus-visible:ring-3 focus-visible:ring-ring/45"
                 onClick={() => onChange(values.filter((_, i) => i !== index))}
               >
-                Remove
-              </Button>
+                <XIcon className="size-4" />
+              </button>
             </li>
           ))}
         </ul>

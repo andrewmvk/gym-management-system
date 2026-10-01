@@ -1,29 +1,46 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { ArrowRightIcon, BadgeCheckIcon, SparklesIcon } from 'lucide-react';
+import Link from 'next/link';
+import { useEffect, useState, type ReactNode } from 'react';
+import { OnboardingForm } from '@/app/(member)/onboarding/onboarding-form';
+import { Deferred } from '@/components/deferred';
+import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { MEMBER_HOME_PATH } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
-import { OnboardingForm } from './onboarding-form';
 
 type View = 'form' | 'summary' | 'submitted';
 
-function OnboardingViewSkeleton() {
+function StatusPanel({ icon, title, description, actions }: { icon: ReactNode; title: string; description: string; actions?: ReactNode }) {
   return (
-    <Card className="w-full max-w-lg">
-      <CardHeader>
-        <Skeleton className="h-6 w-48" />
-      </CardHeader>
-      <CardContent>
-        <Skeleton className="h-24 w-full" />
-      </CardContent>
-    </Card>
+    <div className="flex flex-col gap-4 rounded-lg border bg-card p-5 sm:flex-row sm:items-center sm:p-6">
+      <span className="flex size-12 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground">{icon}</span>
+      <div className="flex flex-1 flex-col gap-1">
+        <p className="font-display text-xl font-bold tracking-wide uppercase">{title}</p>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
   );
 }
 
-export function OnboardingView() {
+function OnboardingViewSkeleton() {
+  return (
+    <div className="flex flex-col gap-4 rounded-lg border bg-card p-5 sm:flex-row sm:items-center sm:p-6">
+      <Skeleton className="size-12 shrink-0 rounded-md" />
+      <div className="flex flex-1 flex-col gap-2">
+        <Skeleton className="h-6 w-40" />
+        <Skeleton className="h-4 w-56" />
+      </div>
+      <Skeleton className="h-10 w-48 rounded-md" />
+    </div>
+  );
+}
+
+function OnboardingViewRoot() {
   const trpc = useTRPC();
   const status = useQuery(trpc.onboarding.getStatus.queryOptions());
   const [view, setView] = useState<View | null>(null);
@@ -35,52 +52,67 @@ export function OnboardingView() {
     if (status.data && view === null) setView(status.data.completed ? 'summary' : 'form');
   }, [status.data, view]);
 
-  if (status.isPending || view === null) return <OnboardingViewSkeleton />;
   if (status.isError) {
     return (
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>We couldn&apos;t load your onboarding status.</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Button variant="outline" onClick={() => status.refetch()}>
-            Try again
-          </Button>
-        </CardContent>
-      </Card>
+      <QueryError
+        title="We couldn't load your profile"
+        onRetry={() => status.refetch()}
+        isRetrying={status.isRefetching}
+      />
+    );
+  }
+  if (status.isPending || view === null) {
+    return (
+      <Deferred>
+        <OnboardingViewSkeleton />
+      </Deferred>
     );
   }
 
   if (view === 'submitted') {
     return (
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>Thanks!</CardTitle>
-          <CardDescription>Your plan is being prepared. This can take a moment.</CardDescription>
-        </CardHeader>
-      </Card>
+      <StatusPanel
+        icon={<SparklesIcon className="size-6" />}
+        title="Thanks, got it"
+        description="Your plan is being prepared. This can take a moment."
+        actions={
+          <Button asChild>
+            <Link href={MEMBER_HOME_PATH}>
+              Go to today
+              <ArrowRightIcon data-icon="inline-end" />
+            </Link>
+          </Button>
+        }
+      />
     );
   }
 
   if (view === 'summary') {
     return (
-      <Card className="w-full max-w-lg">
-        <CardHeader>
-          <CardTitle>You&apos;re all set</CardTitle>
-          <CardDescription>
-            {status.data?.lastSubmittedAt
-              ? `Last updated ${new Date(status.data.lastSubmittedAt).toLocaleDateString()}.`
-              : 'Your onboarding information is on file.'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
+      <StatusPanel
+        icon={<BadgeCheckIcon className="size-6" />}
+        title="You're all set"
+        description={
+          status.data.lastSubmittedAt
+            ? `Last updated ${new Date(status.data.lastSubmittedAt).toLocaleDateString(undefined, { day: 'numeric', month: 'long', year: 'numeric' })}. Each update is saved as a new entry.`
+            : 'Your health profile is on file.'
+        }
+        actions={
           <Button variant="outline" onClick={() => setView('form')}>
-            Update my information
+            Add an update
           </Button>
-        </CardContent>
-      </Card>
+        }
+      />
     );
   }
 
-  return <OnboardingForm isUpdate={status.data?.completed ?? false} onSubmitted={() => setView('submitted')} />;
+  return (
+    <OnboardingForm
+      isUpdate={status.data.completed}
+      onSubmitted={() => setView('submitted')}
+      onCancel={status.data.completed ? () => setView('summary') : undefined}
+    />
+  );
 }
+
+export const OnboardingView = Object.assign(OnboardingViewRoot, { Skeleton: OnboardingViewSkeleton });

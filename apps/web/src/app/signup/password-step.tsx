@@ -7,8 +7,9 @@ import { useRouter } from 'next/navigation';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { BadgeCheckIcon } from 'lucide-react';
+import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useTRPC } from '@/lib/trpc';
@@ -53,12 +54,12 @@ export function PasswordStep({ userId }: PasswordStepProps) {
   );
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Set your password</CardTitle>
-        <CardDescription>You&apos;re cleared to train. Set a password to finish creating your account.</CardDescription>
-      </CardHeader>
-      <CardContent>
+    <StepPanel
+      icon={BadgeCheckIcon}
+      title="You're cleared to train"
+      description="Set a password to finish creating your account."
+    >
+      <div>
         <form
           noValidate
           onSubmit={form.handleSubmit((values) => setPassword.mutate({ userId: values.userId, password: values.password }))}
@@ -98,12 +99,12 @@ export function PasswordStep({ userId }: PasswordStepProps) {
                 </Field>
               )}
             />
-            <Button type="submit" className="w-full" disabled={setPassword.isPending}>
+            <Button type="submit" size="lg" className="w-full mt-4" disabled={setPassword.isPending}>
               {setPassword.isPending ? 'Creating account...' : 'Create account'}
             </Button>
           </FieldGroup>
         </form>
-      </CardContent>
-    </Card>
+      </div>
+    </StepPanel>
   );
 }

@@ -35,6 +35,7 @@ Every change should respect these (from `PRODUCT.md`):
 | [`rules/naming-conventions.md`](./rules/naming-conventions.md) | naming a file, component, variable, tRPC procedure, or branch/commit |
 | [`rules/error-handling.md`](./rules/error-handling.md) | handling an AI/turnstile failure, validation error, or surfacing an error to the UI |
 | [`rules/frontend.md`](./rules/frontend.md) | writing anything in `apps/web` - data fetching, loading states (Skeleton), forms, styling, routing |
+| [`DESIGN.md`](./DESIGN.md) | building or changing any UI - always through the `/impeccable` skill; it defines the visual system (tokens, components, do's and don'ts) |
 | [`rules/backend.md`](./rules/backend.md) | writing anything in `apps/api` - routers, services, AI calls, auth, uploads |
 | [`rules/database.md`](./rules/database.md) | touching Drizzle schema, migrations, or seed data |
 | [`rules/testing.md`](./rules/testing.md) | deciding whether/how to test something |
@@ -46,9 +47,9 @@ Every change should respect these (from `PRODUCT.md`):
 
 ## Keeping docs in sync
 
-`docs/`, `PRODUCT.md`, and the `rules/*.md` files describe the current, agreed-upon shape of this project - treat drift between them and the code as a bug, not a detail to skip. Whenever a change touches scope, the data model, a user-facing flow, or an architecture decision:
+`docs/`, `PRODUCT.md`, `DESIGN.md`, and the `rules/*.md` files describe the current, agreed-upon shape of this project - treat drift between them and the code as a bug, not a detail to skip. Whenever a change touches scope, the data model, a user-facing flow, the visual design system, or an architecture decision:
 
-1. Check whether it's still consistent with `docs/`, `PRODUCT.md`, and the relevant `rules/*.md` file.
+1. Check whether it's still consistent with `docs/`, `PRODUCT.md`, `DESIGN.md`, and the relevant `rules/*.md` file.
 2. If it isn't, tell the developer which doc(s) are now out of date and why - before writing any doc changes.
 3. Only update the docs after the developer approves. Don't let them silently drift out of sync, and don't rewrite them speculatively without confirmation first.
 

@@ -2,13 +2,18 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PlusIcon, WrenchIcon } from 'lucide-react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useAppAbility } from '@/abilities';
+import { Deferred } from '@/components/deferred';
+import { EmptyState } from '@/components/empty-state';
+import { QueryError } from '@/components/query-error';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
@@ -19,21 +24,16 @@ const CreateEquipmentSchema = z.object({
 });
 type CreateEquipmentInput = z.infer<typeof CreateEquipmentSchema>;
 
-function EquipmentSectionSkeleton() {
+function EquipmentListSkeleton() {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Equipment</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-3">
-        {Array.from({ length: 4 }, (_, index) => (
-          <div key={index} className="flex items-center justify-between gap-2">
-            <Skeleton className="h-6 w-40" />
-            <Skeleton className="h-5 w-8 rounded-full" />
-          </div>
-        ))}
-      </CardContent>
-    </Card>
+    <ul className="divide-y overflow-hidden rounded-lg border bg-card">
+      {Array.from({ length: 5 }, (_, index) => (
+        <li key={index} className="flex min-h-15 items-center justify-between gap-4 px-5 sm:px-6">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-6 w-11 rounded-full" />
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -54,17 +54,21 @@ function EquipmentToggle({ id, name, isAvailable }: { id: string; name: string; 
   );
 
   return (
-    <div className="flex items-center justify-between gap-2">
-      <FieldLabel htmlFor={`equipment-${id}`} className="font-normal">
-        {name}
-      </FieldLabel>
+    <label
+      htmlFor={`equipment-${id}`}
+      className="flex min-h-15 items-center justify-between gap-4 px-5 transition-colors hover:bg-muted/60 sm:px-6"
+    >
+      <span className="flex flex-col">
+        <span className="font-semibold">{name}</span>
+        <span className="text-sm text-muted-foreground">{isAvailable ? 'Available on the floor' : 'Out of service'}</span>
+      </span>
       <Switch
         id={`equipment-${id}`}
         checked={isAvailable}
         disabled={toggle.isPending}
         onCheckedChange={() => toggle.mutate({ id })}
       />
-    </div>
+    </label>
   );
 }
 
@@ -78,33 +82,41 @@ function CreateEquipmentForm() {
 
   const create = useMutation(
     trpc.catalog.createEquipment.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (_result, variables) => {
         queryClient.invalidateQueries({ queryKey: trpc.catalog.listEquipment.queryKey() });
         form.reset();
+        toast.message(`${variables.name} added.`);
       },
       onError: () => toast.error("Couldn't add the equipment. Try again."),
     }),
   );
 
   return (
-    <form noValidate onSubmit={form.handleSubmit((values) => create.mutate(values))}>
-      <FieldGroup>
-        <Controller
-          name="name"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="equipment-name">New equipment</FieldLabel>
-              <Input {...field} id="equipment-name" placeholder="e.g. Battle ropes" aria-invalid={fieldState.invalid} />
-              {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-            </Field>
-          )}
-        />
-        <Button type="submit" variant="outline" disabled={create.isPending}>
-          {create.isPending ? 'Adding...' : 'Add equipment'}
-        </Button>
-      </FieldGroup>
-    </form>
+    <Card>
+      <CardHeader>
+        <CardTitle>Add equipment</CardTitle>
+        <CardDescription>Switching an item off makes exercises that rely only on it unavailable.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form noValidate className="flex flex-col gap-4" onSubmit={form.handleSubmit((values) => create.mutate(values))}>
+          <Controller
+            name="name"
+            control={form.control}
+            render={({ field, fieldState }) => (
+              <Field data-invalid={fieldState.invalid}>
+                <FieldLabel htmlFor="equipment-name">Name</FieldLabel>
+                <Input {...field} id="equipment-name" placeholder="e.g. Battle ropes" aria-invalid={fieldState.invalid} />
+                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+              </Field>
+            )}
+          />
+          <Button type="submit" disabled={create.isPending}>
+            <PlusIcon data-icon="inline-start" />
+            {create.isPending ? 'Adding...' : 'Add equipment'}
+          </Button>
+        </form>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -114,41 +126,46 @@ function EquipmentSectionRoot() {
   const canManage = ability.can('manage', 'Catalog');
   const query = useQuery(trpc.catalog.listEquipment.queryOptions());
 
+  let list;
+  if (query.isPending) {
+    list = (
+      <Deferred>
+        <EquipmentListSkeleton />
+      </Deferred>
+    );
+  } else if (query.isError) {
+    list = <QueryError title="We couldn't load the equipment" onRetry={() => query.refetch()} isRetrying={query.isRefetching} />;
+  } else if (query.data.length === 0) {
+    list = (
+      <div className="rounded-lg border bg-card">
+        <EmptyState icon={WrenchIcon} title="No equipment yet" description="Bodyweight exercises work without any." />
+      </div>
+    );
+  } else {
+    list = (
+      <ul className="divide-y overflow-hidden rounded-lg border bg-card">
+        {query.data.map((item) =>
+          canManage ? (
+            <li key={item.id}>
+              <EquipmentToggle id={item.id} name={item.name} isAvailable={item.isAvailable} />
+            </li>
+          ) : (
+            <li key={item.id} className="flex min-h-15 items-center justify-between gap-4 px-5 sm:px-6">
+              <span className="font-semibold">{item.name}</span>
+              <Badge variant={item.isAvailable ? 'live' : 'unavailable'}>{item.isAvailable ? 'Available' : 'Unavailable'}</Badge>
+            </li>
+          ),
+        )}
+      </ul>
+    );
+  }
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Equipment</CardTitle>
-      </CardHeader>
-      <CardContent className="flex flex-col gap-4">
-        {query.isPending && (
-          <div className="flex flex-col gap-3">
-            {Array.from({ length: 4 }, (_, index) => (
-              <div key={index} className="flex items-center justify-between gap-2">
-                <Skeleton className="h-6 w-40" />
-                <Skeleton className="h-5 w-8 rounded-full" />
-              </div>
-            ))}
-          </div>
-        )}
-        {query.isError && <p className="text-sm text-destructive">We couldn't load the equipment list.</p>}
-        {query.isSuccess && query.data.length === 0 && (
-          <p className="text-sm text-muted-foreground">No equipment yet.</p>
-        )}
-        {query.isSuccess &&
-          query.data.map((item) =>
-            canManage ? (
-              <EquipmentToggle key={item.id} id={item.id} name={item.name} isAvailable={item.isAvailable} />
-            ) : (
-              <div key={item.id} className="flex items-center justify-between gap-2">
-                <span>{item.name}</span>
-                <span className="text-sm text-muted-foreground">{item.isAvailable ? 'Available' : 'Unavailable'}</span>
-              </div>
-            ),
-          )}
-        {canManage && <CreateEquipmentForm />}
-      </CardContent>
-    </Card>
+    <div className={canManage ? 'grid items-start gap-6 lg:grid-cols-3' : undefined}>
+      <div className="min-w-0 lg:col-span-2">{list}</div>
+      {canManage && <CreateEquipmentForm />}
+    </div>
   );
 }
 
-export const EquipmentSection = Object.assign(EquipmentSectionRoot, { Skeleton: EquipmentSectionSkeleton });
+export const EquipmentSection = Object.assign(EquipmentSectionRoot, { Skeleton: EquipmentListSkeleton });

@@ -1,9 +1,10 @@
 'use client';
 
 import { useMutation } from '@tanstack/react-query';
+import { RotateCwIcon } from 'lucide-react';
 import { toast } from 'sonner';
+import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPC } from '@/lib/trpc';
 
 interface AptitudeResultStepProps {
@@ -30,18 +31,15 @@ export function AptitudeResultStep({ userId, onRechecked }: AptitudeResultStepPr
   );
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Still processing</CardTitle>
-        <CardDescription>
-          We couldn&apos;t evaluate your questionnaire yet. This is a temporary issue on our side, not a rejection.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Button className="w-full" disabled={recheck.isPending} onClick={() => recheck.mutate({ userId })}>
-          {recheck.isPending ? 'Checking...' : 'Check again'}
-        </Button>
-      </CardContent>
-    </Card>
+    <StepPanel
+      icon={RotateCwIcon}
+      tone="pending"
+      title="Still processing"
+      description="We couldn't evaluate your questionnaire yet. This is a temporary issue on our side, not a rejection. Your answers are saved."
+    >
+      <Button size="lg" className="w-full" disabled={recheck.isPending} onClick={() => recheck.mutate({ userId })}>
+        {recheck.isPending ? 'Checking...' : 'Check again'}
+      </Button>
+    </StepPanel>
   );
 }

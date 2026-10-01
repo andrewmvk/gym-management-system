@@ -1,13 +1,13 @@
+import { ChatPanel } from '@/app/(member)/chat-panel';
 import { AppHeader } from '@/components/app-header';
 import { AuthGuard } from '@/components/auth-guard';
 import { GuardedContent } from '@/components/guarded-content';
 import { OnboardingGate } from '@/components/onboarding-gate';
-import { ChatPanel } from './chat-panel';
 
 export default function MemberLayout({ children }: LayoutProps<'/'>) {
   return (
     <>
-      <AppHeader area="Member" />
+      <AppHeader area="member" />
       <AuthGuard action="read" subject="MemberApp">
         {/* FR-25: the chat is available "at any time," so it sits outside OnboardingGate rather than
             waiting for onboarding to complete like the rest of the member app. GuardedContent keeps it

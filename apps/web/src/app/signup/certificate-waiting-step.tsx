@@ -1,9 +1,10 @@
 'use client';
 
+import { HourglassIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useTRPCClient } from '@/lib/trpc';
 
 interface CertificateWaitingStepProps {
@@ -24,6 +25,7 @@ export function CertificateWaitingStep({ userId, onStatusChanged }: CertificateW
       const result = await trpcClient.aptitude.getStatus.query({ userId });
       if (result.status === 'cleared' || result.status === 'rejected' || result.status === 'certificate_pending_review') {
         onStatusChanged(result.status);
+        if (result.status === 'certificate_pending_review') toast.message('Still under review. Check back later.');
         return;
       }
       toast.message('Still under review. Check back later.');
@@ -35,19 +37,15 @@ export function CertificateWaitingStep({ userId, onStatusChanged }: CertificateW
   }
 
   return (
-    <Card className="w-full max-w-sm">
-      <CardHeader>
-        <CardTitle>Your certificate is under review</CardTitle>
-        <CardDescription>
-          An admin needs to review your medical certificate before you can continue. This can take a while - come
-          back and check later.
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <Button className="w-full" variant="outline" disabled={checking} onClick={() => void checkStatus()}>
-          {checking ? 'Checking...' : 'Check status'}
-        </Button>
-      </CardContent>
-    </Card>
+    <StepPanel
+      icon={HourglassIcon}
+      tone="pending"
+      title="Under review"
+      description="A gym admin needs to review your medical certificate before you can continue. This can take a while. Come back to this page and check later."
+    >
+      <Button size="lg" className="w-full" variant="outline" disabled={checking} onClick={() => void checkStatus()}>
+        {checking ? 'Checking...' : 'Check status'}
+      </Button>
+    </StepPanel>
   );
 }

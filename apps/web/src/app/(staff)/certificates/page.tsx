@@ -1,14 +1,17 @@
 'use client';
 
+import { CertificateQueue } from '@/app/(staff)/certificates/certificate-queue';
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
-import { CertificateQueue } from './certificate-queue';
+
+const TITLE = 'Certificates';
+const DESCRIPTION = 'Every medical certificate lands here for an admin decision, whatever the AI said.';
 
 function CertificatesSkeleton() {
   return (
-    <PageContainer width="wide">
-      <PageHeading.Skeleton />
+    <PageContainer>
+      <PageHeading title={TITLE} description={DESCRIPTION} />
       <CertificateQueue.Skeleton />
     </PageContainer>
   );
@@ -17,11 +20,8 @@ function CertificatesSkeleton() {
 export default function CertificatesPage() {
   return (
     <GuardedContent skeleton={<CertificatesSkeleton />}>
-      <PageContainer width="wide">
-        <PageHeading
-          title="Certificate review"
-          description="Every medical certificate lands here, whatever the AI said (FR-6)."
-        />
+      <PageContainer>
+        <PageHeading title={TITLE} description={DESCRIPTION} />
         <CertificateQueue />
       </PageContainer>
     </GuardedContent>

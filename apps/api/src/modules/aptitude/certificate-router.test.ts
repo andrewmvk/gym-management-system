@@ -1,5 +1,3 @@
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
@@ -10,6 +8,8 @@ import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 const TINY_JPEG_BASE64 =
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
@@ -80,7 +80,12 @@ describe('certificates router', () => {
   it('lets an admin list the queue and review a certificate', async () => {
     const anonymous = await callerFor();
     const userId = await notClearedApplicant(anonymous);
-    await anonymous.certificates.upload({ userId, filename: 'certificate.jpg', mimeType: 'image/jpeg', base64: TINY_JPEG_BASE64 });
+    await anonymous.certificates.upload({
+      userId,
+      filename: 'certificate.jpg',
+      mimeType: 'image/jpeg',
+      base64: TINY_JPEG_BASE64,
+    });
 
     const [admin] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_ADMIN_EMAIL));
     const adminCaller = await callerFor(signSessionToken(admin!.id));

@@ -18,6 +18,40 @@ docs/             Product/requirements/architecture/data-model docs (source of t
 rules/            Code-level conventions for AI agents - see table below
 ```
 
+## Commands
+
+**Always use `pnpm`. Never `npm`, `npx`, `yarn`, or `bun`** (the repo is a pnpm workspace and pins `packageManager`). Run everything from the repo root; root scripts fan out to the workspaces.
+
+| Command | What it does |
+|---|---|
+| `pnpm install` | Install all workspace dependencies |
+| `pnpm dev` | Start the web (Next.js) and api (tsx watch) dev servers in parallel |
+| `pnpm build` | Build every workspace (`next build` for web, `tsc` for api and shared) |
+| `pnpm test` | Run the Vitest suites of every workspace (`vitest run`) |
+| `pnpm --filter <workspace> exec vitest run path/to/test.spec.ts` | Run a single test file |
+| `pnpm types` | Type check every workspace with `tsc --noEmit`, no emit and no build |
+| `pnpm fix` | Biome lint and format with auto-fix across the repo |
+| `pnpm check` | Biome lint and format check only, no files are changed; fails on any issue |
+| `pnpm db:up` | Start the PostgreSQL container on `127.0.0.1:5432` and wait until it is ready |
+| `pnpm db:down` | Stop the PostgreSQL container |
+| `pnpm db:generate` | Generate a Drizzle migration from schema changes |
+| `pnpm db:migrate` | Apply pending migrations |
+| `pnpm db:seed` | Load the seed data |
+| `pnpm db:reset` | Drop and recreate the schema, then re-migrate and re-seed |
+| `pnpm db:studio` | Open Drizzle Studio to browse the database |
+
+To target one workspace, use `pnpm --filter @cadence/web <script>` (or `@cadence/api`, `@cadence/shared`).
+
+## Verification loop
+
+Before every commit, run these three commands from the repo root, in this order, and fix whatever they report:
+
+1. `pnpm fix` - Biome lint and format with auto-fix. Review what it changed before staging.
+2. `pnpm types` - type check only.
+3. `pnpm test` - Vitest.
+
+That is the whole loop. `pnpm build` is not part of it; run it only when a change specifically needs a production build. Don't commit while any of the three is failing.
+
 ## Non-negotiable product principles
 
 Every change should respect these (from `PRODUCT.md`):

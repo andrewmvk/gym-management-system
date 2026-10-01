@@ -11,7 +11,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { setThemePreference, useResolvedTheme, useThemePreference, type ThemePreference } from '@/lib/theme';
+import { setThemePreference, type ThemePreference, useResolvedTheme, useThemePreference } from '@/lib/theme';
 import { cn } from '@/lib/utils';
 
 export const THEME_OPTIONS: { value: ThemePreference; label: string; icon: typeof SunIcon }[] = [
@@ -38,7 +38,10 @@ export function ThemeToggle({ className }: { className?: string }) {
           Theme
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuRadioGroup value={preference} onValueChange={(value) => setThemePreference(value as ThemePreference)}>
+        <DropdownMenuRadioGroup
+          value={preference}
+          onValueChange={(value) => setThemePreference(value as ThemePreference)}
+        >
           {THEME_OPTIONS.map(({ value, label, icon: OptionIcon }) => (
             <DropdownMenuRadioItem key={value} value={value}>
               <OptionIcon />

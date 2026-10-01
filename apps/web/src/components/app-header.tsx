@@ -12,7 +12,7 @@ import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/user-menu';
-import { isNavItemActive, NAV_ITEMS, type AppArea, type NavItem } from '@/lib/navigation';
+import { type AppArea, isNavItemActive, NAV_ITEMS, type NavItem } from '@/lib/navigation';
 import { MEMBER_HOME_PATH, STAFF_HOME_PATH } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -48,7 +48,10 @@ function MobileNav({ items, pathname }: { items: NavItem[]; pathname: string }) 
                   isActive ? 'text-kit-foreground' : 'text-kit-muted hover:text-kit-foreground',
                 )}
               >
-                <span className={cn('h-6 w-1.5 -skew-x-12 rounded-xs', isActive ? 'bg-tape' : 'bg-transparent')} aria-hidden />
+                <span
+                  className={cn('h-6 w-1.5 -skew-x-12 rounded-xs', isActive ? 'bg-tape' : 'bg-transparent')}
+                  aria-hidden
+                />
                 {item.label}
               </Link>
             );

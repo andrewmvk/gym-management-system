@@ -2,8 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
+import { resolveUploadPath, type SaveUploadInput, sanitizeFilename, saveUpload } from '@api/lib/uploads';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { resolveUploadPath, sanitizeFilename, saveUpload, type SaveUploadInput } from '@api/lib/uploads';
 
 const JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x00, 0x10]);
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00]);
@@ -14,7 +14,14 @@ let uploadsDir: string;
 const ownerId = randomUUID();
 
 function input(overrides: Partial<SaveUploadInput> = {}): SaveUploadInput {
-  return { ownerId, kind: 'reference_photo', filename: 'me.jpg', mimeType: 'image/jpeg', base64: JPEG.toString('base64'), ...overrides };
+  return {
+    ownerId,
+    kind: 'reference_photo',
+    filename: 'me.jpg',
+    mimeType: 'image/jpeg',
+    base64: JPEG.toString('base64'),
+    ...overrides,
+  };
 }
 
 function padded(header: Buffer, totalBytes: number) {
@@ -38,7 +45,11 @@ describe('saveUpload', () => {
   it.each([
     ['a PNG photo', { mimeType: 'image/png', base64: PNG.toString('base64') }, 'png'],
     ['a PDF exam', { kind: 'exam', mimeType: 'application/pdf', base64: PDF.toString('base64') }, 'pdf'],
-    ['a data URL certificate', { kind: 'certificate', base64: `data:image/jpeg;base64,${JPEG.toString('base64')}` }, 'jpg'],
+    [
+      'a data URL certificate',
+      { kind: 'certificate', base64: `data:image/jpeg;base64,${JPEG.toString('base64')}` },
+      'jpg',
+    ],
   ] as const)('accepts %s', async (_, overrides, extension) => {
     const saved = await saveUpload(input(overrides), uploadsDir);
 
@@ -47,7 +58,11 @@ describe('saveUpload', () => {
 
   it.each([
     ['a PDF photo', { mimeType: 'application/pdf', base64: PDF.toString('base64') }, 'not allowed'],
-    ['a PDF certificate', { kind: 'certificate', mimeType: 'application/pdf', base64: PDF.toString('base64') }, 'not allowed'],
+    [
+      'a PDF certificate',
+      { kind: 'certificate', mimeType: 'application/pdf', base64: PDF.toString('base64') },
+      'not allowed',
+    ],
     ['an unknown type', { kind: 'exam', mimeType: 'image/gif' }, 'not allowed'],
     ['content that does not match the type', { mimeType: 'image/png' }, 'does not match'],
     ['invalid base64', { base64: 'not base64!' }, 'not valid base64'],

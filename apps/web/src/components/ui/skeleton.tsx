@@ -1,13 +1,7 @@
-import { cn } from "cn"
+import { cn } from 'cn';
 
-function Skeleton({ className, ...props }: React.ComponentProps<"div">) {
-  return (
-    <div
-      data-slot="skeleton"
-      className={cn("animate-pulse rounded-sm bg-foreground/7", className)}
-      {...props}
-    />
-  )
+function Skeleton({ className, ...props }: React.ComponentProps<'div'>) {
+  return <div data-slot="skeleton" className={cn('animate-pulse rounded-sm bg-foreground/7', className)} {...props} />;
 }
 
-export { Skeleton }
+export { Skeleton };

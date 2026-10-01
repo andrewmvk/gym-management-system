@@ -3,7 +3,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { ExamAttachmentsField, type Attachment } from '@/app/(member)/onboarding/exam-attachments-field';
+import { type Attachment, ExamAttachmentsField } from '@/app/(member)/onboarding/exam-attachments-field';
 import { StringListField } from '@/app/(member)/onboarding/string-list-field';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
@@ -93,7 +93,11 @@ export function OnboardingForm({ isUpdate, onSubmitted, onCancel }: OnboardingFo
             />
             <Field>
               <FieldLabel htmlFor="onboarding-other-notes">Anything else we should know?</FieldLabel>
-              <Textarea id="onboarding-other-notes" value={otherNotes} onChange={(e) => setOtherNotes(e.target.value)} />
+              <Textarea
+                id="onboarding-other-notes"
+                value={otherNotes}
+                onChange={(e) => setOtherNotes(e.target.value)}
+              />
             </Field>
             <ExamAttachmentsField values={attachments} onChange={setAttachments} />
           </FieldGroup>

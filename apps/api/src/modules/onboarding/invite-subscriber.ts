@@ -1,8 +1,8 @@
 import { env } from '@api/config/env';
 import { sendEmail as defaultSendEmail } from '@api/lib/email';
 import { logger } from '@api/lib/logger';
-import { findUserById } from '@api/modules/auth/repository';
 import { subscribeToMemberActivated } from '@api/modules/auth/member-activated';
+import { findUserById } from '@api/modules/auth/repository';
 
 const log = logger.child({ module: 'onboarding' });
 

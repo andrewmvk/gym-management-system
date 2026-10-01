@@ -1,6 +1,6 @@
-import { asc, eq } from 'drizzle-orm';
-import { db, type DatabaseExecutor } from '@api/db/client';
+import { type DatabaseExecutor, db } from '@api/db/client';
 import { dExerciseEquipment, dExercises, dGymEquipment } from '@api/db/schema';
+import { asc, eq } from 'drizzle-orm';
 
 export async function findExercisesWithEquipment(executor: DatabaseExecutor = db) {
   const exercises = await executor.select().from(dExercises).orderBy(asc(dExercises.name));

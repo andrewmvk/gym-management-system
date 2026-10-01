@@ -1,8 +1,3 @@
-import { MEMBER_POLICY_IDS } from '@cadence/shared/auth';
-import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
-import bcrypt from 'bcryptjs';
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
@@ -12,6 +7,11 @@ import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
+import { MEMBER_POLICY_IDS } from '@cadence/shared/auth';
+import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
+import bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MEMBER_EMAIL = 'member@example.com';
 
@@ -63,10 +63,12 @@ describe('catalog', () => {
     const equipment = await caller.catalog.listEquipment();
 
     expect(equipment.length).toBeGreaterThanOrEqual(12);
-    expect(equipment.filter((item) => !item.isAvailable).map((item) => item.name).sort()).toEqual([
-      'Rowing Machine',
-      'Stationary Bike',
-    ]);
+    expect(
+      equipment
+        .filter((item) => !item.isAvailable)
+        .map((item) => item.name)
+        .sort(),
+    ).toEqual(['Rowing Machine', 'Stationary Bike']);
   });
 
   describe('a member without the catalog-management policy', () => {
@@ -74,7 +76,12 @@ describe('catalog', () => {
       const caller = await callerFor(await memberToken());
 
       await expect(
-        caller.catalog.createExercise({ name: 'Test Exercise', muscleGroup: 'legs', instructions: 'Do it.', equipmentIds: [] }),
+        caller.catalog.createExercise({
+          name: 'Test Exercise',
+          muscleGroup: 'legs',
+          instructions: 'Do it.',
+          equipmentIds: [],
+        }),
       ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
 

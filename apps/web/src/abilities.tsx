@@ -1,7 +1,7 @@
 'use client';
 
 import type { AppAbility } from '@cadence/shared/auth';
-import { AbilityProvider, Can as CaslCan, useAbility, type CanProps } from '@casl/react';
+import { AbilityProvider, type CanProps, Can as CaslCan, useAbility } from '@casl/react';
 
 export { AbilityProvider };
 

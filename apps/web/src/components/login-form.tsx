@@ -1,7 +1,7 @@
 'use client';
 
 import { createAppAbility } from '@cadence/shared/auth';
-import { LoginInputSchema, type LoginInput } from '@cadence/shared/schemas/auth';
+import { type LoginInput, LoginInputSchema } from '@cadence/shared/schemas/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -54,7 +54,13 @@ export function LoginForm() {
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="login-email">E-mail</FieldLabel>
-                <Input {...field} id="login-email" type="email" autoComplete="email" aria-invalid={fieldState.invalid} />
+                <Input
+                  {...field}
+                  id="login-email"
+                  type="email"
+                  autoComplete="email"
+                  aria-invalid={fieldState.invalid}
+                />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}

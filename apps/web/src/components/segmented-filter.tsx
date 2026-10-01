@@ -8,7 +8,13 @@ interface SegmentedFilterProps<T extends string> {
   className?: string;
 }
 
-export function SegmentedFilter<T extends string>({ label, value, options, onChange, className }: SegmentedFilterProps<T>) {
+export function SegmentedFilter<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+  className,
+}: SegmentedFilterProps<T>) {
   return (
     <div role="radiogroup" aria-label={label} className={cn('inline-flex rounded-md border bg-muted p-0.5', className)}>
       {options.map((option) => {
@@ -26,7 +32,9 @@ export function SegmentedFilter<T extends string>({ label, value, options, onCha
             )}
           >
             {option.label}
-            {option.count !== undefined && <span className="numerals text-base text-muted-foreground">{option.count}</span>}
+            {option.count !== undefined && (
+              <span className="numerals text-base text-muted-foreground">{option.count}</span>
+            )}
           </button>
         );
       })}

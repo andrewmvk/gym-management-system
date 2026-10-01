@@ -1,5 +1,5 @@
-import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 import { dUsers } from '@api/db/schema/users';
+import { pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
 
 // Append-only (FR-46, RN-12): a new consent is a new row, never an edit to an old one, so the system
 // can always prove what a member agreed to and when, not just what is true today.

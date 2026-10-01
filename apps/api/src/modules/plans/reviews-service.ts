@@ -1,6 +1,6 @@
 import { listExercises } from '@api/modules/catalog/service';
-import * as repository from '@api/modules/plans/repository';
 import type { PlanExerciseInput } from '@api/modules/plans/repository';
+import * as repository from '@api/modules/plans/repository';
 
 const DEFAULT_EDIT_NOTE = 'Exercises updated';
 
@@ -35,6 +35,11 @@ export async function editPlan(planId: string, userId: string, exercises: PlanEx
   if (!plan) return null;
 
   const updated = await repository.editPlanExercises({ planId, exercises, editedByUserId: userId });
-  await repository.insertReview({ trainingPlanId: planId, userId, note: note?.trim() || DEFAULT_EDIT_NOTE, isEdit: true });
+  await repository.insertReview({
+    trainingPlanId: planId,
+    userId,
+    note: note?.trim() || DEFAULT_EDIT_NOTE,
+    isEdit: true,
+  });
   return updated;
 }

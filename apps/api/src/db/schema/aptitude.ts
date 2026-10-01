@@ -1,6 +1,6 @@
+import { dUsers } from '@api/db/schema/users';
 import type { QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
 import { jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-core';
-import { dUsers } from '@api/db/schema/users';
 
 export const aiResult = pgEnum('ai_result', ['cleared', 'not_cleared', 'pending_retry']);
 export const certificateDecision = pgEnum('certificate_decision', ['cleared', 'not_cleared']);

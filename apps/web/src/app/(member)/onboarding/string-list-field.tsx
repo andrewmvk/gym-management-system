@@ -23,7 +23,7 @@ export function StringListField({ id, label, description, placeholder, values, o
   function addDraft() {
     const trimmed = draft.trim();
     if (!trimmed) return;
-    onChange([...values, trimmed]);
+    if (!values.includes(trimmed)) onChange([...values, trimmed]);
     setDraft('');
   }
 
@@ -53,7 +53,7 @@ export function StringListField({ id, label, description, placeholder, values, o
         <ul className="flex flex-wrap gap-2">
           {values.map((value, index) => (
             <li
-              key={`${value}-${index}`}
+              key={value}
               className="flex h-8 items-center gap-1 rounded-sm bg-secondary pr-1 pl-3 text-sm font-medium"
             >
               {value}

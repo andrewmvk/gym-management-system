@@ -1,8 +1,8 @@
+import * as service from '@api/modules/plans/reviews-service';
+import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 import { subject } from '@cadence/shared/auth';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
-import * as service from '@api/modules/plans/reviews-service';
-import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 
 // CASL matches a bare subject-type check ("read", "TrainingPlan") against ANY rule for that type,
 // conditions included - it can't rule out a conditioned (self-scope) rule without a real object to test

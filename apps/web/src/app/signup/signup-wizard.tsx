@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { type ReactNode, useEffect, useState } from 'react';
 import { AptitudeResultStep } from '@/app/signup/aptitude-result-step';
 import { BasicInfoStep } from '@/app/signup/basic-info-step';
 import { CertificateStep } from '@/app/signup/certificate-step';
@@ -61,6 +61,7 @@ export function SignupWizard() {
   // FR-46 / RN-12: a resumed signup goes through consent again by default, since a plain reload can't
   // tell whether photo (and thus consent) already happened. If a questionnaire already exists for this
   // applicant, that's proof photo and consent are both done, so skip straight to its result instead.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per client; goToAptitudeStep only calls the stable setStep.
   useEffect(() => {
     const storedUserId = sessionStorage.getItem(STORAGE_KEY);
     if (!storedUserId) return;
@@ -74,7 +75,6 @@ export function SignupWizard() {
         goToAptitudeStep(result.status);
       })
       .catch(() => {});
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [trpcClient]);
 
   function handleResolved(result: { userId: string; nextStep: 'photo' | 'done' }) {

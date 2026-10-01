@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest';
 import { appRouter } from '@api/trpc/app-router';
 import type { Context } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
+import { describe, expect, it } from 'vitest';
 
 describe('system.health', () => {
   it('answers ok', async () => {

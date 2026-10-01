@@ -1,6 +1,6 @@
-import type { ProfileEventType } from '@cadence/shared/schemas/profile-events';
-import { db, type DatabaseExecutor } from '@api/db/client';
+import { type DatabaseExecutor, db } from '@api/db/client';
 import { fProfileEvents } from '@api/db/schema';
+import type { ProfileEventType } from '@cadence/shared/schemas/profile-events';
 
 export interface ProfileEventInput {
   userId: string;

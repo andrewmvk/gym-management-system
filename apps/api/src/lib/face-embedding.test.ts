@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
 import { createFaceEmbedder, FACE_EMBEDDING_LENGTH } from '@api/lib/face-embedding';
+import { describe, expect, it } from 'vitest';
 
 const image = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5]);
 

@@ -24,6 +24,11 @@ function readAsBase64(file: File): Promise<string> {
   });
 }
 
+// Doubles as the list key, so picking the same file twice must not add a second entry.
+function attachmentKey(attachment: Attachment) {
+  return `${attachment.filename}:${attachment.base64.length}`;
+}
+
 export function ExamAttachmentsField({ values, onChange }: ExamAttachmentsFieldProps) {
   async function handleFiles(files: File[]) {
     if (files.length === 0) return;
@@ -34,7 +39,14 @@ export function ExamAttachmentsField({ values, onChange }: ExamAttachmentsFieldP
         base64: await readAsBase64(file),
       })),
     );
-    onChange([...values, ...added]);
+    const known = new Set(values.map(attachmentKey));
+    const fresh = added.filter((attachment) => {
+      const key = attachmentKey(attachment);
+      if (known.has(key)) return false;
+      known.add(key);
+      return true;
+    });
+    onChange([...values, ...fresh]);
   }
 
   return (
@@ -52,7 +64,7 @@ export function ExamAttachmentsField({ values, onChange }: ExamAttachmentsFieldP
       {values.length > 0 && (
         <ul className="flex flex-col divide-y rounded-md border">
           {values.map((attachment, index) => (
-            <li key={`${attachment.filename}-${index}`} className="flex items-center gap-3 py-1.5 pr-1.5 pl-3 text-sm">
+            <li key={attachmentKey(attachment)} className="flex items-center gap-3 py-1.5 pr-1.5 pl-3 text-sm">
               <FileIcon className="size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">{attachment.filename}</span>
               <button

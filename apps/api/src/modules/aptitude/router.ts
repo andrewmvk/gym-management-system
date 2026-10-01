@@ -1,11 +1,11 @@
+import * as service from '@api/modules/aptitude/service';
+import { publicProcedure, router } from '@api/trpc/procedures';
 import {
   GetAptitudeStatusInputSchema,
   RecheckInputSchema,
   SubmitQuestionnaireInputSchema,
 } from '@cadence/shared/schemas/aptitude';
 import { RecordConsentInputSchema, SavePhotoInputSchema, StartSignupInputSchema } from '@cadence/shared/schemas/signup';
-import * as service from '@api/modules/aptitude/service';
-import { publicProcedure, router } from '@api/trpc/procedures';
 
 // Public on purpose: no account or login exists before aptitude clearance (FR-9).
 export const aptitudeRouter = router({

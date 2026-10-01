@@ -9,6 +9,7 @@ export function useLaggedValue<T>(value: T, isLoading: boolean): T {
   const [settled, setSettled] = useState(value);
   const [isSlow, setIsSlow] = useState(false);
 
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new value restarts the slow-load timer.
   useEffect(() => {
     setIsSlow(false);
     if (!isLoading) return;

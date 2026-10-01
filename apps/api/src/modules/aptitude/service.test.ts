@@ -1,12 +1,19 @@
-import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
-import { count, eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
 import type { ComputeFaceEmbedding } from '@api/lib/face-embedding';
 import type { EvaluateAptitude } from '@api/modules/aptitude/service';
-import { getAptitudeStatus, recheck, recordConsent, savePhoto, startSignup, submitQuestionnaire } from '@api/modules/aptitude/service';
+import {
+  getAptitudeStatus,
+  recheck,
+  recordConsent,
+  savePhoto,
+  startSignup,
+  submitQuestionnaire,
+} from '@api/modules/aptitude/service';
 import { resetTestDatabase } from '@api/test/database';
+import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
+import { count, eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 const APPLICANT = {
   name: 'Jamie Rivera',
@@ -29,7 +36,10 @@ const alwaysMultipleFaces: ComputeFaceEmbedding = async () => ({ ok: false, reas
 
 const allAnswers = (): QuestionnaireAnswer[] => QUESTIONNAIRE_V1.map((q) => ({ questionId: q.id, answer: false }));
 
-const alwaysCleared: EvaluateAptitude = async () => ({ ok: true, data: { verdict: 'cleared', notes: 'Mock: cleared.' } });
+const alwaysCleared: EvaluateAptitude = async () => ({
+  ok: true,
+  data: { verdict: 'cleared', notes: 'Mock: cleared.' },
+});
 const alwaysNotCleared: EvaluateAptitude = async () => ({
   ok: true,
   data: { verdict: 'not_cleared', notes: 'Mock: certificate required.' },
@@ -99,7 +109,10 @@ describe('aptitude', () => {
     it('persists an optional gender on creation', async () => {
       const created = await startSignup({ ...APPLICANT, gender: 'female' });
 
-      const [user] = await db.select().from(dUsers).where(eq(dUsers.id, (created as { userId: string }).userId));
+      const [user] = await db
+        .select()
+        .from(dUsers)
+        .where(eq(dUsers.id, (created as { userId: string }).userId));
       expect(user?.gender).toBe('female');
     });
 

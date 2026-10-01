@@ -11,6 +11,7 @@
     "start": "tsx src/index.ts",
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "types": "tsc --noEmit -p tsconfig.json",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/cli.ts migrate",
     "db:seed": "tsx src/db/cli.ts seed",

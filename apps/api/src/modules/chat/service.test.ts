@@ -1,6 +1,3 @@
-import type { ProfileEventFact, ProfileEventType } from '@cadence/shared/schemas/profile-events';
-import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { db, pool } from '@api/db/client';
 import { dExercises, dUsers, fProfileEvents, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
@@ -8,9 +5,15 @@ import { todayLocal } from '@api/lib/dates';
 import type { AdjustPlanResult, ChatContext, EvaluateChat, EvaluateCorrection } from '@api/modules/chat/service';
 import { adjustPlan, buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
 import { resetTestDatabase } from '@api/test/database';
+import type { ProfileEventFact, ProfileEventType } from '@cadence/shared/schemas/profile-events';
+import { eq } from 'drizzle-orm';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 async function createMember(email = 'chat-member@example.com') {
-  const [user] = await db.insert(dUsers).values({ email, name: 'Chat Test Member', birthdate: '1995-06-15' }).returning();
+  const [user] = await db
+    .insert(dUsers)
+    .values({ email, name: 'Chat Test Member', birthdate: '1995-06-15' })
+    .returning();
   return user!;
 }
 
@@ -27,7 +30,10 @@ async function exerciseIdByName(name: string) {
 }
 
 async function createPastPlan(userId: string, planDate: string, exerciseNames: readonly string[]) {
-  const [plan] = await db.insert(fTrainingPlans).values({ userId, planDate, status: 'ai_published', aiGeneratedAt: new Date() }).returning();
+  const [plan] = await db
+    .insert(fTrainingPlans)
+    .values({ userId, planDate, status: 'ai_published', aiGeneratedAt: new Date() })
+    .returning();
   const rows = await Promise.all(
     exerciseNames.map(async (name, index) => {
       const exerciseId = await exerciseIdByName(name);
@@ -115,7 +121,12 @@ describe('chat', () => {
     it("assembles a real context that surfaces the member's own injury next to today's plan, plus the cross-member aggregate (FR-28/FR-29)", async () => {
       const member = await createMember();
       const otherMember = await createMember('chat-other-member@example.com');
-      await db.insert(fProfileEvents).values({ userId: member.id, eventType: 'injury', payload: { description: 'sore left knee' }, sourceMessage: 'earlier' });
+      await db.insert(fProfileEvents).values({
+        userId: member.id,
+        eventType: 'injury',
+        payload: { description: 'sore left knee' },
+        sourceMessage: 'earlier',
+      });
       await createPastPlan(member.id, todayLocal(), ['Barbell Back Squat']);
       await createPastPlan(otherMember.id, todayLocal(), ['Push-Up']);
       let capturedPrompt = '';
@@ -179,7 +190,11 @@ describe('chat', () => {
           },
         });
 
-        const corrected = expectOk(await adjustPlan(member.id, '2020-01-01', 'I did squats but also added lunges', false, { evaluateCorrection }));
+        const corrected = expectOk(
+          await adjustPlan(member.id, '2020-01-01', 'I did squats but also added lunges', false, {
+            evaluateCorrection,
+          }),
+        );
 
         expect(corrected.id).toBe(plan.id);
         const exerciseIds = corrected.exercises.map((e) => e.exerciseId).sort();
@@ -187,7 +202,10 @@ describe('chat', () => {
         expect(corrected.exercises.find((e) => e.exerciseId === exercises[0]!.exerciseId)?.completed).toBe(true);
         expect(corrected.exercises.find((e) => e.exerciseId === lungeId)?.completed).toBe(false);
 
-        const rows = await db.select().from(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
+        const rows = await db
+          .select()
+          .from(fTrainingPlanExercises)
+          .where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
         expect(rows).toHaveLength(2);
       });
 
@@ -205,7 +223,9 @@ describe('chat', () => {
           },
         });
 
-        const corrected = expectOk(await adjustPlan(member.id, '2020-01-01', 'add rowing', false, { evaluateCorrection }));
+        const corrected = expectOk(
+          await adjustPlan(member.id, '2020-01-01', 'add rowing', false, { evaluateCorrection }),
+        );
 
         expect(corrected.exercises.map((e) => e.exerciseId)).not.toContain(rowingId);
       });
@@ -225,7 +245,9 @@ describe('chat', () => {
         const blocked = await adjustPlan(member.id, '2020-01-01', 'I did the squats', false, { evaluateCorrection });
         expect(blocked).toMatchObject({ status: 'needs_confirmation', editedBy: 'Chat Test Member' });
 
-        const confirmed = expectOk(await adjustPlan(member.id, '2020-01-01', 'I did the squats', true, { evaluateCorrection }));
+        const confirmed = expectOk(
+          await adjustPlan(member.id, '2020-01-01', 'I did the squats', true, { evaluateCorrection }),
+        );
         expect(confirmed.exercises[0]?.completed).toBe(true);
       });
 
@@ -237,7 +259,10 @@ describe('chat', () => {
           adjustPlan(member.id, '2020-01-01', 'I skipped this', false, { evaluateCorrection: alwaysFailsCorrection }),
         ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
 
-        const rows = await db.select().from(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
+        const rows = await db
+          .select()
+          .from(fTrainingPlanExercises)
+          .where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
         expect(rows).toHaveLength(1);
       });
     });
@@ -245,11 +270,7 @@ describe('chat', () => {
 
   describe('context builder (unit)', () => {
     it('summarizes older events as a single-line count by type', () => {
-      const events = [
-        { eventType: 'injury' },
-        { eventType: 'injury' },
-        { eventType: 'life_event' },
-      ] as never;
+      const events = [{ eventType: 'injury' }, { eventType: 'injury' }, { eventType: 'life_event' }] as never;
 
       expect(summarizeOlderEvents(events)).toBe('3 older events not shown in detail: 2 injury, 1 life_event.');
     });
@@ -263,7 +284,11 @@ describe('chat', () => {
         ageYears: 30,
         gender: 'female',
         onboardingSubmissions: [
-          { goals: 'Get stronger', medications: ['Ibuprofen'], physicalConditions: { conditions: ['asthma'], otherNotes: undefined } } as never,
+          {
+            goals: 'Get stronger',
+            medications: ['Ibuprofen'],
+            physicalConditions: { conditions: ['asthma'], otherNotes: undefined },
+          } as never,
         ],
         recentEvents: [{ eventType: 'skipped_exercise', payload: { description: 'skipped leg day' } } as never],
         activeHealthEvents: [{ eventType: 'injury', payload: { description: 'sore left knee' } } as never],

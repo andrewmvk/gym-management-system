@@ -1,15 +1,15 @@
+import { db, pool } from '@api/db/client';
+import { dUsers } from '@api/db/schema';
+import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
+import type { EvaluateCertificate } from '@api/modules/aptitude/certificate-service';
+import { listQueue, reviewCertificate, uploadCertificate } from '@api/modules/aptitude/certificate-service';
+import type { EvaluateAptitude } from '@api/modules/aptitude/service';
+import { startSignup, submitQuestionnaire } from '@api/modules/aptitude/service';
+import { resetTestDatabase } from '@api/test/database';
 import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
 import type { CertificateUploadInput } from '@cadence/shared/schemas/certificates';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
-import { db, pool } from '@api/db/client';
-import { dUsers } from '@api/db/schema';
-import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
-import type { EvaluateAptitude } from '@api/modules/aptitude/service';
-import { startSignup, submitQuestionnaire } from '@api/modules/aptitude/service';
-import type { EvaluateCertificate } from '@api/modules/aptitude/certificate-service';
-import { listQueue, reviewCertificate, uploadCertificate } from '@api/modules/aptitude/certificate-service';
-import { resetTestDatabase } from '@api/test/database';
 
 const APPLICANT = {
   name: 'Morgan Reyes',
@@ -23,11 +23,17 @@ const TINY_JPEG_BASE64 =
 
 const allAnswers = (): QuestionnaireAnswer[] => QUESTIONNAIRE_V1.map((q) => ({ questionId: q.id, answer: false }));
 
-const alwaysNotCleared: EvaluateAptitude = async () => ({ ok: true, data: { verdict: 'not_cleared', notes: 'needs certificate' } });
+const alwaysNotCleared: EvaluateAptitude = async () => ({
+  ok: true,
+  data: { verdict: 'not_cleared', notes: 'needs certificate' },
+});
 const alwaysCleared: EvaluateAptitude = async () => ({ ok: true, data: { verdict: 'cleared', notes: 'ok' } });
 const alwaysPendingAptitude: EvaluateAptitude = async () => ({ ok: false, reason: 'unavailable' });
 
-const alwaysCertificateOk: EvaluateCertificate = async () => ({ ok: true, data: { verdict: 'not_cleared', notes: 'cannot inspect content' } });
+const alwaysCertificateOk: EvaluateCertificate = async () => ({
+  ok: true,
+  data: { verdict: 'not_cleared', notes: 'cannot inspect content' },
+});
 const alwaysCertificateFails: EvaluateCertificate = async () => ({ ok: false, reason: 'unavailable' });
 
 async function applicantId() {
@@ -109,10 +115,7 @@ describe('certificate-service', () => {
     });
 
     it('refuses an unknown userId', async () => {
-      const result = await uploadCertificate(
-        uploadInput('00000000-0000-0000-0000-000000000000'),
-        alwaysCertificateOk,
-      );
+      const result = await uploadCertificate(uploadInput('00000000-0000-0000-0000-000000000000'), alwaysCertificateOk);
 
       expect(result).toEqual({ status: 'unavailable' });
     });
@@ -126,7 +129,11 @@ describe('certificate-service', () => {
       const queue = await listQueue();
 
       expect(queue).toHaveLength(1);
-      expect(queue[0]).toMatchObject({ applicantName: APPLICANT.name, applicantEmail: APPLICANT.email, aiResult: 'not_cleared' });
+      expect(queue[0]).toMatchObject({
+        applicantName: APPLICANT.name,
+        applicantEmail: APPLICANT.email,
+        aiResult: 'not_cleared',
+      });
     });
   });
 

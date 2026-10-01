@@ -1,7 +1,7 @@
 'use client';
 
 import { UploadIcon } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { cn } from '@/lib/utils';
 
 interface FileDropzoneProps {

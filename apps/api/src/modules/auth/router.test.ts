@@ -1,9 +1,3 @@
-import { MEMBER_POLICY_IDS, READ_STAFF_APP } from '@cadence/shared/auth';
-import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
-import bcrypt from 'bcryptjs';
-import { and, eq } from 'drizzle-orm';
-import jwt from 'jsonwebtoken';
-import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
 import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
@@ -14,6 +8,12 @@ import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { assertCan, authedProcedure, createCallerFactory, router } from '@api/trpc/procedures';
+import { MEMBER_POLICY_IDS, READ_STAFF_APP } from '@cadence/shared/auth';
+import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
+import bcrypt from 'bcryptjs';
+import { and, eq } from 'drizzle-orm';
+import jwt from 'jsonwebtoken';
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const MEMBER_EMAIL = 'member@example.com';
 const MEMBER_PASSWORD = 'member-password';
@@ -107,7 +107,11 @@ describe('auth', () => {
 
       await caller.auth.login({ email: MEMBER_EMAIL, password: MEMBER_PASSWORD });
 
-      expect(res.cookie).toHaveBeenCalledWith(SESSION_COOKIE, expect.any(String), expect.objectContaining({ secure: true }));
+      expect(res.cookie).toHaveBeenCalledWith(
+        SESSION_COOKIE,
+        expect.any(String),
+        expect.objectContaining({ secure: true }),
+      );
     });
 
     it('answers a wrong password and an unknown e-mail with the same generic error', async () => {
@@ -275,6 +279,9 @@ describe('auth', () => {
 
     await caller.auth.logout();
 
-    expect(res.clearCookie).toHaveBeenCalledWith(SESSION_COOKIE, expect.objectContaining({ httpOnly: true, path: '/' }));
+    expect(res.clearCookie).toHaveBeenCalledWith(
+      SESSION_COOKIE,
+      expect.objectContaining({ httpOnly: true, path: '/' }),
+    );
   });
 });

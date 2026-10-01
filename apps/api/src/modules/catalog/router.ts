@@ -1,7 +1,7 @@
-import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import * as service from '@api/modules/catalog/service';
 import { assertCan, authedProcedure, publicProcedure, router } from '@api/trpc/procedures';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 
 const CreateExerciseInputSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),

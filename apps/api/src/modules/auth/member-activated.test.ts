@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
 import { onMemberActivated, subscribeToMemberActivated } from '@api/modules/auth/member-activated';
+import { describe, expect, it, vi } from 'vitest';
 
 describe('member-activated', () => {
   it('calls every subscriber with the activated userId', async () => {

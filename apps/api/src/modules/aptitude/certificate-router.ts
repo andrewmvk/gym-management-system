@@ -1,7 +1,7 @@
-import { CertificateReviewInputSchema, CertificateUploadInputSchema } from '@cadence/shared/schemas/certificates';
-import { TRPCError } from '@trpc/server';
 import * as service from '@api/modules/aptitude/certificate-service';
 import { assertCan, authedProcedure, publicProcedure, router } from '@api/trpc/procedures';
+import { CertificateReviewInputSchema, CertificateUploadInputSchema } from '@cadence/shared/schemas/certificates';
+import { TRPCError } from '@trpc/server';
 
 // Registered as the top-level "certificates" router (not nested under aptitude) so its procedure path
 // matches FILE_UPLOAD_PROCEDURES's "certificates.upload" entry (apps/api/src/lib/uploads.ts, from P-05).
@@ -20,7 +20,10 @@ export const certificateRouter = router({
     const result = await service.reviewCertificate(ctx.user.id, input);
     if (result.status === 'not_found') throw new TRPCError({ code: 'NOT_FOUND', message: 'Certificate not found' });
     if (result.status === 'no_decision_to_confirm') {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Nothing to confirm yet - choose cleared or not_cleared instead' });
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Nothing to confirm yet - choose cleared or not_cleared instead',
+      });
     }
     return result;
   }),

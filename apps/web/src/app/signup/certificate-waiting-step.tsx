@@ -23,7 +23,11 @@ export function CertificateWaitingStep({ userId, onStatusChanged }: CertificateW
     setChecking(true);
     try {
       const result = await trpcClient.aptitude.getStatus.query({ userId });
-      if (result.status === 'cleared' || result.status === 'rejected' || result.status === 'certificate_pending_review') {
+      if (
+        result.status === 'cleared' ||
+        result.status === 'rejected' ||
+        result.status === 'certificate_pending_review'
+      ) {
         onStatusChanged(result.status);
         if (result.status === 'certificate_pending_review') toast.message('Still under review. Check back later.');
         return;

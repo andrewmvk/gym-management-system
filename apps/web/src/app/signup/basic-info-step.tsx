@@ -1,6 +1,6 @@
 'use client';
 
-import { StartSignupInputSchema, type StartSignupInput } from '@cadence/shared/schemas/signup';
+import { type StartSignupInput, StartSignupInputSchema } from '@cadence/shared/schemas/signup';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
@@ -72,7 +72,13 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
                 <FieldLabel htmlFor="signup-email">E-mail</FieldLabel>
-                <Input {...field} id="signup-email" type="email" autoComplete="email" aria-invalid={fieldState.invalid} />
+                <Input
+                  {...field}
+                  id="signup-email"
+                  type="email"
+                  autoComplete="email"
+                  aria-invalid={fieldState.invalid}
+                />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
             )}

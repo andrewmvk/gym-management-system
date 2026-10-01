@@ -1,9 +1,9 @@
 import { fileURLToPath } from 'node:url';
+import { env } from '@api/config/env';
+import * as schema from '@api/db/schema';
 import { drizzle } from 'drizzle-orm/node-postgres';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
 import { Pool } from 'pg';
-import { env } from '@api/config/env';
-import * as schema from '@api/db/schema';
 
 export const MIGRATIONS_FOLDER = fileURLToPath(new URL('../../drizzle', import.meta.url));
 

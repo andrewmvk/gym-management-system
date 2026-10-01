@@ -70,7 +70,9 @@ export function DatePicker({
         >
           <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
           <span className={cn('flex-1 truncate', !selected && 'text-muted-foreground')}>
-            {selected ? selected.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : placeholder}
+            {selected
+              ? selected.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
+              : placeholder}
           </span>
         </button>
       </PopoverTrigger>

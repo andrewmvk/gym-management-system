@@ -1,15 +1,15 @@
-import type { QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
-import { and, desc, eq } from 'drizzle-orm';
-import { db, type DatabaseExecutor } from '@api/db/client';
+import { type DatabaseExecutor, db } from '@api/db/client';
 import {
+  type AptitudeQuestionnaire,
   dUsers,
   fAptitudeQuestionnaires,
   fConsentEvents,
   fMedicalCertificates,
-  type AptitudeQuestionnaire,
   type MedicalCertificate,
   type User,
 } from '@api/db/schema';
+import type { QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
+import { and, desc, eq } from 'drizzle-orm';
 
 type Gender = User['gender'];
 type AptitudeStatus = User['aptitudeStatus'];
@@ -113,10 +113,7 @@ export async function findQuestionnaireByUserId(
   userId: string,
   executor: DatabaseExecutor = db,
 ): Promise<AptitudeQuestionnaire | null> {
-  const [row] = await executor
-    .select()
-    .from(fAptitudeQuestionnaires)
-    .where(eq(fAptitudeQuestionnaires.userId, userId));
+  const [row] = await executor.select().from(fAptitudeQuestionnaires).where(eq(fAptitudeQuestionnaires.userId, userId));
   return row ?? null;
 }
 
@@ -186,7 +183,11 @@ export async function reviewCertificate(
 ): Promise<MedicalCertificate> {
   const [row] = await executor
     .update(fMedicalCertificates)
-    .set({ reviewedByUserId: input.reviewedByUserId, adminReviewedAt: new Date(), adminOverrideResult: input.adminOverrideResult })
+    .set({
+      reviewedByUserId: input.reviewedByUserId,
+      adminReviewedAt: new Date(),
+      adminOverrideResult: input.adminOverrideResult,
+    })
     .where(eq(fMedicalCertificates.id, id))
     .returning();
   return row!;

@@ -1,10 +1,10 @@
-import type { EmailMessage, EmailResult } from '@api/lib/email';
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
+import type { EmailMessage, EmailResult } from '@api/lib/email';
 import { sendOnboardingInvite } from '@api/modules/onboarding/invite-subscriber';
 import { resetTestDatabase } from '@api/test/database';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 async function createUser(email: string) {
   const [user] = await db.insert(dUsers).values({ email, name: 'Onboarding Invite Test' }).returning();
@@ -23,7 +23,10 @@ describe('sendOnboardingInvite', () => {
 
     expect(send).toHaveBeenCalledTimes(1);
     expect(send).toHaveBeenCalledWith(
-      expect.objectContaining({ to: 'invite-target@example.com', text: expect.stringContaining(`${env.WEB_ORIGIN}/onboarding`) }),
+      expect.objectContaining({
+        to: 'invite-target@example.com',
+        text: expect.stringContaining(`${env.WEB_ORIGIN}/onboarding`),
+      }),
     );
   });
 

@@ -76,13 +76,18 @@ export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps
             <li key={question.id} className="flex flex-col gap-3 border-b py-5 first:pt-0 last:border-b-0">
               <fieldset className="flex flex-col gap-3">
                 <legend className="mb-3 flex gap-3 text-base font-medium text-pretty">
-                  <span className="numerals w-5 shrink-0 text-lg leading-6 font-bold text-muted-foreground">{index + 1}</span>
+                  <span className="numerals w-5 shrink-0 text-lg leading-6 font-bold text-muted-foreground">
+                    {index + 1}
+                  </span>
                   <span>{question.text}</span>
                 </legend>
                 <RadioGroup
                   value={state.answer === null ? undefined : state.answer ? 'yes' : 'no'}
                   onValueChange={(value) =>
-                    setAnswers((prev) => ({ ...prev, [question.id]: { ...prev[question.id]!, answer: value === 'yes' } }))
+                    setAnswers((prev) => ({
+                      ...prev,
+                      [question.id]: { ...prev[question.id]!, answer: value === 'yes' },
+                    }))
                   }
                   className="ml-8 grid max-w-56 grid-cols-2 gap-2"
                 >
@@ -96,7 +101,10 @@ export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps
                   placeholder="Additional detail (optional)"
                   value={state.detail}
                   onChange={(e) =>
-                    setAnswers((prev) => ({ ...prev, [question.id]: { ...prev[question.id]!, detail: e.target.value } }))
+                    setAnswers((prev) => ({
+                      ...prev,
+                      [question.id]: { ...prev[question.id]!, detail: e.target.value },
+                    }))
                   }
                 />
               </div>
@@ -111,7 +119,11 @@ export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps
           Your answers are evaluated as soon as you submit, and can&apos;t be edited afterward.
         </p>
         <Button size="lg" className="w-full" disabled={!allAnswered || submit.isPending} onClick={handleSubmit}>
-          {submit.isPending ? 'Submitting...' : allAnswered ? 'Submit answers' : `${answeredCount} of ${QUESTIONNAIRE_V1.length} answered`}
+          {submit.isPending
+            ? 'Submitting...'
+            : allAnswered
+              ? 'Submit answers'
+              : `${answeredCount} of ${QUESTIONNAIRE_V1.length} answered`}
         </Button>
       </div>
     </StepPanel>

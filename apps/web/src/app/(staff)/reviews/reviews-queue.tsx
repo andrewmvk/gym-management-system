@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, ClipboardListIcon, SearchXIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { Pagination } from '@/components/pagination';
@@ -38,7 +38,11 @@ function QueueHead() {
 }
 
 function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">{children}</div>;
+  return (
+    <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+      {children}
+    </div>
+  );
 }
 
 function ReviewsQueueSkeleton() {
@@ -52,6 +56,7 @@ function ReviewsQueueSkeleton() {
         <QueueHead />
         <TableBody>
           {Array.from({ length: 6 }, (_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
             <TableRow key={index}>
               <TableCell>
                 <Skeleton className="h-5 w-36" />
@@ -84,7 +89,8 @@ function ReviewsQueueRoot() {
   const entries = queueQuery.data ?? [];
   const term = search.trim().toLowerCase();
   const filtered = entries.filter(
-    (entry) => (status === 'all' || entry.status === status) && (!term || entry.memberName.toLowerCase().includes(term)),
+    (entry) =>
+      (status === 'all' || entry.status === status) && (!term || entry.memberName.toLowerCase().includes(term)),
   );
   const pagination = usePagination(filtered, PAGE_SIZE);
 
@@ -118,7 +124,8 @@ function ReviewsQueueRoot() {
     );
   }
 
-  const countOf = (value: StatusFilter) => (value === 'all' ? entries.length : entries.filter((e) => e.status === value).length);
+  const countOf = (value: StatusFilter) =>
+    value === 'all' ? entries.length : entries.filter((e) => e.status === value).length;
 
   return (
     <div className="flex flex-col gap-4">
@@ -164,7 +171,9 @@ function ReviewsQueueRoot() {
                     </Link>
                     <p className="text-muted-foreground sm:hidden">{formatPlanDate(entry.planDate)}</p>
                   </TableCell>
-                  <TableCell className="hidden whitespace-nowrap sm:table-cell">{formatPlanDate(entry.planDate)}</TableCell>
+                  <TableCell className="hidden whitespace-nowrap sm:table-cell">
+                    {formatPlanDate(entry.planDate)}
+                  </TableCell>
                   <TableCell>
                     <PlanStatusBadge status={entry.status} />
                   </TableCell>

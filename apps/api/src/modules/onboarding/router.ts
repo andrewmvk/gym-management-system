@@ -1,7 +1,7 @@
-import { subject } from '@cadence/shared/auth';
-import { OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding';
 import * as service from '@api/modules/onboarding/service';
 import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
+import { subject } from '@cadence/shared/auth';
+import { OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding';
 
 // manage_own_onboarding is scope "self" (packages/shared/src/auth/constants/policies.ts): the
 // condition binds to ctx.user.id, never a client-supplied id, so a member can only ever act on their

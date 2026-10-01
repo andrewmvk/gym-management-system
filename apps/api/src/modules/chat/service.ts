@@ -1,15 +1,15 @@
-import { ChatResponseSchema, type ChatResponse } from '@cadence/shared/schemas/profile-events';
-import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 import type { ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
 import { todayLocal } from '@api/lib/dates';
-import { runStructured, type AiResult } from '@api/modules/ai';
+import { type AiResult, runStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
 import * as repository from '@api/modules/chat/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import * as plansRepository from '@api/modules/plans/repository';
 import { generateForDate, getToday, getTodayAggregate, type PlanAggregate } from '@api/modules/plans/service';
+import { type ChatResponse, ChatResponseSchema } from '@cadence/shared/schemas/profile-events';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
 
 const RECENT_EVENTS_LIMIT = 50;
 const SOURCE_MESSAGE_EXCERPT_LENGTH = 200;
@@ -76,7 +76,9 @@ async function assembleChatContext(userId: string): Promise<ChatContext> {
 
 function buildAggregateLines(aggregate: PlanAggregate): string[] {
   const lines: string[] = [];
-  lines.push("Today's aggregate across all members (anonymized, no member identity) - use this only if asked what other members are doing:");
+  lines.push(
+    "Today's aggregate across all members (anonymized, no member identity) - use this only if asked what other members are doing:",
+  );
   lines.push(
     aggregate.topExercises.length > 0
       ? `- Top exercises: ${aggregate.topExercises.map((e) => `${e.name} (${e.count})`).join(', ')}`
@@ -109,7 +111,9 @@ export function buildChatUserPrompt(context: ChatContext, message: string): stri
   if (context.todayPlan) {
     lines.push(`Today's plan (${context.todayPlan.status}):`);
     for (const exercise of context.todayPlan.exercises) {
-      lines.push(`- ${exercise.exerciseName} (${exercise.sets}x${exercise.reps}${exercise.completed ? ', completed' : ''})`);
+      lines.push(
+        `- ${exercise.exerciseName} (${exercise.sets}x${exercise.reps}${exercise.completed ? ', completed' : ''})`,
+      );
     }
   } else {
     lines.push("Today's plan: none generated yet.");
@@ -117,12 +121,13 @@ export function buildChatUserPrompt(context: ChatContext, message: string): stri
 
   // FR-28: placed right next to today's plan so a risk (e.g. an old knee injury) is easy to weigh
   // against today's actual exercises, rather than buried in the general history dump below.
-  lines.push('Active injuries and medication changes (weigh these against today\'s plan above):');
+  lines.push("Active injuries and medication changes (weigh these against today's plan above):");
   if (context.activeHealthEvents.length === 0) lines.push('- none reported');
   for (const event of context.activeHealthEvents) lines.push(`- ${event.eventType}: ${JSON.stringify(event.payload)}`);
 
   lines.push('Available exercise catalog - propose alternatives only from this list:');
-  for (const exercise of context.availableExercises) lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
+  for (const exercise of context.availableExercises)
+    lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
 
   lines.push('Profile history, most recent first:');
   if (context.recentEvents.length === 0) lines.push('- none yet');
@@ -147,12 +152,17 @@ const CHAT_SYSTEM_PROMPT =
   'physical state, or a request to adjust their plan) as structured facts - never invent facts the ' +
   "message does not support. Weigh the member's active injuries and medication changes against today's " +
   'exercises: if one conflicts, warn about it and propose a safer alternative from the available ' +
-  "catalog. Only mention the cross-member aggregate if the member asks about what others are doing.";
+  'catalog. Only mention the cross-member aggregate if the member asks about what others are doing.';
 
 export type EvaluateChat = (contextPrompt: string) => Promise<AiResult<ChatResponse>>;
 
 async function defaultEvaluateChat(contextPrompt: string): Promise<AiResult<ChatResponse>> {
-  return runStructured({ purpose: 'chat', system: CHAT_SYSTEM_PROMPT, user: contextPrompt, schema: ChatResponseSchema });
+  return runStructured({
+    purpose: 'chat',
+    system: CHAT_SYSTEM_PROMPT,
+    user: contextPrompt,
+    schema: ChatResponseSchema,
+  });
 }
 
 export interface SendMessageOverrides {
@@ -165,7 +175,11 @@ export interface SendMessageResult {
   adjustment?: ChatResponse['adjustment'];
 }
 
-export async function sendMessage(userId: string, message: string, overrides: SendMessageOverrides = {}): Promise<SendMessageResult> {
+export async function sendMessage(
+  userId: string,
+  message: string,
+  overrides: SendMessageOverrides = {},
+): Promise<SendMessageResult> {
   const context = await assembleChatContext(userId);
   const evaluateChat = overrides.evaluateChat ?? defaultEvaluateChat;
   const result = await evaluateChat(buildChatUserPrompt(context, message));
@@ -193,7 +207,7 @@ type PlanCorrection = z.infer<typeof PlanCorrectionSchema>;
 // FR-21/FR-23: this project's own wording, not a requirement quote.
 const PLAN_CORRECTION_SYSTEM_PROMPT =
   "You are correcting a gym member's training plan for a past date based on what they say actually " +
-  'happened, not generating a new one. You are given that date\'s current exercises and the available ' +
+  "happened, not generating a new one. You are given that date's current exercises and the available " +
   'exercise catalog. Return the full corrected exercise list - keep, remove, or replace exercises per the ' +
   "member's message, choosing exerciseId only from the catalog, and set completed accurately for every " +
   'exercise you return, including ones you keep unchanged.';
@@ -205,14 +219,17 @@ function buildCorrectionUserPrompt(
   instruction: string,
 ): string {
   const lines: string[] = [];
-  lines.push("Current exercises for this date:");
+  lines.push('Current exercises for this date:');
   if (currentExercises.length === 0) lines.push('- none');
   for (const exercise of currentExercises) {
-    lines.push(`- ${exercise.exerciseId} | ${exercise.exerciseName} | sets ${exercise.sets} reps ${exercise.reps} | completed: ${exercise.completed}`);
+    lines.push(
+      `- ${exercise.exerciseId} | ${exercise.exerciseName} | sets ${exercise.sets} reps ${exercise.reps} | completed: ${exercise.completed}`,
+    );
   }
 
   lines.push('Available exercise catalog - choose exerciseId only from this list:');
-  for (const exercise of availableExercises) lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
+  for (const exercise of availableExercises)
+    lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
 
   lines.push(...buildAggregateLines(aggregate));
 
@@ -225,7 +242,12 @@ function buildCorrectionUserPrompt(
 export type EvaluateCorrection = (contextPrompt: string) => Promise<AiResult<PlanCorrection>>;
 
 async function defaultEvaluateCorrection(contextPrompt: string): Promise<AiResult<PlanCorrection>> {
-  return runStructured({ purpose: 'chat', system: PLAN_CORRECTION_SYSTEM_PROMPT, user: contextPrompt, schema: PlanCorrectionSchema });
+  return runStructured({
+    purpose: 'chat',
+    system: PLAN_CORRECTION_SYSTEM_PROMPT,
+    user: contextPrompt,
+    schema: PlanCorrectionSchema,
+  });
 }
 
 export type AdjustPlanResult =
@@ -273,20 +295,26 @@ export async function adjustPlan(
   const availableExercises = catalog.filter((exercise) => exercise.isAvailable);
 
   const evaluateCorrection = overrides.evaluateCorrection ?? defaultEvaluateCorrection;
-  const result = await evaluateCorrection(buildCorrectionUserPrompt(currentExercises, availableExercises, aggregate, instruction));
+  const result = await evaluateCorrection(
+    buildCorrectionUserPrompt(currentExercises, availableExercises, aggregate, instruction),
+  );
   if (!result.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
 
   const availableIds = new Set(availableExercises.map((exercise) => exercise.id));
   const corrected = result.data.exercises.filter((exercise) => availableIds.has(exercise.exerciseId));
-  const completedExerciseIds = new Set(corrected.filter((exercise) => exercise.completed).map((exercise) => exercise.exerciseId));
+  const completedExerciseIds = new Set(
+    corrected.filter((exercise) => exercise.completed).map((exercise) => exercise.exerciseId),
+  );
 
-  const exercisesInput: plansRepository.PlanExerciseInput[] = corrected.map(({ exerciseId, sets, reps, load, notes }) => ({
-    exerciseId,
-    sets,
-    reps,
-    load,
-    notes,
-  }));
+  const exercisesInput: plansRepository.PlanExerciseInput[] = corrected.map(
+    ({ exerciseId, sets, reps, load, notes }) => ({
+      exerciseId,
+      sets,
+      reps,
+      load,
+      notes,
+    }),
+  );
   const plan = await plansRepository.replacePlan({ userId, planDate: date, exercises: exercisesInput });
 
   // replacePlan always inserts fresh rows with completed=false - reapply completed=true for whichever

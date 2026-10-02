@@ -2,7 +2,7 @@
 
 This folder is the single location of the face-api.js weights for **both** the backend (signup reference embedding) and the kiosk (probe embedding in the browser). The two sides must load the exact same files: descriptors from different models or weight versions are not comparable, and matching would fail silently (`docs/04-architecture.md` §5).
 
-The weights are binaries and are not committed (the local `.gitignore` keeps only this README). Every developer downloads them once into this folder.
+The weights are small (about 12 MB in total), so they are committed here and every checkout has them. The kiosk serves them from this folder through `apps/web/src/app/kiosk/models/[file]/route.ts`.
 
 ## Required files
 
@@ -14,9 +14,9 @@ Three nets, in the original face-api.js format (a weights manifest plus its shar
 | 68-point face landmark | Aligns the detected face before recognition | `face_landmark_68_model-weights_manifest.json`, `face_landmark_68_model-shard1` |
 | Face recognition | Produces the 128-number descriptor that is stored and matched | `face_recognition_model-weights_manifest.json`, `face_recognition_model-shard1`, `face_recognition_model-shard2` |
 
-## Where to download
+## Where they come from
 
-From the `weights/` folder of the face-api.js repository: <https://github.com/justadudewhohacks/face-api.js/tree/master/weights>. Download the eight files above (use each file's "Download raw file" button, or clone the repository and copy them) into this folder, keeping their names unchanged.
+The `weights/` folder of the face-api.js repository: <https://github.com/justadudewhohacks/face-api.js/tree/master/weights>. If a file is ever missing, download the eight files above into this folder, keeping their names unchanged.
 
 ## Status
 

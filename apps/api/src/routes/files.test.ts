@@ -134,7 +134,7 @@ describe('tRPC body limit', () => {
   });
 
   it('does not apply the default limit to a file procedure', async () => {
-    const response = await fetch(`${baseUrl}/trpc/aptitude.savePhoto`, {
+    const response = await fetch(`${baseUrl}/trpc/aptitude.submitSignup`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: oversizedBody,

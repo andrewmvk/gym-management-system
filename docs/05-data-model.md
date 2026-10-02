@@ -34,7 +34,7 @@ Single table for every person in the system - member, trainer, or admin alike. T
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
-| email | text, unique | Signup looks up an existing incomplete row by this value before creating a new one (FR-1) |
+| email | text, unique | A row is only created when the signup's questionnaire is submitted (FR-1, FR-3); the e-mail is looked up before that to refuse a blocked or registered e-mail, or to resume one whose questionnaire already exists |
 | phone | text, nullable | |
 | password_hash | text, nullable | Null until aptitude clearance (FR-9); no login possible before it's set |
 | name | text | |

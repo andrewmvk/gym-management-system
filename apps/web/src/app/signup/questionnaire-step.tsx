@@ -1,33 +1,32 @@
 'use client';
 
-import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
-import { useMutation } from '@tanstack/react-query';
+import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
 import { LockIcon } from 'lucide-react';
-import { useState } from 'react';
-import { toast } from 'sonner';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
-interface QuestionnaireStepProps {
-  userId: string;
-  onResolved: (outcome: 'cleared' | 'certificate_required' | 'pending_retry') => void;
+export type AnswerState = Record<string, { answer: boolean | null; detail: string }>;
+
+export function initialAnswers(): AnswerState {
+  return Object.fromEntries(QUESTIONNAIRE_V1.map((q) => [q.id, { answer: null, detail: '' }]));
 }
 
-type AnswerState = Record<string, { answer: boolean | null; detail: string }>;
-
-function initialAnswers(): AnswerState {
-  return Object.fromEntries(QUESTIONNAIRE_V1.map((q) => [q.id, { answer: null, detail: '' }]));
+interface QuestionnaireStepProps {
+  answers: AnswerState;
+  onAnswersChange: (update: (previous: AnswerState) => AnswerState) => void;
+  // Submitting is the single write of the whole signup, owned by the wizard.
+  onSubmit: () => void;
+  isSubmitting: boolean;
 }
 
 function YesNoOption({ id, value, label }: { id: string; value: 'yes' | 'no'; label: string }) {
   return (
     <label
       htmlFor={id}
-      className="flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-card px-4 font-display text-base font-semibold tracking-wider uppercase transition-colors hover:border-foreground/35 has-data-checked:border-primary has-data-checked:bg-primary has-data-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/45"
+      className="flex h-10 items-center justify-center gap-2 rounded-md border border-input bg-card px-4 font-display text-base font-semibold tracking-wider uppercase transition-colors hover:border-foreground/35 has-data-[state=checked]:border-primary has-data-[state=checked]:bg-primary has-data-[state=checked]:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/45"
     >
       <RadioGroupItem value={value} id={id} className="sr-only" />
       {label}
@@ -35,34 +34,9 @@ function YesNoOption({ id, value, label }: { id: string; value: 'yes' | 'no'; la
   );
 }
 
-export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps) {
-  const trpc = useTRPC();
-  const [answers, setAnswers] = useState<AnswerState>(initialAnswers);
-
+export function QuestionnaireStep({ answers, onAnswersChange, onSubmit, isSubmitting }: QuestionnaireStepProps) {
   const answeredCount = QUESTIONNAIRE_V1.filter((q) => answers[q.id]!.answer !== null).length;
   const allAnswered = answeredCount === QUESTIONNAIRE_V1.length;
-
-  const submit = useMutation(
-    trpc.aptitude.submitQuestionnaire.mutationOptions({
-      onSuccess: (result) => {
-        if (result.status === 'unavailable') {
-          toast.error("We couldn't submit your questionnaire right now. Try again.");
-          return;
-        }
-        onResolved(result.status);
-      },
-      onError: () => toast.error("We couldn't submit your questionnaire. Try again."),
-    }),
-  );
-
-  function handleSubmit() {
-    const payload: QuestionnaireAnswer[] = QUESTIONNAIRE_V1.map((q) => ({
-      questionId: q.id,
-      answer: answers[q.id]!.answer!,
-      detail: answers[q.id]!.detail.trim() || undefined,
-    }));
-    submit.mutate({ userId, answers: payload });
-  }
 
   return (
     <StepPanel
@@ -84,7 +58,7 @@ export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps
                 <RadioGroup
                   value={state.answer === null ? undefined : state.answer ? 'yes' : 'no'}
                   onValueChange={(value) =>
-                    setAnswers((prev) => ({
+                    onAnswersChange((prev) => ({
                       ...prev,
                       [question.id]: { ...prev[question.id]!, answer: value === 'yes' },
                     }))
@@ -101,7 +75,7 @@ export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps
                   placeholder="Additional detail (optional)"
                   value={state.detail}
                   onChange={(e) =>
-                    setAnswers((prev) => ({
+                    onAnswersChange((prev) => ({
                       ...prev,
                       [question.id]: { ...prev[question.id]!, detail: e.target.value },
                     }))
@@ -118,8 +92,8 @@ export function QuestionnaireStep({ userId, onResolved }: QuestionnaireStepProps
           <LockIcon className="mt-0.5 size-4 shrink-0 text-foreground" />
           Your answers are evaluated as soon as you submit, and can&apos;t be edited afterward.
         </p>
-        <Button size="lg" className="w-full" disabled={!allAnswered || submit.isPending} onClick={handleSubmit}>
-          {submit.isPending
+        <Button size="lg" className="w-full" disabled={!allAnswered || isSubmitting} onClick={onSubmit}>
+          {isSubmitting
             ? 'Submitting...'
             : allAnswered
               ? 'Submit answers'

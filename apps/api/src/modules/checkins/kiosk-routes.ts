@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { listKioskEmbeddings } from '@api/modules/checkins/repository';
+import type { Env } from '@api/config/env';
+import { listKioskDevMembers, listKioskEmbeddings } from '@api/modules/checkins/repository';
 import { recordCheckIn } from '@api/modules/checkins/service';
 import { CheckInInputSchema } from '@cadence/shared/schemas/turnstile';
 import express, { type RequestHandler, Router } from 'express';
@@ -24,8 +25,15 @@ export function requireKioskKey(expectedKey: string): RequestHandler {
   };
 }
 
-export function createKioskRouter(kioskApiKey: string) {
+export function createKioskRouter(kioskApiKey: string, nodeEnv: Env['NODE_ENV']) {
   const router = Router();
+
+  // Names are not part of the embeddings payload; this exists only so the dev simulation can pick a member by name.
+  if (nodeEnv !== 'production') {
+    router.get('/kiosk/dev/members', requireKioskKey(kioskApiKey), async (_req, res) => {
+      res.set('Cache-Control', 'private, no-store').json(await listKioskDevMembers());
+    });
+  }
 
   router.get('/kiosk/embeddings', requireKioskKey(kioskApiKey), async (_req, res) => {
     res.set('Cache-Control', 'private, no-store').json(await listKioskEmbeddings());

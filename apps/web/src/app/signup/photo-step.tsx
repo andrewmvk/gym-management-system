@@ -1,19 +1,26 @@
 'use client';
 
-import { useMutation } from '@tanstack/react-query';
-import { CameraIcon, CameraOffIcon, RotateCcwIcon } from 'lucide-react';
+import { CameraIcon, CameraOffIcon, RotateCcwIcon, UploadIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { toast } from 'sonner';
+import { FileDropzone } from '@/components/file-dropzone';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { useTRPC } from '@/lib/trpc';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { fileToCanvas, IMAGE_ACCEPTED_TYPES } from '@/lib/image';
+
+export type CapturedPhoto = { dataUrl: string; mirrored: boolean };
 
 interface PhotoStepProps {
-  userId: string;
-  onSaved: () => void;
+  photo: CapturedPhoto | null;
+  onPhotoChange: (photo: CapturedPhoto | null) => void;
+  // Why the backend rejected the last photo, shown until a new one is picked.
+  rejection: string | null;
+  onContinue: () => void;
 }
 
-const REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', string> = {
+type PhotoMode = 'camera' | 'upload';
+
+export const PHOTO_REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', string> = {
   no_face: "We couldn't detect a face in that photo. Make sure your face is centered and well lit, then try again.",
   multiple_faces: 'More than one face was detected. Make sure you are alone in the frame, then try again.',
   unavailable: "We couldn't process that photo right now. Try again.",
@@ -27,17 +34,21 @@ function FrameGuide() {
   );
 }
 
-export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
-  const trpc = useTRPC();
+export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: PhotoStepProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [mode, setMode] = useState<PhotoMode>('camera');
+  const [cameraReady, setCameraReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
-  const [rejection, setRejection] = useState<string | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const cameraActive = mode === 'camera' && !photo;
 
   useEffect(() => {
-    if (capturedImage) return;
+    if (!cameraActive) return;
     let cancelled = false;
+    setCameraReady(false);
+    setCameraError(null);
 
     navigator.mediaDevices
       ?.getUserMedia({ video: { facingMode: 'user' } })
@@ -49,43 +60,46 @@ export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
       })
-      .catch(() => setCameraError('We could not access your camera. Check your browser permissions and try again.'));
+      .catch(() =>
+        setCameraError('We could not access your camera. Check your browser permissions, or upload a photo.'),
+      );
 
     return () => {
       cancelled = true;
       for (const track of streamRef.current?.getTracks() ?? []) track.stop();
       streamRef.current = null;
     };
-  }, [capturedImage]);
+  }, [cameraActive]);
 
   function capture() {
     const video = videoRef.current;
-    if (!video) return;
+    if (!video || video.videoWidth === 0) return;
     const canvas = document.createElement('canvas');
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
     canvas.getContext('2d')?.drawImage(video, 0, 0);
-    setCapturedImage(canvas.toDataURL('image/jpeg', 0.9));
-    setRejection(null);
+    onPhotoChange({ dataUrl: canvas.toDataURL('image/jpeg', 0.9), mirrored: true });
   }
 
-  const savePhoto = useMutation(
-    trpc.aptitude.savePhoto.mutationOptions({
-      onSuccess: (result) => {
-        if (result.status === 'photo_rejected') {
-          setRejection(REJECTION_MESSAGES[result.reason]);
-          return;
-        }
-        onSaved();
-      },
-      onError: () => toast.error("We couldn't save your photo. Try again."),
-    }),
-  );
+  async function handleFiles([file]: File[]) {
+    if (!file) return;
+    if (!IMAGE_ACCEPTED_TYPES.includes(file.type)) {
+      setUploadError('Use a JPEG or PNG photo.');
+      return;
+    }
+    try {
+      const canvas = await fileToCanvas(file);
+      onPhotoChange({ dataUrl: canvas.toDataURL('image/jpeg', 0.9), mirrored: false });
+      setUploadError(null);
+    } catch {
+      setUploadError("We couldn't read that image. Try another one.");
+    }
+  }
 
   return (
     <StepPanel
       title="Reference photo"
-      description="Used for face recognition at check-in. Face the camera in good light, alone in the frame."
+      description="Used for face recognition at check-in. Face the camera in good light, alone in the frame, or upload a clear photo."
     >
       {rejection && (
         <p
@@ -96,52 +110,88 @@ export function PhotoStep({ userId, onSaved }: PhotoStepProps) {
         </p>
       )}
 
-      {cameraError && (
+      {!photo && (
+        <Tabs
+          value={mode}
+          onValueChange={(next) => {
+            setMode(next as PhotoMode);
+            setUploadError(null);
+          }}
+        >
+          <TabsList>
+            <TabsTrigger value="camera">
+              <CameraIcon data-icon="inline-start" />
+              Camera
+            </TabsTrigger>
+            <TabsTrigger value="upload">
+              <UploadIcon data-icon="inline-start" />
+              Upload
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+      )}
+
+      {cameraActive && cameraError && (
         <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-destructive/50 p-6 text-center">
           <CameraOffIcon className="size-8 text-destructive" />
           <p className="max-w-xs text-sm text-muted-foreground">{cameraError}</p>
+          <Button variant="outline" onClick={() => setMode('upload')}>
+            Upload a photo instead
+          </Button>
         </div>
       )}
 
-      {!capturedImage && !cameraError && (
-        <>
-          <div className="relative overflow-hidden rounded-lg bg-kit">
-            {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
-            <video
-              ref={videoRef}
-              autoPlay
-              playsInline
-              muted
-              className="aspect-square w-full -scale-x-100 object-cover"
-            />
-            <FrameGuide />
+      {cameraActive && !cameraError && (
+        <div className="relative overflow-hidden rounded-lg bg-kit">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            onLoadedData={() => setCameraReady(true)}
+            className="aspect-square w-full -scale-x-100 object-cover"
+          />
+          <FrameGuide />
+          <div className="absolute inset-x-0 bottom-4 flex justify-center">
+            <Button size="lg" onClick={capture} disabled={!cameraReady}>
+              <CameraIcon data-icon="inline-start" />
+              Take photo
+            </Button>
           </div>
-          <Button size="lg" className="w-full" onClick={capture}>
-            <CameraIcon data-icon="inline-start" />
-            Capture photo
-          </Button>
+        </div>
+      )}
+
+      {mode === 'upload' && !photo && (
+        <>
+          <FileDropzone
+            id="reference-photo-upload"
+            accept={IMAGE_ACCEPTED_TYPES.join(',')}
+            hint="JPEG or PNG. Your face centered, alone in the frame."
+            onFiles={handleFiles}
+          />
+          {uploadError && (
+            <p role="alert" className="text-sm text-destructive">
+              {uploadError}
+            </p>
+          )}
         </>
       )}
 
-      {capturedImage && (
+      {photo && (
         <>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={capturedImage}
-            alt="Captured reference"
-            className="aspect-square w-full -scale-x-100 rounded-lg object-cover"
+            src={photo.dataUrl}
+            alt="Selected reference"
+            className={`aspect-square w-full rounded-lg object-cover ${photo.mirrored ? '-scale-x-100' : ''}`}
           />
           <div className="grid grid-cols-2 gap-2">
-            <Button variant="outline" size="lg" onClick={() => setCapturedImage(null)} disabled={savePhoto.isPending}>
+            <Button variant="outline" size="lg" onClick={() => onPhotoChange(null)}>
               <RotateCcwIcon data-icon="inline-start" />
-              Retake
+              {photo.mirrored ? 'Retake' : 'Choose another'}
             </Button>
-            <Button
-              size="lg"
-              disabled={savePhoto.isPending}
-              onClick={() => savePhoto.mutate({ userId, imageBase64: capturedImage, mimeType: 'image/jpeg' })}
-            >
-              {savePhoto.isPending ? 'Saving...' : 'Use this photo'}
+            <Button size="lg" onClick={onContinue}>
+              Use this photo
             </Button>
           </div>
         </>

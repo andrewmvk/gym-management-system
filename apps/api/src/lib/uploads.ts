@@ -29,7 +29,7 @@ export const MIME_TYPE_BY_EXTENSION: Record<string, MimeType> = Object.fromEntri
 
 // Files travel as base64 inside tRPC inputs, so only these procedures get the larger body limit (see app.ts).
 export const FILE_UPLOAD_PROCEDURES: readonly string[] = [
-  'aptitude.savePhoto',
+  'aptitude.submitSignup',
   'certificates.upload',
   'onboarding.submit',
 ];

@@ -2,7 +2,7 @@ import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
-import { upsertQuestionnaire } from '@api/modules/aptitude/repository';
+import { insertPendingApplicant, upsertQuestionnaire } from '@api/modules/aptitude/repository';
 import { signSessionToken } from '@api/modules/auth/session';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
@@ -21,14 +21,13 @@ async function callerFor(token?: string) {
   return createCallerFactory(appRouter)(ctx);
 }
 
-async function notClearedApplicant(caller: Awaited<ReturnType<typeof callerFor>>) {
-  const created = await caller.aptitude.startSignup({
+async function notClearedApplicant() {
+  const { id: userId } = await insertPendingApplicant({
     name: 'Riley Chen',
     phone: '+1 555-0177',
     email: 'riley.chen@example.com',
     birthdate: '1992-08-11',
   });
-  const userId = (created as { userId: string }).userId;
   // Force a not_cleared questionnaire state directly (router-level test doesn't need to exercise the AI mock).
   await upsertQuestionnaire({ userId, answers: [], aiResult: 'not_cleared', aiNotes: 'test setup' });
   return userId;
@@ -43,7 +42,7 @@ describe('certificates router', () => {
 
   it('lets an applicant upload without a session', async () => {
     const caller = await callerFor();
-    const userId = await notClearedApplicant(caller);
+    const userId = await notClearedApplicant();
 
     const result = await caller.certificates.upload({
       userId,
@@ -79,7 +78,7 @@ describe('certificates router', () => {
 
   it('lets an admin list the queue and review a certificate', async () => {
     const anonymous = await callerFor();
-    const userId = await notClearedApplicant(anonymous);
+    const userId = await notClearedApplicant();
     await anonymous.certificates.upload({
       userId,
       filename: 'certificate.jpg',

@@ -1,21 +1,27 @@
 'use client';
 
+import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
+import { type BasicInfoInput, CONSENT_VERSION } from '@cadence/shared/schemas/signup';
+import { useMutation } from '@tanstack/react-query';
+import { ArrowLeftIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { AptitudeResultStep } from '@/app/signup/aptitude-result-step';
 import { BasicInfoStep } from '@/app/signup/basic-info-step';
 import { CertificateStep } from '@/app/signup/certificate-step';
 import { CertificateWaitingStep } from '@/app/signup/certificate-waiting-step';
 import { ConsentStep } from '@/app/signup/consent-step';
 import { PasswordStep } from '@/app/signup/password-step';
-import { PhotoStep } from '@/app/signup/photo-step';
-import { QuestionnaireStep } from '@/app/signup/questionnaire-step';
+import { type CapturedPhoto, PHOTO_REJECTION_MESSAGES, PhotoStep } from '@/app/signup/photo-step';
+import { type AnswerState, initialAnswers, QuestionnaireStep } from '@/app/signup/questionnaire-step';
 import { RejectedStep } from '@/app/signup/rejected-step';
 import { Stepper } from '@/components/stepper';
-import { useTRPCClient } from '@/lib/trpc';
+import { Button } from '@/components/ui/button';
+import { useTRPC, useTRPCClient } from '@/lib/trpc';
 
 const STORAGE_KEY = 'cadence-signup-user-id';
 
-// The wider set getStatus can report on resume; submitQuestionnaire/recheck only ever return the first
+// The wider set getStatus can report on resume; submitSignup/recheck only ever return the first
 // three (a certificate can't exist yet at that point).
 type ResumeStatus = 'cleared' | 'certificate_required' | 'pending_retry' | 'certificate_pending_review' | 'rejected';
 type Step =
@@ -43,12 +49,43 @@ const STATION_OF_STEP: Record<Step, number> = {
   password: 4,
 };
 
-// The userId is kept in sessionStorage (not a cookie): there is no session before aptitude clearance
-// (FR-9), and this is just a capability letting the browser resume the wizard after a reload.
+// Only the steps before the health check can be revisited: nothing is stored until the questionnaire is
+// submitted, and once it is its answers are final, so later steps have no way back.
+const PREVIOUS_STEP: Partial<Record<Step, Step>> = {
+  consent: 'basic-info',
+  photo: 'consent',
+  questionnaire: 'photo',
+};
+
+const EMPTY_BASIC_INFO: BasicInfoInput = { name: '', phone: '', email: '', birthdate: '', gender: undefined };
+
+// Everything the applicant enters before the health check lives in this component's state and reaches the
+// backend in one submitSignup call, so abandoning the wizard stores nothing (FR-1). Only after that call
+// does the userId exist; it is kept in sessionStorage (not a cookie): there is no session before aptitude
+// clearance (FR-9), and this is just a capability letting the browser resume the wizard after a reload.
 export function SignupWizard() {
+  const trpc = useTRPC();
   const trpcClient = useTRPCClient();
   const [step, setStep] = useState<Step>('basic-info');
   const [userId, setUserId] = useState<string | null>(null);
+  const [basicInfo, setBasicInfo] = useState<BasicInfoInput>(EMPTY_BASIC_INFO);
+  const [consented, setConsented] = useState(false);
+  const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
+  const [photoRejection, setPhotoRejection] = useState<string | null>(null);
+  const [answers, setAnswers] = useState<AnswerState>(initialAnswers);
+
+  // The stored id can outlive its signup (a finished account, a reset database); drop it and start over.
+  function restart() {
+    sessionStorage.removeItem(STORAGE_KEY);
+    setUserId(null);
+    setStep('basic-info');
+  }
+
+  // Once submitted the answers are final and the raw photo is the backend's alone: don't keep either.
+  function clearDraft() {
+    setPhoto(null);
+    setAnswers(initialAnswers());
+  }
 
   function goToAptitudeStep(status: ResumeStatus) {
     if (status === 'cleared') return setStep('password');
@@ -58,50 +95,120 @@ export function SignupWizard() {
     setStep('aptitude-result');
   }
 
-  // FR-46 / RN-12: a resumed signup goes through consent again by default, since a plain reload can't
-  // tell whether photo (and thus consent) already happened. If a questionnaire already exists for this
-  // applicant, that's proof photo and consent are both done, so skip straight to its result instead.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per client; goToAptitudeStep only calls the stable setStep.
-  useEffect(() => {
-    const storedUserId = sessionStorage.getItem(STORAGE_KEY);
-    if (!storedUserId) return;
-    setUserId(storedUserId);
-    setStep('consent');
+  // Routes a returning applicant (a reload, or an e-mail whose questionnaire was already submitted) to
+  // wherever their verdict left them. A row with no questionnaire is not resumable: start over.
+  function resume(resumedUserId: string) {
+    sessionStorage.setItem(STORAGE_KEY, resumedUserId);
+    setUserId(resumedUserId);
+    clearDraft();
 
     trpcClient.aptitude.getStatus
-      .query({ userId: storedUserId })
+      .query({ userId: resumedUserId })
       .then((result) => {
-        if (result.status === 'not_submitted' || result.status === 'unavailable') return;
+        if (result.status === 'unavailable' || result.status === 'not_submitted') return restart();
         goToAptitudeStep(result.status);
       })
       .catch(() => {});
+  }
+
+  // biome-ignore lint/correctness/useExhaustiveDependencies: runs once per client; resume only calls stable setters.
+  useEffect(() => {
+    const storedUserId = sessionStorage.getItem(STORAGE_KEY);
+    if (storedUserId) resume(storedUserId);
   }, [trpcClient]);
 
-  function handleResolved(result: { userId: string; nextStep: 'photo' | 'done' }) {
-    sessionStorage.setItem(STORAGE_KEY, result.userId);
-    setUserId(result.userId);
+  const submitSignup = useMutation(
+    trpc.aptitude.submitSignup.mutationOptions({
+      onSuccess: (result) => {
+        if (result.status === 'email_blocked') {
+          toast.error("This e-mail can't be used to sign up.");
+          setStep('basic-info');
+          return;
+        }
+        if (result.status === 'already_registered') {
+          toast.error('An account already exists for this e-mail. Try signing in instead.');
+          setStep('basic-info');
+          return;
+        }
+        if (result.status === 'photo_rejected') {
+          setPhoto(null);
+          setPhotoRejection(PHOTO_REJECTION_MESSAGES[result.reason]);
+          setStep('photo');
+          return;
+        }
+        if (result.status === 'resumed') {
+          toast.message('Welcome back! Picking up where you left off.');
+          resume(result.userId);
+          return;
+        }
+        sessionStorage.setItem(STORAGE_KEY, result.userId);
+        setUserId(result.userId);
+        clearDraft();
+        goToAptitudeStep(result.outcome);
+      },
+      onError: () => toast.error("We couldn't submit your signup. Try again."),
+    }),
+  );
 
-    if (result.nextStep === 'photo') {
-      setStep('consent');
-      return;
-    }
-
-    // nextStep === 'done': the reference photo (and thus consent) is already saved for this e-mail.
-    void trpcClient.aptitude.getStatus.query({ userId: result.userId }).then((status) => {
-      if (status.status === 'not_submitted' || status.status === 'unavailable') {
-        setStep('questionnaire');
-        return;
-      }
-      goToAptitudeStep(status.status);
+  function handleSubmit() {
+    if (!consented) return setStep('consent');
+    if (!photo) return setStep('photo');
+    submitSignup.mutate({
+      ...basicInfo,
+      consented: true,
+      consentVersion: CONSENT_VERSION,
+      photo: { imageBase64: photo.dataUrl, mimeType: 'image/jpeg' },
+      answers: QUESTIONNAIRE_V1.map((q) => ({
+        questionId: q.id,
+        answer: answers[q.id]!.answer!,
+        detail: answers[q.id]!.detail.trim() || undefined,
+      })),
     });
   }
 
   let content: ReactNode = null;
-  if (step === 'basic-info') content = <BasicInfoStep onResolved={handleResolved} />;
-  else if (step === 'consent' && userId) content = <ConsentStep userId={userId} onConsented={() => setStep('photo')} />;
-  else if (step === 'photo' && userId) content = <PhotoStep userId={userId} onSaved={() => setStep('questionnaire')} />;
-  else if (step === 'questionnaire' && userId) {
-    content = <QuestionnaireStep userId={userId} onResolved={(result) => goToAptitudeStep(result)} />;
+  if (step === 'basic-info') {
+    content = (
+      <BasicInfoStep
+        defaultValues={basicInfo}
+        onContinue={(values) => {
+          setBasicInfo(values);
+          setStep('consent');
+        }}
+        onResume={resume}
+      />
+    );
+  } else if (step === 'consent') {
+    content = (
+      <ConsentStep
+        initialAgreed={consented}
+        onConsented={() => {
+          setConsented(true);
+          setStep('photo');
+        }}
+      />
+    );
+  } else if (step === 'photo') {
+    content = (
+      <PhotoStep
+        photo={photo}
+        onPhotoChange={(next) => {
+          setPhoto(next);
+          if (next) setPhotoRejection(null);
+        }}
+        rejection={photoRejection}
+        onContinue={() => setStep('questionnaire')}
+      />
+    );
+  } else if (step === 'questionnaire') {
+    content = (
+      <QuestionnaireStep
+        answers={answers}
+        onAnswersChange={setAnswers}
+        onSubmit={handleSubmit}
+        isSubmitting={submitSignup.isPending}
+      />
+    );
   } else if (step === 'aptitude-result' && userId) {
     content = <AptitudeResultStep userId={userId} onRechecked={(result) => goToAptitudeStep(result)} />;
   } else if (step === 'certificate-upload' && userId) {
@@ -109,11 +216,27 @@ export function SignupWizard() {
   } else if (step === 'certificate-waiting' && userId) {
     content = <CertificateWaitingStep userId={userId} onStatusChanged={(result) => goToAptitudeStep(result)} />;
   } else if (step === 'rejected') content = <RejectedStep />;
-  else if (step === 'password' && userId) content = <PasswordStep userId={userId} />;
+  else if (step === 'password' && userId) {
+    content = <PasswordStep userId={userId} onActivated={() => sessionStorage.removeItem(STORAGE_KEY)} />;
+  }
+
+  const previousStep = PREVIOUS_STEP[step];
 
   return (
     <div className="flex flex-col gap-8">
       <Stepper steps={STATIONS} current={STATION_OF_STEP[step]} />
+      {previousStep && (
+        <Button
+          variant="ghost"
+          size="sm"
+          className="-mt-4 self-start"
+          disabled={submitSignup.isPending}
+          onClick={() => setStep(previousStep)}
+        >
+          <ArrowLeftIcon />
+          Back
+        </Button>
+      )}
       {content}
     </div>
   );

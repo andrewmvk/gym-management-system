@@ -1,38 +1,21 @@
 'use client';
 
-import { CONSENT_VERSION } from '@cadence/shared/schemas/signup';
-import { useMutation } from '@tanstack/react-query';
 import { ShieldCheckIcon } from 'lucide-react';
 import { useState } from 'react';
-import { toast } from 'sonner';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { useTRPC } from '@/lib/trpc';
 
 interface ConsentStepProps {
-  userId: string;
+  initialAgreed: boolean;
   onConsented: () => void;
 }
 
 // FR-46 / RN-12 (LGPD art. 11): the applicant must give explicit, specific consent to processing of
-// their facial biometric data before we ever capture or process the reference photo.
-export function ConsentStep({ userId, onConsented }: ConsentStepProps) {
-  const trpc = useTRPC();
-  const [agreed, setAgreed] = useState(false);
-
-  const recordConsent = useMutation(
-    trpc.aptitude.recordConsent.mutationOptions({
-      onSuccess: (result) => {
-        if (result.status === 'unavailable') {
-          toast.error("We couldn't record your consent right now. Try again.");
-          return;
-        }
-        onConsented();
-      },
-      onError: () => toast.error("We couldn't record your consent. Try again."),
-    }),
-  );
+// their facial biometric data before the reference photo is taken. The consent is held in the browser
+// and recorded by the backend together with the rest of the signup, before any embedding is computed.
+export function ConsentStep({ initialAgreed, onConsented }: ConsentStepProps) {
+  const [agreed, setAgreed] = useState(initialAgreed);
 
   return (
     <StepPanel
@@ -57,13 +40,8 @@ export function ConsentStep({ userId, onConsented }: ConsentStepProps) {
         />
         <span>I consent to Cadence processing my facial biometric data for check-in identification.</span>
       </label>
-      <Button
-        size="lg"
-        className="w-full"
-        disabled={!agreed || recordConsent.isPending}
-        onClick={() => recordConsent.mutate({ userId, consentVersion: CONSENT_VERSION })}
-      >
-        {recordConsent.isPending ? 'Continuing...' : 'Continue'}
+      <Button size="lg" className="w-full" disabled={!agreed} onClick={onConsented}>
+        Continue
       </Button>
     </StepPanel>
   );

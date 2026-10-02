@@ -42,7 +42,7 @@ export function createApp(env: Env) {
   app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
   app.use(cookieParser());
   app.use(createFilesRouter(env.UPLOADS_DIR));
-  app.use(createKioskRouter(env.KIOSK_API_KEY));
+  app.use(createKioskRouter(env.KIOSK_API_KEY, env.NODE_ENV));
   app.use('/trpc', trpcHandler());
 
   return app;

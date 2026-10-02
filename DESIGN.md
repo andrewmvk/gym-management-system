@@ -277,7 +277,16 @@ Confident and kit-sharp: uppercase condensed labels, solid fills, no gloss.
 - **Titles:** Title typography, uppercase.
 
 ### Kit Panel (signature)
-The ink header strip on today's plan, the landing sample plan, the auth card top and the kiosk. Locker Ink fill, Locker Ink Muted eyebrow label, a big tabular tally, and the **sleeve stripes**: two bands at 107° (Stripe Cobalt then Pace Tape) in a 6rem-wide strip at the top-right corner. The right side of the panel is padded 80px so content never sits on the stripes.
+The ink header strip on today's plan, the landing sample plan and the auth card top. Locker Ink fill, Locker Ink Muted eyebrow label, a big tabular tally, and the **sleeve stripes**: two bands at 107° (Stripe Cobalt then Pace Tape) in a 6rem-wide strip at the top-right corner. The right side of the panel is padded 80px so content never sits on the stripes.
+
+The stripes are a small detail, not a surface. They belong only on a compact ink strip (a header or card top roughly 8rem tall or less), once per screen, in its top-right corner. They never go on a page or full-screen background, on a tall panel, or behind content. If a surface is big enough that the stripes would dominate it, it gets none: the brand mark carries the kit.
+
+### Kiosk Panel
+The wall-mounted check-in screen is the one surface with its own layout, because it is read from a few metres away, not used up close. A full-viewport Locker Ink page with no stripes and no app header: a slim row with the brand mark (and the dev-only simulation control), then two columns from lg (3/5 and 2/5) that stack below it, camera first.
+- **Step highlight:** each card has an inset outline (it never moves the content) in three weights, 1px, 2px, 4px, that rises as its own step progresses and is not synced with the other card. The camera stage is 1px until the camera is on or an image is chosen, 2px while it watches, 4px once a face is in. The status panel is 1px until recognition starts, 2px while it runs, 4px once it has an answer. The highlight walks from the camera to the status.
+- **Camera stage:** fills the column's full height, mirrored, with an outline that takes the state's color (cobalt while scanning, solid green or tape for a result, dashed for retry and failure). While scanning, a dashed oval shows where to stand.
+- **Status panel:** the peak of the screen. An outlined 8px panel holding a 5rem to 6rem icon, a Display-weight uppercase title (up to 6rem), and a 1.5 to 1.875rem sentence. A result fills the whole panel: Cleared Green for access granted, Pace Tape for "open the turnstile manually", a dashed outline on ink for retry, see staff and failures. A slanted bar drains across its bottom edge during the 5 second cooldown.
+- **Scanning:** the panel stays quiet, with three slanted cobalt segments pulsing in turn.
 
 ### Inputs / Fields
 - **Style:** 40px tall, Card White fill, 1px Field Stroke border, 6px corners; textareas grow with content from 80px.
@@ -316,6 +325,7 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 
 ### Don't:
 - **Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.
+- **Don't** use the sleeve stripes as a background or on a large surface (the kiosk page has none); they are a subtle corner detail of a compact ink strip, once per screen.
 - **Don't** use bracket values for size, tracking, leading, radius or borders (`text-[10px]`, `tracking-[0.04em]`); use the Tailwind scale.
 - **Don't** show a technical failure (`pending_retry`, a failed turnstile call) with the solid red "not cleared" form.
 - **Don't** put a shadow on a card that sits on the page.

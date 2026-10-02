@@ -148,20 +148,20 @@ describe('chat', () => {
       it('regenerates the plan through the normal generation path', async () => {
         const member = await createMember();
 
-        const plan = expectOk(await adjustPlan(member.id, '2026-10-01', 'make it easier today'));
+        const plan = expectOk(await adjustPlan(member.id, todayLocal(), 'make it easier today'));
 
         expect(plan.exercises.length).toBeGreaterThan(0);
       });
 
       it('reports needs_confirmation for a trainer-edited plan and blocks the regeneration', async () => {
         const member = await createMember();
-        const { plan } = await createPastPlan(member.id, '2026-10-01', ['Barbell Back Squat']);
+        const { plan } = await createPastPlan(member.id, todayLocal(), ['Barbell Back Squat']);
         await db
           .update(fTrainingPlans)
           .set({ status: 'trainer_edited', lastEditedByUserId: member.id, lastEditedAt: new Date('2026-09-20') })
           .where(eq(fTrainingPlans.id, plan.id));
 
-        const result = await adjustPlan(member.id, '2026-10-01', 'swap squats for lunges');
+        const result = await adjustPlan(member.id, todayLocal(), 'swap squats for lunges');
 
         expect(result).toMatchObject({ status: 'needs_confirmation', editedBy: 'Chat Test Member' });
       });

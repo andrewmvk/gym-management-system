@@ -1,6 +1,7 @@
 import type { Env } from '@api/config/env';
 import { requestLogger } from '@api/lib/request-logger';
 import { DEFAULT_REQUEST_MAX_BYTES, FILE_REQUEST_MAX_BYTES, FILE_UPLOAD_PROCEDURES } from '@api/lib/uploads';
+import { createKioskRouter } from '@api/modules/checkins/kiosk-routes';
 import { createFilesRouter } from '@api/routes/files';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
@@ -41,6 +42,7 @@ export function createApp(env: Env) {
   app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
   app.use(cookieParser());
   app.use(createFilesRouter(env.UPLOADS_DIR));
+  app.use(createKioskRouter(env.KIOSK_API_KEY));
   app.use('/trpc', trpcHandler());
 
   return app;

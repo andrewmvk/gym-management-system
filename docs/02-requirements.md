@@ -46,10 +46,10 @@ See [01-product-overview.md](./01-product-overview.md) for roles and context.
 ### 1.5 Facial Recognition Check-in
 - FR-30: A kiosk-style web app (running at the gym's physical panel) captures a photo via webcam and computes its face embedding client-side.
 - FR-31: The kiosk performs 1:N matching against embeddings only. It fetches a dataset of `{memberId, embedding}` pairs from a dedicated, kiosk-authenticated backend endpoint - raw reference photos are never sent to or stored on the kiosk.
-- FR-32: Matching applies a similarity/distance threshold to decide whether there's a match at all. If the best and second-best candidates are both above threshold and too close to call (ambiguous), the match is rejected and the member is asked to retry, rather than guessing between them.
+- FR-32: Matching applies a similarity/distance threshold to decide whether there's a match at all. If the best and second-best candidates are both within the threshold and too close to call (ambiguous), the match is rejected and the member is asked to retry, rather than guessing between them.
 - FR-33: On an accepted match, the backend attempts to call the gym's existing external turnstile REST API to unlock the turnstile. Whether that call succeeds or fails, the check-in itself is always recorded, tagged with the outcome (`success`/`failed`).
 - FR-34: If the turnstile API call fails/times out, the kiosk surfaces the failure so gym staff can open the turnstile manually - the visit is still counted as a check-in regardless.
-- FR-35: An Admin has a settings area to input/configure the values needed to call the external turnstile REST API (base URL, credentials/API key, field mappings) - the API itself is not built by this project.
+- FR-35: An Admin has a settings area to input/configure the values needed to call the external turnstile REST API (HTTP method, URL, headers such as credentials or an API key, and an optional request body) - the API itself is not built by this project.
 
 ### 1.6 Metrics & Gym Info
 - FR-36: The member can view personal metrics: training frequency, days trained, exercises performed (breakdown), training volume, and progress toward stated goals/pretensions. "Days trained"/training frequency counts distinct calendar days with at least one recorded check-in (`f_check_ins`) - a day where only plan exercises were marked completed without a physical check-in does not count.

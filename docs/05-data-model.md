@@ -214,11 +214,12 @@ This table is what the AI reads (alongside `f_onboarding_submissions` and recent
 Singleton row, editable by whoever holds the turnstile-config permission (FR-35).
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid PK | Effectively singleton (one row) |
-| base_url | text | |
-| api_key | text | Consider encrypting at rest even though mocked |
-| field_mapping | jsonb | How local fields map to the external API's expected request shape |
-| updated_by_user_id | uuid FK → d_users.id | |
+| id | uuid PK | Singleton: always the fixed id `00000000-0000-4000-8000-000000000001`, created empty on first read |
+| method | enum(`GET`,`POST`,`PUT`) | HTTP method of the unlock request |
+| url | text | Full address of the unlock request, including path and any query string. Empty until configured |
+| headers | jsonb | List of `{ name, value, secret }`, validated by a zod schema. Secret values are masked on read. Consider encrypting secrets at rest even though mocked |
+| body_template | text | Optional request body (JSON, XML, any text) with `{{memberId}}` and `{{timestamp}}` placeholders; ignored for GET |
+| updated_by_user_id | uuid FK → d_users.id, nullable | Null until an admin first saves the config |
 | updated_at | timestamp | |
 
 ### `d_gym_settings`

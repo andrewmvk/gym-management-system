@@ -1,7 +1,7 @@
 Blocked by: P-02, P-05
 Covers: FR-31, FR-32
 MVP: 3
-Artifacts: apps/api/src/modules/checkins/kiosk-routes.ts (kiosk key middleware and embeddings endpoint), packages/shared/src/faces/{match.ts, match.test.ts}
+Artifacts: apps/api/src/modules/checkins/{kiosk-routes.ts (kiosk key middleware and embeddings endpoint), kiosk-routes.test.ts, repository.ts (embeddings query)}, packages/shared/src/faces/{match.ts, match.test.ts}, packages/shared/package.json (./faces/* export)
 Evidence: Vitest: the endpoint rejects a missing or wrong key and returns only { memberId, embedding }; the matching function rejects an ambiguous top-two instead of guessing (RN-08)
 
 Task: implement the kiosk-authenticated embeddings dataset endpoint and the pure 1:N matching decision.
@@ -11,12 +11,13 @@ Context:
 - Embeddings are 128-number vectors compared by Euclidean distance (face-api.js convention).
 
 Permitted scope:
-- Only the files in Artifacts and the route registration. No new dependencies.
+- Only the files in Artifacts and the route registration in apps/api/src/app.ts. No new dependencies.
 
 Functional requirements:
 1. requireKioskKey middleware: the x-kiosk-key header must equal KIOSK_API_KEY, compared in constant time. Export it for reuse by P-20.
-2. GET /kiosk/embeddings returns [{ memberId, embedding }] only for users that are cleared, have a password, and have an embedding. It returns no photo, name, or other field.
+2. GET /kiosk/embeddings returns [{ memberId, embedding }] only for users that are cleared, have a password, and have an embedding. It returns no photo, name, or other field. The Drizzle query lives in the module's repository.ts, not in the route file (rules/backend.md).
 3. packages/shared/src/faces/match.ts exports DEFAULT_MATCH_THRESHOLD = 0.6, DEFAULT_MATCH_MARGIN = 0.1 and matchFace(probe, gallery, options?), returning { status: "match", memberId, distance }, { status: "ambiguous" } or { status: "no_match" }. The best candidate must be at or under the threshold; if the second best is also under the threshold and the gap is smaller than the margin, the result is ambiguous. An empty gallery is no_match, and a vector of the wrong length throws a TypeError. The function is pure and does not import face-api.js.
+4. packages/shared/package.json exports "./faces/*" so the kiosk (P-21) can import `@cadence/shared/faces/match`.
 
 Acceptance criteria:
 - The endpoint answers 401 without the right key and never includes rejected or pending users.

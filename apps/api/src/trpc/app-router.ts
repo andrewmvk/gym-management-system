@@ -7,6 +7,7 @@ import { onboardingRouter } from '@api/modules/onboarding/router';
 import { reviewsRouter } from '@api/modules/plans/reviews-router';
 import { plansRouter } from '@api/modules/plans/router';
 import { systemRouter } from '@api/modules/system/router';
+import { turnstileRouter } from '@api/modules/turnstile/router';
 import { router } from '@api/trpc/procedures';
 
 export const appRouter = router({
@@ -19,6 +20,7 @@ export const appRouter = router({
   plans: plansRouter,
   reviews: reviewsRouter,
   system: systemRouter,
+  turnstile: turnstileRouter,
 });
 
 export type AppRouter = typeof appRouter;

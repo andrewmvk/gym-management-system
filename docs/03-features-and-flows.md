@@ -65,7 +65,7 @@ Onboarding is not a one-time gate - members can add or revise this information l
       call → rejected; member is asked to retry.
 4. On an accepted match:
    a. Backend attempts to call the external turnstile REST API (using
-      Admin-configured base URL/credentials/field mapping).
+      Admin-configured method, URL, headers and optional body).
    b. The check-in (member, timestamp, turnstile_status: success|failed)
       is recorded regardless of whether that call succeeded.
    c. If the call failed/timed out, the kiosk shows a failure notice so
@@ -134,8 +134,9 @@ Onboarding is not a one-time gate - members can add or revise this information l
 ```
 1. Admin logs in (via a seeded demo account with known credentials created
    at first boot - there is no staff self-signup anywhere), can:
-   - Configure the external turnstile REST API integration (base URL,
-     API key/credentials, field mapping) used by the check-in flow.
+   - Configure the external turnstile REST API integration (method, URL,
+     headers/credentials, optional body) used by the check-in flow, and
+     test the saved request from the settings page.
    - Manage the exercise/equipment catalog: add new exercises, add new
      gym equipment, and toggle whether a piece of equipment is currently
      available. Existing exercises can never be deleted - only added -

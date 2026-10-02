@@ -1,8 +1,8 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
-import { db } from '@api/db/client';
-import { dUsers } from '@api/db/schema';
-import { and, eq, isNotNull } from 'drizzle-orm';
-import { type RequestHandler, Router } from 'express';
+import { listKioskEmbeddings } from '@api/modules/checkins/repository';
+import { recordCheckIn } from '@api/modules/checkins/service';
+import { CheckInInputSchema } from '@cadence/shared/schemas/turnstile';
+import express, { type RequestHandler, Router } from 'express';
 
 export const KIOSK_KEY_HEADER = 'x-kiosk-key';
 
@@ -28,18 +28,27 @@ export function createKioskRouter(kioskApiKey: string) {
   const router = Router();
 
   router.get('/kiosk/embeddings', requireKioskKey(kioskApiKey), async (_req, res) => {
-    const rows = await db
-      .select({ memberId: dUsers.id, embedding: dUsers.referenceFaceEmbedding })
-      .from(dUsers)
-      .where(
-        and(
-          eq(dUsers.aptitudeStatus, 'cleared'),
-          isNotNull(dUsers.passwordHash),
-          isNotNull(dUsers.referenceFaceEmbedding),
-        ),
-      );
+    res.set('Cache-Control', 'private, no-store').json(await listKioskEmbeddings());
+  });
 
-    res.set('Cache-Control', 'private, no-store').json(rows);
+  router.post('/kiosk/checkins', requireKioskKey(kioskApiKey), express.json({ limit: '1kb' }), async (req, res) => {
+    const body = CheckInInputSchema.safeParse(req.body);
+    if (!body.success) {
+      res.status(400).json({ error: 'memberId must be a valid id' });
+      return;
+    }
+
+    const outcome = await recordCheckIn(body.data.memberId);
+    switch (outcome.kind) {
+      case 'member_not_found':
+        res.status(404).json({ error: 'Member not found' });
+        return;
+      case 'member_not_cleared':
+        res.status(403).json({ error: 'Member is not cleared to train' });
+        return;
+      case 'recorded':
+        res.json({ checkInId: outcome.checkInId, turnstileStatus: outcome.turnstileStatus });
+    }
   });
 
   return router;

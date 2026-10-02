@@ -50,6 +50,13 @@
       "when": 1790469112549,
       "tag": "0006_overrated_centennial",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790909059660,
+      "tag": "0007_milky_praxagora",
+      "breakpoints": true
     }
   ]
 }

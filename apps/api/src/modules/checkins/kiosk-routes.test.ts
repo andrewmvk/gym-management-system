@@ -3,7 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { createApp } from '@api/app';
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
-import { dUsers } from '@api/db/schema';
+import { dUsers, fCheckIns } from '@api/db/schema';
 import { KIOSK_KEY_HEADER } from '@api/modules/checkins/kiosk-routes';
 import { resetTestDatabase } from '@api/test/database';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -72,5 +72,57 @@ describe('GET /kiosk/embeddings', () => {
 
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual([]);
+  });
+});
+
+describe('POST /kiosk/checkins', () => {
+  function postCheckIn(body: unknown, key?: string) {
+    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    if (key !== undefined) headers[KIOSK_KEY_HEADER] = key;
+    return fetch(`${baseUrl}/kiosk/checkins`, { method: 'POST', headers, body: JSON.stringify(body) });
+  }
+
+  async function createMember(aptitudeStatus: 'cleared' | 'pending') {
+    const [member] = await db
+      .insert(dUsers)
+      .values({ email: `${aptitudeStatus}@example.com`, name: 'Member', aptitudeStatus })
+      .returning();
+    return member!.id;
+  }
+
+  beforeEach(async () => {
+    await resetTestDatabase();
+  });
+
+  it('answers 401 without the right key and records nothing', async () => {
+    const memberId = await createMember('cleared');
+
+    expect((await postCheckIn({ memberId })).status).toBe(401);
+    expect((await postCheckIn({ memberId }, 'wrong-key')).status).toBe(401);
+    expect(await db.select().from(fCheckIns)).toHaveLength(0);
+  });
+
+  it('answers 400 for a malformed body, 404 for an unknown member, and 403 for a member who is not cleared', async () => {
+    const pending = await createMember('pending');
+
+    expect((await postCheckIn({ memberId: 'nope' }, env.KIOSK_API_KEY)).status).toBe(400);
+    expect((await postCheckIn({}, env.KIOSK_API_KEY)).status).toBe(400);
+    expect((await postCheckIn({ memberId: crypto.randomUUID() }, env.KIOSK_API_KEY)).status).toBe(404);
+    expect((await postCheckIn({ memberId: pending }, env.KIOSK_API_KEY)).status).toBe(403);
+    expect(await db.select().from(fCheckIns)).toHaveLength(0);
+  });
+
+  it('records the check-in as failed and still answers 200 when the turnstile is not configured', async () => {
+    const memberId = await createMember('cleared');
+
+    const response = await postCheckIn({ memberId }, env.KIOSK_API_KEY);
+
+    expect(response.status).toBe(200);
+    const body = (await response.json()) as { checkInId: string; turnstileStatus: string };
+    expect(body.turnstileStatus).toBe('failed');
+    expect(Object.keys(body).sort()).toEqual(['checkInId', 'turnstileStatus']);
+    const rows = await db.select().from(fCheckIns);
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({ id: body.checkInId, userId: memberId, turnstileStatus: 'failed' });
   });
 });

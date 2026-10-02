@@ -24,6 +24,11 @@ export const NAV_ITEMS: Record<AppArea, NavItem[]> = {
       isVisible: (ability) => ability.can('manage', 'MedicalCertificate'),
     },
     { href: '/catalog', label: 'Catalog' },
+    {
+      href: '/settings/turnstile',
+      label: 'Turnstile',
+      isVisible: (ability) => ability.can('manage', 'TurnstileConfig'),
+    },
   ],
 };
 

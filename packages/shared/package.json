@@ -6,6 +6,7 @@
   "exports": {
     ".": "./src/index.ts",
     "./auth": "./src/auth/index.ts",
+    "./faces/*": "./src/faces/*.ts",
     "./schemas/*": "./src/schemas/*.ts"
   },
   "scripts": {

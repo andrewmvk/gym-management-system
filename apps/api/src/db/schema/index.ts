@@ -1,5 +1,6 @@
 export * from '@api/db/schema/aptitude';
 export * from '@api/db/schema/catalog';
+export * from '@api/db/schema/checkins';
 export * from '@api/db/schema/consent';
 export * from '@api/db/schema/onboarding';
 export * from '@api/db/schema/plans';

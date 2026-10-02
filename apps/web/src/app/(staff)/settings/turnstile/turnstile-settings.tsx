@@ -123,7 +123,7 @@ function TurnstileSettingsRoot() {
     );
   }
 
-  if (configQuery.isPending) {
+  if (configQuery.isPending || !config) {
     return (
       <Deferred>
         <TurnstileSettingsSkeleton />

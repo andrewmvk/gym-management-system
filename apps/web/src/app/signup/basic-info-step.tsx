@@ -1,6 +1,6 @@
 'use client';
 
-import { type StartSignupInput, StartSignupInputSchema } from '@cadence/shared/schemas/signup';
+import { type BasicInfoInput, BasicInfoInputSchema } from '@cadence/shared/schemas/signup';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
@@ -21,18 +21,22 @@ const GENDER_LABELS = {
 } as const;
 
 interface BasicInfoStepProps {
-  onResolved: (result: { userId: string; nextStep: 'photo' | 'done' }) => void;
+  defaultValues: BasicInfoInput;
+  onContinue: (values: BasicInfoInput) => void;
+  onResume: (userId: string) => void;
 }
 
-export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
+export function BasicInfoStep({ defaultValues, onContinue, onResume }: BasicInfoStepProps) {
   const trpc = useTRPC();
-  const form = useForm<StartSignupInput>({
-    resolver: zodResolver(StartSignupInputSchema),
-    defaultValues: { name: '', phone: '', email: '', birthdate: '', gender: undefined },
+  const form = useForm<BasicInfoInput>({
+    resolver: zodResolver(BasicInfoInputSchema),
+    defaultValues,
   });
 
-  const startSignup = useMutation(
-    trpc.aptitude.startSignup.mutationOptions({
+  // Nothing is stored here: the check only rejects an unusable e-mail, or sends a returning applicant
+  // straight to their verdict, before they fill in the rest of the signup.
+  const checkEmail = useMutation(
+    trpc.aptitude.checkEmail.mutationOptions({
       onSuccess: (result) => {
         if (result.status === 'email_blocked') {
           toast.error("This e-mail can't be used to sign up.");
@@ -42,18 +46,20 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
           toast.error('An account already exists for this e-mail. Try signing in instead.');
           return;
         }
-        if (result.status === 'resumed') {
+        if (result.status === 'resumable') {
           toast.message('Welcome back! Picking up where you left off.');
+          onResume(result.userId);
+          return;
         }
-        onResolved({ userId: result.userId, nextStep: result.nextStep });
+        onContinue(form.getValues());
       },
-      onError: () => toast.error("We couldn't submit your information. Try again."),
+      onError: () => toast.error("We couldn't check your e-mail. Try again."),
     }),
   );
 
   return (
     <StepPanel title="About you" description="Start with your basic information. We'll ask for a reference photo next.">
-      <form noValidate onSubmit={form.handleSubmit((values) => startSignup.mutate(values))}>
+      <form noValidate onSubmit={form.handleSubmit((values) => checkEmail.mutate({ email: values.email }))}>
         <FieldGroup>
           <Controller
             name="name"
@@ -139,8 +145,8 @@ export function BasicInfoStep({ onResolved }: BasicInfoStepProps) {
               </Field>
             )}
           />
-          <Button type="submit" size="lg" className="mt-4 w-full" disabled={startSignup.isPending}>
-            {startSignup.isPending ? 'Continuing...' : 'Continue'}
+          <Button type="submit" size="lg" className="mt-4 w-full" disabled={checkEmail.isPending}>
+            {checkEmail.isPending ? 'Continuing...' : 'Continue'}
           </Button>
         </FieldGroup>
       </form>

@@ -14,7 +14,8 @@
       "!**/*.css",
       "!.claude",
       "!.impeccable",
-      "!apps/api/drizzle"
+      "!apps/api/drizzle",
+      "!packages/shared/face-models"
     ]
   },
   "formatter": {

@@ -1,3 +1,4 @@
+import { BasicInfoInputSchema, CONSENT_VERSION, SignupPhotoSchema } from '@shared/schemas/signup';
 import { z } from 'zod';
 
 export interface QuestionnaireQuestion {
@@ -41,19 +42,24 @@ export const QuestionnaireAnswerSchema = z.object({
 export type QuestionnaireAnswer = z.infer<typeof QuestionnaireAnswerSchema>;
 
 // Every question answered exactly once, matching QUESTIONNAIRE_V1 - not just any array of answers.
-export const SubmitQuestionnaireInputSchema = z
-  .object({
-    userId: z.uuid(),
-    answers: z.array(QuestionnaireAnswerSchema),
-  })
-  .refine(
-    (input) => {
-      const ids = input.answers.map((a) => a.questionId);
-      return ids.length === QUESTIONNAIRE_V1.length && new Set(ids).size === ids.length;
-    },
-    { message: 'Every questionnaire question must be answered exactly once', path: ['answers'] },
-  );
-export type SubmitQuestionnaireInput = z.infer<typeof SubmitQuestionnaireInputSchema>;
+export const QuestionnaireAnswersSchema = z.array(QuestionnaireAnswerSchema).refine(
+  (answers) => {
+    const ids = answers.map((a) => a.questionId);
+    return ids.length === QUESTIONNAIRE_V1.length && new Set(ids).size === ids.length;
+  },
+  { message: 'Every questionnaire question must be answered exactly once' },
+);
+
+// FR-1..FR-3, FR-46: the whole pre-verdict signup travels in one request, so nothing is stored for an
+// applicant who abandons the wizard midway. consented must be literally true (FR-46) and consentVersion
+// is the wording the applicant was shown.
+export const SubmitSignupInputSchema = BasicInfoInputSchema.extend({
+  consented: z.literal(true, 'Biometric consent is required'),
+  consentVersion: z.string().min(1).default(CONSENT_VERSION),
+  photo: SignupPhotoSchema,
+  answers: QuestionnaireAnswersSchema,
+});
+export type SubmitSignupInput = z.input<typeof SubmitSignupInputSchema>;
 
 export const RecheckInputSchema = z.object({ userId: z.uuid() });
 export type RecheckInput = z.infer<typeof RecheckInputSchema>;

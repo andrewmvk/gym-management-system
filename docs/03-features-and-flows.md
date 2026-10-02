@@ -5,11 +5,20 @@ See [02-requirements.md](./02-requirements.md) for the requirement IDs reference
 ## 1. Member: Signup → Aptitude → Account Creation
 
 ```
-1. Member fills basic signup form: name, phone, email, birthdate.
-2. Member captures a reference photo via webcam. The backend computes a
-   face embedding from it and stores that embedding; the raw photo is kept
-   server-side only (audit/recompute) and is never distributed further.
-3. Member fills the digital aptitude/health questionnaire.
+1. Member fills basic signup form: name, phone, email, birthdate. The
+   e-mail is checked (nothing is stored): a rejected or registered e-mail is
+   refused, and one whose questionnaire was already submitted resumes at
+   its verdict.
+2. Member gives the biometric consent (FR-46), then captures a reference
+   photo via webcam. Both stay in the browser; the member can go back to any
+   earlier step and change them.
+3. Member fills the digital aptitude/health questionnaire and submits it.
+   This is the one write of the whole signup: the backend records the
+   consent, computes the face embedding from the photo and stores it (the
+   raw photo is kept server-side only for audit/recompute and is never
+   distributed further), and stores the answers. A photo with no face or
+   several faces rolls everything back and sends the member to retake it.
+   Nothing exists for a member who leaves before this point.
 4. AI evaluates the questionnaire, returning cleared / not_cleared / pending_retry:
    a. cleared       → go to step 7.
    b. pending_retry  → member sees "still processing, check back shortly";
@@ -31,6 +40,7 @@ See [02-requirements.md](./02-requirements.md) for the requirement IDs reference
 
 Notes:
 - No login is possible before step 7 - there's nothing to authenticate against yet.
+- Once step 3 is submitted its answers are final: later steps have no way back to them.
 - The Admin override in step 6a is the *only* recovery path for a member the AI has wrongly rejected, since they have no account to log in and contest it themselves.
 
 ## 2. Member: Detailed Onboarding (post-authentication)

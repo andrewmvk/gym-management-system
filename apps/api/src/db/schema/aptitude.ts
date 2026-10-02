@@ -5,7 +5,7 @@ import { jsonb, pgEnum, pgTable, text, timestamp, uuid } from 'drizzle-orm/pg-co
 export const aiResult = pgEnum('ai_result', ['cleared', 'not_cleared', 'pending_retry']);
 export const certificateDecision = pgEnum('certificate_decision', ['cleared', 'not_cleared']);
 
-// One row per applicant (unique user_id), updated in place by submitQuestionnaire/recheck: RN-01's
+// One row per applicant (unique user_id), updated in place by submitSignup/recheck: RN-01's
 // "latest result" is this row's current ai_result, not a history of past submissions.
 export const fAptitudeQuestionnaires = pgTable('f_aptitude_questionnaires', {
   id: uuid('id').primaryKey().defaultRandom(),

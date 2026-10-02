@@ -75,6 +75,54 @@ describe('GET /kiosk/embeddings', () => {
   });
 });
 
+describe('GET /kiosk/dev/members', () => {
+  beforeEach(async () => {
+    await resetTestDatabase();
+  });
+
+  it('needs the kiosk key and lists the eligible members by name', async () => {
+    await db.insert(dUsers).values([
+      {
+        email: 'b@example.com',
+        name: 'Bruno',
+        passwordHash: 'hash',
+        aptitudeStatus: 'cleared',
+        referenceFaceEmbedding: embedding(1),
+      },
+      {
+        email: 'a@example.com',
+        name: 'Ana',
+        passwordHash: 'hash',
+        aptitudeStatus: 'cleared',
+        referenceFaceEmbedding: embedding(2),
+      },
+      { email: 'p@example.com', name: 'Pending', passwordHash: 'hash', aptitudeStatus: 'pending' },
+    ]);
+
+    expect((await fetch(`${baseUrl}/kiosk/dev/members`)).status).toBe(401);
+    const response = await fetch(`${baseUrl}/kiosk/dev/members`, {
+      headers: { [KIOSK_KEY_HEADER]: env.KIOSK_API_KEY },
+    });
+
+    expect(response.status).toBe(200);
+    const members = (await response.json()) as { name: string }[];
+    expect(members.map((member) => member.name)).toEqual(['Ana', 'Bruno']);
+  });
+
+  it('is not mounted in production', async () => {
+    const productionServer = createApp({ ...env, NODE_ENV: 'production' }).listen(0);
+    await new Promise((resolve) => productionServer.once('listening', resolve));
+    const { port } = productionServer.address() as AddressInfo;
+
+    const response = await fetch(`http://127.0.0.1:${port}/kiosk/dev/members`, {
+      headers: { [KIOSK_KEY_HEADER]: env.KIOSK_API_KEY },
+    });
+    await new Promise((resolve) => productionServer.close(resolve));
+
+    expect(response.status).toBe(404);
+  });
+});
+
 describe('POST /kiosk/checkins', () => {
   function postCheckIn(body: unknown, key?: string) {
     const headers: Record<string, string> = { 'content-type': 'application/json' };

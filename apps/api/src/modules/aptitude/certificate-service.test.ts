@@ -1,10 +1,12 @@
 import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
+import type { ComputeFaceEmbedding } from '@api/lib/face-embedding';
 import type { EvaluateCertificate } from '@api/modules/aptitude/certificate-service';
 import { listQueue, reviewCertificate, uploadCertificate } from '@api/modules/aptitude/certificate-service';
+import { insertPendingApplicant } from '@api/modules/aptitude/repository';
 import type { EvaluateAptitude } from '@api/modules/aptitude/service';
-import { startSignup, submitQuestionnaire } from '@api/modules/aptitude/service';
+import { submitSignup } from '@api/modules/aptitude/service';
 import { resetTestDatabase } from '@api/test/database';
 import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
 import type { CertificateUploadInput } from '@cadence/shared/schemas/certificates';
@@ -36,15 +38,28 @@ const alwaysCertificateOk: EvaluateCertificate = async () => ({
 });
 const alwaysCertificateFails: EvaluateCertificate = async () => ({ ok: false, reason: 'unavailable' });
 
+const alwaysEmbedding: ComputeFaceEmbedding = async () => ({ ok: true, embedding: Array(128).fill(0.01) });
+
+const signupInput = () => ({
+  ...APPLICANT,
+  consented: true as const,
+  photo: { imageBase64: TINY_JPEG_BASE64, mimeType: 'image/jpeg' },
+  answers: allAnswers(),
+});
+
+// An applicant row that never submitted a questionnaire.
 async function applicantId() {
-  const created = await startSignup(APPLICANT);
-  return (created as { userId: string }).userId;
+  const user = await insertPendingApplicant(APPLICANT);
+  return user.id;
 }
 
-async function notClearedApplicant() {
-  const userId = await applicantId();
-  await submitQuestionnaire({ userId, answers: allAnswers() }, alwaysNotCleared);
-  return userId;
+async function submittedApplicant(evaluateAptitude: EvaluateAptitude) {
+  const result = await submitSignup(signupInput(), alwaysEmbedding, evaluateAptitude);
+  return (result as { userId: string }).userId;
+}
+
+function notClearedApplicant() {
+  return submittedApplicant(alwaysNotCleared);
 }
 
 function uploadInput(userId: string): CertificateUploadInput {
@@ -78,8 +93,7 @@ describe('certificate-service', () => {
     });
 
     it('refuses when the questionnaire already cleared the applicant', async () => {
-      const userId = await applicantId();
-      await submitQuestionnaire({ userId, answers: allAnswers() }, alwaysCleared);
+      const userId = await submittedApplicant(alwaysCleared);
 
       const result = await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
 
@@ -96,8 +110,7 @@ describe('certificate-service', () => {
     });
 
     it('succeeds after a persistent pending_retry questionnaire', async () => {
-      const userId = await applicantId();
-      await submitQuestionnaire({ userId, answers: allAnswers() }, alwaysPendingAptitude);
+      const userId = await submittedApplicant(alwaysPendingAptitude);
 
       const result = await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
 
@@ -197,7 +210,7 @@ describe('certificate-service', () => {
       const [certificate] = await listQueue();
       await reviewCertificate(await reviewerId(), { certificateId: certificate!.id, result: 'not_cleared' });
 
-      const result = await startSignup(APPLICANT);
+      const result = await submitSignup(signupInput(), alwaysEmbedding, alwaysCleared);
 
       expect(result).toEqual({ status: 'email_blocked' });
     });

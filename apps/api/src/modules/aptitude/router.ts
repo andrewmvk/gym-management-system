@@ -3,18 +3,14 @@ import { publicProcedure, router } from '@api/trpc/procedures';
 import {
   GetAptitudeStatusInputSchema,
   RecheckInputSchema,
-  SubmitQuestionnaireInputSchema,
+  SubmitSignupInputSchema,
 } from '@cadence/shared/schemas/aptitude';
-import { RecordConsentInputSchema, SavePhotoInputSchema, StartSignupInputSchema } from '@cadence/shared/schemas/signup';
+import { CheckEmailInputSchema } from '@cadence/shared/schemas/signup';
 
 // Public on purpose: no account or login exists before aptitude clearance (FR-9).
 export const aptitudeRouter = router({
-  startSignup: publicProcedure.input(StartSignupInputSchema).mutation(({ input }) => service.startSignup(input)),
-  recordConsent: publicProcedure.input(RecordConsentInputSchema).mutation(({ input }) => service.recordConsent(input)),
-  savePhoto: publicProcedure.input(SavePhotoInputSchema).mutation(({ input }) => service.savePhoto(input)),
-  submitQuestionnaire: publicProcedure
-    .input(SubmitQuestionnaireInputSchema)
-    .mutation(({ input }) => service.submitQuestionnaire(input)),
+  checkEmail: publicProcedure.input(CheckEmailInputSchema).mutation(({ input }) => service.checkEmail(input)),
+  submitSignup: publicProcedure.input(SubmitSignupInputSchema).mutation(({ input }) => service.submitSignup(input)),
   recheck: publicProcedure.input(RecheckInputSchema).mutation(({ input }) => service.recheck(input)),
   getStatus: publicProcedure.input(GetAptitudeStatusInputSchema).query(({ input }) => service.getAptitudeStatus(input)),
 });

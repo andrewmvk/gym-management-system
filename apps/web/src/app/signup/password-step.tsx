@@ -16,6 +16,7 @@ import { useTRPC } from '@/lib/trpc';
 
 interface PasswordStepProps {
   userId: string;
+  onActivated: () => void;
 }
 
 const FormSchema = SetPasswordInputSchema.extend({
@@ -26,7 +27,7 @@ const FormSchema = SetPasswordInputSchema.extend({
 });
 type FormValues = z.input<typeof FormSchema>;
 
-export function PasswordStep({ userId }: PasswordStepProps) {
+export function PasswordStep({ userId, onActivated }: PasswordStepProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -41,6 +42,7 @@ export function PasswordStep({ userId }: PasswordStepProps) {
       onSuccess: (session) => {
         if (!session) return;
         queryClient.setQueryData(trpc.auth.me.queryKey(), session);
+        onActivated();
         router.replace('/onboarding');
       },
       onError: (error) => {

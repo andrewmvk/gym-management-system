@@ -28,7 +28,19 @@ While data loads, render the shadcn/ui `Skeleton` in place of the content it sta
 
 ## Client state
 
-There is no global client store (Zustand, Redux, Context-for-server-data, etc.) by default. Before adding one, confirm the state genuinely isn't server state and doesn't fit in local component state or the URL (search params) - most of this app's state is "a plan," "a profile," "a catalog," which React Query already owns.
+There is no global client store (Zustand, Redux, Context-for-server-data, etc.) by default. Before adding one, confirm the state genuinely isn't server state and doesn't fit in local component state or the URL (search params, see "Filters and tabs" above) - most of this app's state is "a plan," "a profile," "a catalog," which React Query already owns.
+
+## Filters and tabs (URL state)
+
+Filters, search terms, and tabs live in the URL's search params through `useUrlState` (`hooks/use-url-state.ts`), never in plain `useState`, so a page refresh (or a shared link) restores the same filters and the same open tab.
+
+- `const [status, setStatus] = useUrlState<StatusFilter>('status', 'all', oneOf(STATUS_FILTERS))`: key, default value, and a validator. A missing or unrecognized param falls back to the default, so a hand-edited URL can never put the page in an invalid state. `oneOf` builds the validator from the same `as const` array the type is derived from.
+- The default value is kept out of the URL (`/catalog`, not `/catalog?tab=exercises`). Updates use `replaceState`, so changing a filter doesn't add back-button stops.
+- Tabs are controlled: `<Tabs value={tab} onValueChange={...}>` with `useUrlState('tab', ...)`. The page's skeleton keeps an uncontrolled `defaultValue` because it can't read the URL (it is the Suspense fallback).
+- Reset dependent state when a filter changes (`pagination.setPage(1)`), as before.
+- Key names: `tab`, `q` for a search term, otherwise the filter's own name (`status`, `filter`, `date`).
+- Not URL state: transient UI (an open dialog, a draft in a form, a selected row) and wizard steps. Only what a user would expect to survive a reload or to send to a colleague.
+- Pages using it must render inside `GuardedContent`, which supplies the `Suspense` boundary `useSearchParams` requires.
 
 ## Styling
 

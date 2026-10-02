@@ -59,9 +59,10 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
 
   const gridStart = addDays(month, -month.getDay());
   const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
-  const weekdays = Array.from({ length: 7 }, (_, index) =>
-    addDays(WEEKDAY_REFERENCE_SUNDAY, index).toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2),
-  );
+  const weekdays = Array.from({ length: 7 }, (_, index) => {
+    const date = addDays(WEEKDAY_REFERENCE_SUNDAY, index);
+    return { key: toIsoDate(date), label: date.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2) };
+  });
 
   const showMonth = (next: Date) => {
     setMonth(startOfMonth(next));
@@ -140,13 +141,13 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
       </div>
 
       <div role="grid" ref={gridRef} onKeyDown={handleKeyDown} className="grid grid-cols-7 gap-0.5">
-        {weekdays.map((weekday) => (
+        {weekdays.map(({ key, label }) => (
           <span
-            key={weekday}
+            key={key}
             role="columnheader"
             className="flex h-8 items-center justify-center font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase"
           >
-            {weekday}
+            {label}
           </span>
         ))}
         {days.map((date) => {

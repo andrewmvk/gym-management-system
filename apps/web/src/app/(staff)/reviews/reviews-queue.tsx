@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, ClipboardListIcon, SearchXIcon } from 'lucide-react';
 import Link from 'next/link';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { Pagination } from '@/components/pagination';
@@ -13,13 +13,15 @@ import { SearchInput } from '@/components/search-input';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { oneOf, useUrlState } from '@/hooks/use-url-state';
 import { formatPlanDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
 const PAGE_SIZE = 10;
 
-type StatusFilter = 'all' | 'ai_published' | 'trainer_edited';
+const STATUS_FILTERS = ['all', 'ai_published', 'trainer_edited'] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 function QueueHead() {
   return (
@@ -83,8 +85,8 @@ function ReviewsQueueSkeleton() {
 function ReviewsQueueRoot() {
   const trpc = useTRPC();
   const queueQuery = useQuery(trpc.reviews.queue.queryOptions());
-  const [search, setSearch] = useState('');
-  const [status, setStatus] = useState<StatusFilter>('all');
+  const [search, setSearch] = useUrlState<string>('q', '');
+  const [status, setStatus] = useUrlState<StatusFilter>('status', 'all', oneOf(STATUS_FILTERS));
 
   const entries = queueQuery.data ?? [];
   const term = search.trim().toLowerCase();

@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DumbbellIcon, PlusIcon, SearchXIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import type { ReactNode } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -22,6 +22,7 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { useUrlState } from '@/hooks/use-url-state';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
@@ -220,7 +221,7 @@ function ExerciseSectionRoot() {
   const ability = useAppAbility();
   const canManage = ability.can('manage', 'Catalog');
   const query = useQuery(trpc.catalog.list.queryOptions());
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useUrlState<string>('q', '');
 
   const term = search.trim().toLowerCase();
   const filtered = (query.data ?? []).filter(

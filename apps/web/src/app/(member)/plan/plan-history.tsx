@@ -2,16 +2,18 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { CalendarSearchIcon, CalendarX2Icon } from 'lucide-react';
-import { useState } from 'react';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
 import { DatePicker } from '@/components/date-picker';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
 import { useLaggedValue } from '@/hooks/use-lagged-value';
+import { useUrlState } from '@/hooks/use-url-state';
 import { toIsoDate } from '@/lib/calendar-date';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
+
+const isIsoDate = (raw: string): raw is string => /^\d{4}-\d{2}-\d{2}$/.test(raw);
 
 function lastDays(count: number) {
   return Array.from({ length: count }, (_, index) => {
@@ -24,7 +26,7 @@ function lastDays(count: number) {
 // Always read-only, regardless of which date is picked - history is for browsing, not editing.
 export function PlanHistory() {
   const trpc = useTRPC();
-  const [selectedDate, setSelectedDate] = useState('');
+  const [selectedDate, setSelectedDate] = useUrlState('date', '', isIsoDate);
   const recentDays = lastDays(7);
 
   const planQueryFor = (date: string) => ({

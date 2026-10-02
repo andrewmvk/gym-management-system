@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, ExternalLinkIcon, FileCheck2Icon, LockIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
 import { toast } from 'sonner';
 import { useAppAbility } from '@/abilities';
 import { AptitudeResultBadge } from '@/components/aptitude-result-badge';
@@ -14,13 +13,15 @@ import { SegmentedFilter } from '@/components/segmented-filter';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { oneOf, useUrlState } from '@/hooks/use-url-state';
 import { API_URL } from '@/lib/env';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
 const PAGE_SIZE = 8;
 
-type ReviewFilter = 'open' | 'reviewed' | 'all';
+const REVIEW_FILTERS = ['open', 'reviewed', 'all'] as const;
+type ReviewFilter = (typeof REVIEW_FILTERS)[number];
 
 function CertificateRowSkeleton() {
   return (
@@ -55,7 +56,7 @@ function CertificateQueueRoot() {
   const queryClient = useQueryClient();
   const ability = useAppAbility();
   const canReview = ability.can('manage', 'MedicalCertificate');
-  const [filter, setFilter] = useState<ReviewFilter>('open');
+  const [filter, setFilter] = useUrlState<ReviewFilter>('filter', 'open', oneOf(REVIEW_FILTERS));
 
   const queueQuery = useQuery({ ...trpc.certificates.listQueue.queryOptions(), enabled: canReview });
 

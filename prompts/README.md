@@ -41,7 +41,7 @@ A prompt is a specification, not a contract. If the implementation has to deviat
 | [P-20](./P-20-checkin-and-turnstile.md) | Check-in and turnstile | FR-33, FR-35 | 3 | P-03, P-19 | Andrew |
 | [P-21](./P-21-kiosk-capture-ui.md) | Kiosk capture UI | FR-30, FR-34 | 3 | P-19, P-20 | Andrew |
 | [P-22](./P-22-real-face-embedding.md) | Real face embedding | the real implementation behind the signup embedding interface (upgrade of the stub) | 3 | P-05 | Andrew |
-| [P-23](./P-23-policy-management.md) | Policy management | FR-43 | 4 | P-03 | Andrew |
+| [P-23](./P-23-policy-management.md) | Policy management and groups | FR-43, FR-47, FR-48 | 4 | P-03, P-09 | Andrew |
 | [P-24](./P-24-member-metrics-and-membership.md) | Member metrics and membership | FR-36, FR-40 | 4 | P-14, P-20 | Heitor |
 | [P-25](./P-25-gym-info.md) | Gym info | FR-37, FR-38, FR-39 | 4 | P-06, P-13, P-14, P-20 | Heitor |
 | [P-26](./P-26-demo-data-readme-and-docs-sync.md) | Demo data, README and docs sync | the demo data described in docs/04-architecture.md §8, and the "Keeping docs in sync" rule in AGENTS.md | 5 | all other prompts | Heitor |
@@ -52,12 +52,12 @@ A prompt is a specification, not a contract. If the implementation has to deviat
 
 ## Distribution (requirements and stages)
 
-Total: 28 prompts covering all 46 functional requirements exactly once (44 original + 2 added by `P-27`/`P-28`, see `docs/09-audit-log.md`).
+Total: 28 prompts covering all 48 functional requirements exactly once (44 original + 2 added by `P-27`/`P-28` + 2 added by the policy groups amendment of `P-23`, see `docs/09-audit-log.md`).
 
 | Owner | Prompts | Functional requirements | Non-functional requirements (primary) |
 |---|---|---|---|
-| Andrew | 10 | 10 of 46 | NFR-1, NFR-3, NFR-5 |
-| Heitor | 18 | 36 of 46 | none as primary |
+| Andrew | 10 | 12 of 48 | NFR-1, NFR-3, NFR-5 |
+| Heitor | 18 | 36 of 48 | none as primary |
 
 NFR-1 (responsive UI) is listed once, on the foundation prompt P-03, but it applies to every screen of every prompt. NFR-2 has no dedicated work. NFR-4 and NFR-6 are explicit non-goals.
 
@@ -78,9 +78,9 @@ A wave only needs prompts from earlier waves, so everything inside a wave can ru
 - **Wave 0**: P-01
 - **Wave 1**: P-02, P-04
 - **Wave 2**: P-03
-- **Wave 3**: P-05, P-06, P-23
+- **Wave 3**: P-05, P-06
 - **Wave 4**: P-07, P-11, P-19, P-22, P-27, P-28 (the last two only after P-07 lands, even though they list no formal `Blocked by`)
 - **Wave 5**: P-08, P-13, P-20
 - **Wave 6**: P-09, P-14, P-15, P-16, P-21
-- **Wave 7**: P-10, P-12, P-17, P-18, P-24, P-25
+- **Wave 7**: P-10, P-12, P-17, P-18, P-23 (it moved here from wave 3 once it began replacing P-09's direct member grants with the member group), P-24, P-25
 - **Wave 8**: P-26

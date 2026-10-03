@@ -33,8 +33,8 @@ See [02-requirements.md](./02-requirements.md) for the requirement IDs reference
                                                no account is created.
    c. pending_retry stays queued until the AI resolves it or Admin
       manually decides.
-7. Member sets a password → account created, granted the member-designated
-   access policies (FR-42/44), authenticated session begins.
+7. Member sets a password → account created, added to the member policy
+   group (FR-42/44/47), authenticated session begins.
 8. System sends an email with a link to the onboarding form.
 ```
 
@@ -180,14 +180,28 @@ Onboarding is not a one-time gate - members can add or revise this information l
 1. Admin (holding the policy-management permission) opens the policy
    screen, sees:
    - Every defined policy (d_user_policy): its operation, resource, and
-     scope.
-   - Every user and which policies are currently active on their account
-     (f_user_policy_on_user rows not yet expired).
-2. Admin grants a policy to any existing user - including the trainer or
-   admin policy set - which writes/updates an f_user_policy_on_user row.
-   This never creates a new account (FR-41 still holds); it only changes
-   what an existing account can do (FR-42/FR-43).
-3. Admin revokes a policy by setting its expires_on to now, or extends a
-   grant by moving expires_on forward (or clearing it for an indefinite
-   grant).
+     scope, and every policy group (d_user_policy_group) with the
+     policies it contains (read-only, FR-47).
+   - Every user with the groups they belong to (non-expired
+     f_user_policy_group_on_user rows) shown at a glance, and the
+     policies they hold directly (f_user_policy_on_user rows not yet
+     expired). Each effective policy says where it comes from: "via
+     <group>" or "direct" (FR-48).
+   - A filter by group and by policy, so the Admin can list only the
+     users who belong to a group or hold a policy.
+2. Admin assigns a group to any existing user - including the trainer or
+   admin group - which writes/updates an f_user_policy_group_on_user row,
+   or grants an individual policy, which writes/updates an
+   f_user_policy_on_user row. Neither creates a new account (FR-41 still
+   holds); they only change what an existing account can do
+   (FR-42/FR-43).
+3. Admin revokes a group or a policy by setting its expires_on to now, or
+   extends it by moving expires_on forward (or clearing it for an
+   indefinite one). A policy a user receives through a group cannot be
+   revoked on its own: the Admin either removes the group or adds a
+   direct "denied" grant for that policy, which overrides the group
+   (RN-10).
+4. The Admin is never allowed to remove their own access to the staff
+   area or to policy management, directly or by leaving the group that
+   supplies it (RN-13).
 ```

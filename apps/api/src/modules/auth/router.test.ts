@@ -1,17 +1,18 @@
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
-import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
+import { dUsers, fUserPolicyGroupOnUser, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
+import { findActiveGrants } from '@api/modules/auth/repository';
 import { SESSION_COOKIE, signSessionToken } from '@api/modules/auth/session';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { assertCan, authedProcedure, createCallerFactory, router } from '@api/trpc/procedures';
-import { MEMBER_POLICY_IDS, READ_STAFF_APP } from '@cadence/shared/auth';
+import { MEMBER_GROUP, MEMBER_POLICY_IDS, READ_STAFF_APP } from '@cadence/shared/auth';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 import bcrypt from 'bcryptjs';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import jwt from 'jsonwebtoken';
 import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -196,10 +197,7 @@ describe('auth', () => {
 
     it('drops a denied staff policy on the next request', async () => {
       const id = await adminId();
-      await db
-        .update(fUserPolicyOnUser)
-        .set({ effect: 'denied' })
-        .where(and(eq(fUserPolicyOnUser.userId, id), eq(fUserPolicyOnUser.policyId, READ_STAFF_APP)));
+      await db.insert(fUserPolicyOnUser).values({ userId: id, policyId: READ_STAFF_APP, effect: 'denied' });
       const { staffCaller } = await callerFor(signSessionToken(id));
 
       await expect(staffCaller.staffArea()).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -217,11 +215,15 @@ describe('auth', () => {
       expect(result?.user.membershipStatus).toBe('active');
       expect(res.cookie).toHaveBeenCalledWith(SESSION_COOKIE, expect.any(String), expect.any(Object));
 
-      const grants = await db
-        .select({ policyId: fUserPolicyOnUser.policyId })
-        .from(fUserPolicyOnUser)
-        .where(eq(fUserPolicyOnUser.userId, applicant.id));
-      expect(grants.map((g) => g.policyId).sort()).toEqual([...MEMBER_POLICY_IDS].sort());
+      const memberships = await db
+        .select({ groupId: fUserPolicyGroupOnUser.groupId, expiresOn: fUserPolicyGroupOnUser.expiresOn })
+        .from(fUserPolicyGroupOnUser)
+        .where(eq(fUserPolicyGroupOnUser.userId, applicant.id));
+      expect(memberships).toEqual([{ groupId: MEMBER_GROUP, expiresOn: null }]);
+      const directGrants = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, applicant.id));
+      expect(directGrants).toHaveLength(0);
+      const effective = await findActiveGrants(applicant.id, new Date());
+      expect(effective).toHaveLength(MEMBER_POLICY_IDS.length);
 
       const [user] = await db.select().from(dUsers).where(eq(dUsers.id, applicant.id));
       expect(user?.passwordHash).not.toBeNull();

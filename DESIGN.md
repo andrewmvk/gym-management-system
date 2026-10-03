@@ -228,7 +228,7 @@ Flat by default. Cards and panels are separated from the ground by a 1px Hairlin
 
 ### Shadow Vocabulary
 - **Raised** (`box-shadow: 0 1px 2px oklch(0 0 0 / 0.16)`): primary buttons and the active segment of a segmented filter.
-- **Popover** (`box-shadow: 0 12px 32px -12px oklch(0 0 0 / 0.35)`): dropdown menus, selects, the date picker, toasts.
+- **Popover** (`box-shadow: 0 12px 32px -12px oklch(0 0 0 / 0.35)`): dropdown menus, selects, the date picker, tooltips, toasts.
 - **Overlay** (`box-shadow: 0 24px 64px -16px oklch(0 0 0 / 0.42)`): sheets, alert dialogs, the coach chat panel.
 - **Showcase** (`box-shadow: 0 24px 48px -24px oklch(0.2 0.05 266 / 0.4)`): the auth card and the landing sample plan, the two places the kit is presented rather than used.
 - **FAB** (`box-shadow: 0 12px 32px -8px oklch(0.3 0.2 266 / 0.55)`): the floating "Coach" button.
@@ -309,6 +309,12 @@ The wall-mounted check-in screen is the one surface with its own layout, because
 
 ### Exercise Row (signature interaction)
 The checkbox, the order number, the name and muscle-group label, and sets × reps (with load under it) as right-aligned numerals. Completing it fills the checkbox cobalt, draws a line through the name from left to right (420ms, expo-out), dims the numerals, and ticks the panel's tally and progress segments. Exercises that can't be done strike their numerals and show an "Equipment unavailable" badge.
+
+### Tooltip
+Explains a label without a visible second line. Opens on hover and keyboard focus after 150ms from a small icon-only trigger: a help (`?`) icon, 28px square, muted until hovered, with the same text as its accessible name. The bubble is a Card-colored popover with a Hairline border, the Popover shadow, 6px corners, caption-sized text and a 15rem maximum width. Use `?` to explain what something is; reserve `!` for a warning, which belongs in a badge or message instead. Never put information users need to act on only in a tooltip, because a tap on a phone may not open it.
+
+### Group Matrix (signature table)
+The policies-by-groups comparison on the policy screen's second tab: one row per policy, one column per group, a Kit Cobalt tick where the group includes it and a faint dash where it doesn't. Group headers are Title typography with a help tooltip for the description and the group's tally in numerals ("8 of 18") underneath; the first header, "Policy", is the same size and vertically centered with them. Rows holding the same set of groups sit together, widest first, and a 4px Bench Gray rule marks each new cluster, so every group reads as a block of ticks down its column. Each row leads with the policy's description and, under it, its permission in caption type. Each cell has an off-screen label for screen readers. It scrolls horizontally inside its card on a phone.
 
 ### Loading
 Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they replace. They wait 200ms before appearing, so fast loads never flash. When a parameter changes (a history date), the previous result stays until the new one arrives or 200ms pass.

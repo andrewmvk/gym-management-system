@@ -152,6 +152,9 @@ export const POLICY_CATALOG: readonly PolicyDefinition[] = [
   { id: READ_CHECKINS, description: 'View every check-in', operation: 'read', resource: 'CheckIn', scope: 'all' },
 ];
 
+// Removing one of these from your own account locks you out of the staff area or of policy management.
+export const LOCKOUT_PROTECTED_POLICY_IDS: readonly PolicyId[] = [READ_STAFF_APP, MANAGE_POLICY_ASSIGNMENTS];
+
 export const MEMBER_POLICY_IDS = [
   READ_MEMBER_APP,
   MANAGE_OWN_ONBOARDING,
@@ -184,3 +187,25 @@ export const ADMIN_POLICY_IDS = [
   READ_CATALOG,
   READ_GYM_INFO,
 ] as const satisfies readonly PolicyId[];
+
+export const MEMBER_GROUP = 'member';
+export const TRAINER_GROUP = 'trainer';
+export const ADMIN_GROUP = 'admin';
+
+export type PolicyGroupId = typeof MEMBER_GROUP | typeof TRAINER_GROUP | typeof ADMIN_GROUP;
+
+export interface PolicyGroupDefinition {
+  id: PolicyGroupId;
+  description: string;
+  policyIds: readonly PolicyId[];
+}
+
+export const POLICY_GROUP_CATALOG: readonly PolicyGroupDefinition[] = [
+  { id: MEMBER_GROUP, description: 'Gym members: their own plans, chat and onboarding', policyIds: MEMBER_POLICY_IDS },
+  { id: TRAINER_GROUP, description: 'Personal trainers: review and edit every plan', policyIds: TRAINER_POLICY_IDS },
+  {
+    id: ADMIN_GROUP,
+    description: 'Gym admins: catalog, turnstile, certificates and access',
+    policyIds: ADMIN_POLICY_IDS,
+  },
+];

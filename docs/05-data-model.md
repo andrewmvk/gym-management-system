@@ -25,12 +25,16 @@ erDiagram
     D_USERS ||--o| D_TURNSTILE_CONFIG : configures
     D_USERS ||--o{ F_USER_POLICY_ON_USER : holds
     D_USER_POLICY ||--o{ F_USER_POLICY_ON_USER : "assigned via"
+    D_USERS ||--o{ F_USER_POLICY_GROUP_ON_USER : "belongs to"
+    D_USER_POLICY_GROUP ||--o{ F_USER_POLICY_GROUP_ON_USER : "assigned via"
+    D_USER_POLICY_GROUP ||--o{ D_USER_POLICY_GROUP_POLICY : contains
+    D_USER_POLICY ||--o{ D_USER_POLICY_GROUP_POLICY : "member of"
 ```
 
 ## 2. Tables
 
 ### `d_users`
-Single table for every person in the system - member, trainer, or admin alike. There is **no `role` column and no separate per-role profile table**; what a user can do is entirely determined by their active policy grants (`f_user_policy_on_user` → `d_user_policy`, see below), and which of the columns below are populated depends on what kind of person they are (see notes per column).
+Single table for every person in the system - member, trainer, or admin alike. There is **no `role` column and no separate per-role profile table**; what a user can do is entirely determined by their active policy grants and group memberships (`f_user_policy_on_user` → `d_user_policy`, and `f_user_policy_group_on_user` → `d_user_policy_group` → `d_user_policy`, see below), and which of the columns below are populated depends on what kind of person they are (see notes per column).
 | Column | Type | Notes |
 |---|---|---|
 | id | uuid PK | |
@@ -48,7 +52,7 @@ Single table for every person in the system - member, trainer, or admin alike. T
 | created_at | timestamp | |
 | updated_at | timestamp | |
 
-Trainer/admin rows are created only by the seed script (FR-41) - there is no application code path that inserts a `d_users` row and grants it staff-designated policies other than that seed, or the Admin policy-management feature (FR-43) acting on an *existing* row.
+Trainer/admin rows are created only by the seed script (FR-41) - there is no application code path that inserts a `d_users` row and gives it staff-designated policies or groups other than that seed, or the Admin policy-management feature (FR-43) acting on an *existing* row.
 
 ### `f_consent_events`
 Records each LGPD consent a member has given (FR-46, RN-12). Append-only: a new consent (a re-worded
@@ -63,7 +67,7 @@ was agreed to and when, not just what is true now.
 | consented_at | timestamp | |
 
 ### `d_user_policy`
-One row per granular, independently-grantable permission - the building block CASL abilities are constructed from. **Add-mostly**: policies are seeded/added over time; an existing one shouldn't be deleted once any `f_user_policy_on_user` row references it, for the same reason `d_exercises` is add-only.
+One row per granular, independently-grantable permission - the building block CASL abilities are constructed from. **Add-mostly**: policies are seeded/added over time; an existing one shouldn't be deleted once any `f_user_policy_on_user` or `d_user_policy_group_policy` row references it, for the same reason `d_exercises` is add-only.
 | Column | Type | Notes |
 |---|---|---|
 | id | text PK | Human-readable slug matching the policy's purpose, e.g. `manage_onboarding`, `read_aptitude` - not a random uuid, since it's referenced directly as a stable identifier in code (`packages/shared/src/auth/constants/policies.ts`) |
@@ -84,7 +88,32 @@ The assignment of a policy to a user. A user's effective permissions are the uni
 | effect | enum(`granted`,`denied`) | A `denied` row is a targeted override that takes precedence over a `granted` row the user would otherwise hold - mirrors CASL's `cannot()`/inverted rules |
 | expires_on | timestamp, nullable | `NULL` = indefinite. This is a **mutable** fact row, not an append-only event log: revoking a grant means updating `expires_on` on the existing row, not inserting a new one - same idea as `f_training_plan_exercises`'s retroactive corrections |
 
-Building a CASL ability for a user: load every row here where `expires_on IS NULL OR expires_on > now()`, join to `d_user_policy`, and map each to a CASL rule `{ action: operation, subject: resource, conditions: scope === 'self' ? { userId: user.id } : undefined, inverted: effect === 'denied' }`. See `docs/04-architecture.md` §11 for where this happens in the request lifecycle.
+### `d_user_policy_group`
+A named bundle of policies, so an Admin can tell at a glance who is a member, a trainer or an admin without reading dozens of individual grants (FR-47). **Seeded and read-only**: no procedure creates, edits or deletes one, and the seed owns the contents. Add-mostly, like `d_user_policy`: never delete a group once any `f_user_policy_group_on_user` row references it.
+| Column | Type | Notes |
+|---|---|---|
+| id | text PK | Human-readable slug, e.g. `member`, `trainer`, `admin` - referenced directly as a stable identifier in code (`packages/shared/src/auth/constants/policies.ts`), same exception to the uuid rule as `d_user_policy.id`. The Admin policy screen shows it capitalized (`Member`, `Trainer`, `Admin`) |
+| description | text | Short human-readable explanation of who the group is for |
+| created_at | timestamp | |
+
+### `d_user_policy_group_policy`
+The N:N bridge between two dimensions: which policies a group contains. Seeded alongside the groups and re-asserted by every seed run, so a change to a group's policy list in code reaches every current member.
+| Column | Type | Notes |
+|---|---|---|
+| group_id | text FK → d_user_policy_group.id | Composite PK with `policy_id` |
+| policy_id | text FK → d_user_policy.id | |
+
+### `f_user_policy_group_on_user`
+The assignment of a group to a user. Belonging to a group has exactly the effect of holding every policy in it as a `granted` row, for as long as the membership is active.
+| Column | Type | Notes |
+|---|---|---|
+| user_id | uuid FK → d_users.id | Composite PK with `group_id` |
+| group_id | text FK → d_user_policy_group.id | |
+| expires_on | timestamp, nullable | `NULL` = indefinite. Mutable in place, exactly like `f_user_policy_on_user`: removing a user from a group means updating `expires_on`, never deleting the row |
+
+There is no `effect` column: a group only ever grants. Taking one policy away from a user who gets it through a group is done with a direct `f_user_policy_on_user` row whose `effect` is `denied`, never by editing the group.
+
+Building a CASL ability for a user: take the union of (a) every `f_user_policy_on_user` row where `expires_on IS NULL OR expires_on > now()`, and (b) every policy of every group the user belongs to through an `f_user_policy_group_on_user` row where `expires_on IS NULL OR expires_on > now()` (via `d_user_policy_group_policy`), each of these treated as `granted`. Join to `d_user_policy`, and map each to a CASL rule `{ action: operation, subject: resource, conditions: scope === 'self' ? { userId: user.id } : undefined, inverted: effect === 'denied' }`. A `denied` direct row wins over a `granted` policy that arrives through a group (RN-10). See `docs/04-architecture.md` §11 for where this happens in the request lifecycle.
 
 ### `f_aptitude_questionnaires`
 | Column | Type | Notes |
@@ -236,12 +265,14 @@ These are queries, not tables:
 - **Personal metrics** (FR-36): training frequency/days trained counts distinct calendar days with a row in `f_check_ins` for that member - physical check-in only, not exercise completion. Exercise breakdown and training volume come from `f_training_plan_exercises`/`f_training_plans` instead. Reflects the corrected record where retroactive edits were made (FR-23).
 - **Current occupancy** (FR-37): `COUNT(*) FROM f_check_ins WHERE checked_in_at >= now() - interval '90 minutes'` (window is a tunable constant, not user-configurable) - an estimate, since there is no checkout event.
 - **Gym-wide equipment/muscle-group demand** (FR-38): aggregating today's `f_check_ins` joined to `f_training_plans`/`f_training_plan_exercises`/`d_exercises`, filtered to exercises currently available per the `d_exercise_equipment` → `d_gym_equipment.is_available` rule.
-- **A user's effective permissions** (FR-42): every non-expired `f_user_policy_on_user` row for that user, joined to `d_user_policy`, translated into CASL rules (see `d_user_policy`/`f_user_policy_on_user` above).
+- **A user's effective permissions** (FR-42): every non-expired `f_user_policy_on_user` row for that user plus every policy of each non-expired group membership (`f_user_policy_group_on_user` → `d_user_policy_group_policy`), joined to `d_user_policy`, translated into CASL rules (see `f_user_policy_on_user`/`f_user_policy_group_on_user` above).
+- **Where a user's policy comes from** (FR-48): for each effective policy, the groups that supply it and whether a direct row also exists; this is what the Admin policy screen labels "via Admin group" or "direct".
 
 ## 4. Seed Data
 
 A first-boot seed script (see [04-architecture.md](./04-architecture.md) §8) creates:
 - The full set of `d_user_policy` rows the app needs (one per operation+resource+scope combination).
-- Fixed demo trainer and admin `d_users` rows with known credentials, each granted its staff-designated `f_user_policy_on_user` rows (the only way these accounts and their access come into existence - FR-41/FR-42/FR-43).
+- The three `d_user_policy_group` rows (`member`, `trainer`, `admin`) and their `d_user_policy_group_policy` contents (FR-47).
+- Fixed demo trainer and admin `d_users` rows with known credentials, each given the `trainer` or `admin` group through an `f_user_policy_group_on_user` row (the only way these accounts and their access come into existence - FR-41/FR-42/FR-43).
 - An initial `d_exercises` / `d_gym_equipment` / `d_exercise_equipment` catalog.
-- A batch of fake seeded members (`d_users` rows plus their member-designated policy grants), `f_check_ins`, and `f_training_plans` so occupancy and equipment-demand queries return meaningful results for a demo.
+- A batch of fake seeded members (`d_users` rows plus their `member` group membership), `f_check_ins`, and `f_training_plans` so occupancy and equipment-demand queries return meaningful results for a demo.

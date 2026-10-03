@@ -1,6 +1,6 @@
 import { type DatabaseExecutor, db } from '@api/db/client';
-import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
-import type { PolicyId } from '@cadence/shared/auth';
+import { dUserPolicy, dUserPolicyGroupPolicy, dUsers, fUserPolicyGroupOnUser, fUserPolicyOnUser } from '@api/db/schema';
+import type { PolicyGroupId } from '@cadence/shared/auth';
 import { and, eq, gt, isNull, or } from 'drizzle-orm';
 
 export async function findUserByEmail(email: string, executor: DatabaseExecutor = db) {
@@ -13,7 +13,7 @@ export async function findUserById(id: string, executor: DatabaseExecutor = db) 
   return user ?? null;
 }
 
-// FR-9: turns a cleared applicant into a member. Called inside a transaction alongside grantPolicies
+// FR-9: turns a cleared applicant into a member. Called inside a transaction alongside assignGroup
 // so the row update and the policy grants either both land or neither does.
 export async function activateMember(
   id: string,
@@ -28,15 +28,14 @@ export async function activateMember(
   return user!;
 }
 
-export async function grantPolicies(userId: string, policyIds: readonly PolicyId[], executor: DatabaseExecutor = db) {
-  await executor
-    .insert(fUserPolicyOnUser)
-    .values(policyIds.map((policyId) => ({ userId, policyId, effect: 'granted' as const })))
-    .onConflictDoNothing();
+export async function assignGroup(userId: string, groupId: PolicyGroupId, executor: DatabaseExecutor = db) {
+  await executor.insert(fUserPolicyGroupOnUser).values({ userId, groupId }).onConflictDoNothing();
 }
 
-export function findActiveGrants(userId: string, now: Date, executor: DatabaseExecutor = db) {
-  return executor
+// RN-10: a user's effective grants are their own non-expired policy rows plus every policy of each non-expired
+// group membership, the latter always as `granted` (a group never denies).
+export async function findActiveGrants(userId: string, now: Date, executor: DatabaseExecutor = db) {
+  const direct = await executor
     .select({
       operation: dUserPolicy.operation,
       resource: dUserPolicy.resource,
@@ -52,4 +51,23 @@ export function findActiveGrants(userId: string, now: Date, executor: DatabaseEx
         or(isNull(fUserPolicyOnUser.expiresOn), gt(fUserPolicyOnUser.expiresOn, now)),
       ),
     );
+
+  const viaGroups = await executor
+    .select({
+      operation: dUserPolicy.operation,
+      resource: dUserPolicy.resource,
+      scope: dUserPolicy.scope,
+      expiresOn: fUserPolicyGroupOnUser.expiresOn,
+    })
+    .from(fUserPolicyGroupOnUser)
+    .innerJoin(dUserPolicyGroupPolicy, eq(dUserPolicyGroupPolicy.groupId, fUserPolicyGroupOnUser.groupId))
+    .innerJoin(dUserPolicy, eq(dUserPolicy.id, dUserPolicyGroupPolicy.policyId))
+    .where(
+      and(
+        eq(fUserPolicyGroupOnUser.userId, userId),
+        or(isNull(fUserPolicyGroupOnUser.expiresOn), gt(fUserPolicyGroupOnUser.expiresOn, now)),
+      ),
+    );
+
+  return [...direct, ...viaGroups.map((grant) => ({ ...grant, effect: 'granted' as const }))];
 }

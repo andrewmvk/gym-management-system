@@ -3,17 +3,17 @@ import type { User } from '@api/db/schema';
 import { onMemberActivated } from '@api/modules/auth/member-activated';
 import {
   activateMember as activateMemberRow,
+  assignGroup,
   findActiveGrants,
   findUserByEmail,
   findUserById,
-  grantPolicies,
 } from '@api/modules/auth/repository';
 import {
   type AbilityRule,
   type AppAbility,
   buildAbilityRules,
   defineAbilityFor,
-  MEMBER_POLICY_IDS,
+  MEMBER_GROUP,
 } from '@cadence/shared/auth';
 import type { SetPasswordInput } from '@cadence/shared/schemas/auth';
 import { TRPCError } from '@trpc/server';
@@ -84,7 +84,7 @@ export async function activateMember(input: SetPasswordInput): Promise<User> {
       { passwordHash, membershipPlan: DEFAULT_MEMBERSHIP_PLAN },
       tx,
     );
-    await grantPolicies(input.userId, MEMBER_POLICY_IDS, tx);
+    await assignGroup(input.userId, MEMBER_GROUP, tx);
     return activated;
   });
 

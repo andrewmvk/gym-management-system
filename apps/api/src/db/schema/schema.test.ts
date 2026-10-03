@@ -1,5 +1,12 @@
 import { db, pool } from '@api/db/client';
-import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
+import {
+  dUserPolicy,
+  dUserPolicyGroup,
+  dUserPolicyGroupPolicy,
+  dUsers,
+  fUserPolicyGroupOnUser,
+  fUserPolicyOnUser,
+} from '@api/db/schema';
 import { resetTestDatabase } from '@api/test/database';
 import { READ_CATALOG } from '@cadence/shared/auth';
 import { sql } from 'drizzle-orm';
@@ -57,6 +64,43 @@ describe('users and policies schema', () => {
       ['created_at', 'description', 'id', 'operation', 'resource', 'scope'].sort(),
     );
     expect(await columnsOf('f_user_policy_on_user')).toEqual(['effect', 'expires_on', 'policy_id', 'user_id'].sort());
+    expect(await columnsOf('d_user_policy_group')).toEqual(['created_at', 'description', 'id'].sort());
+    expect(await columnsOf('d_user_policy_group_policy')).toEqual(['group_id', 'policy_id'].sort());
+    expect(await columnsOf('f_user_policy_group_on_user')).toEqual(['expires_on', 'group_id', 'user_id'].sort());
+  });
+
+  it('rejects a duplicate membership, and a membership pointing to a missing user or group', async () => {
+    const user = await insertUser();
+    await db.insert(dUserPolicyGroup).values({ id: 'member', description: 'Gym members' });
+    const membership = { userId: user.id, groupId: 'member' };
+    await db.insert(fUserPolicyGroupOnUser).values(membership);
+
+    await expect(db.insert(fUserPolicyGroupOnUser).values(membership)).rejects.toMatchObject({
+      cause: { code: UNIQUE_VIOLATION },
+    });
+    await expect(
+      db.insert(fUserPolicyGroupOnUser).values({ userId: '00000000-0000-0000-0000-000000000000', groupId: 'member' }),
+    ).rejects.toMatchObject({ cause: { code: FOREIGN_KEY_VIOLATION } });
+    await expect(
+      db.insert(fUserPolicyGroupOnUser).values({ userId: user.id, groupId: 'no_such_group' }),
+    ).rejects.toMatchObject({ cause: { code: FOREIGN_KEY_VIOLATION } });
+  });
+
+  it('rejects a group policy pointing to a missing group or policy, and a duplicate pair', async () => {
+    await insertPolicy();
+    await db.insert(dUserPolicyGroup).values({ id: 'member', description: 'Gym members' });
+    const pair = { groupId: 'member', policyId: READ_CATALOG };
+    await db.insert(dUserPolicyGroupPolicy).values(pair);
+
+    await expect(db.insert(dUserPolicyGroupPolicy).values(pair)).rejects.toMatchObject({
+      cause: { code: UNIQUE_VIOLATION },
+    });
+    await expect(
+      db.insert(dUserPolicyGroupPolicy).values({ groupId: 'no_such_group', policyId: READ_CATALOG }),
+    ).rejects.toMatchObject({ cause: { code: FOREIGN_KEY_VIOLATION } });
+    await expect(
+      db.insert(dUserPolicyGroupPolicy).values({ groupId: 'member', policyId: 'no_such_policy' }),
+    ).rejects.toMatchObject({ cause: { code: FOREIGN_KEY_VIOLATION } });
   });
 
   it('rejects a duplicate e-mail', async () => {

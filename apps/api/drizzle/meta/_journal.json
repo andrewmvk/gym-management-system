@@ -57,6 +57,13 @@
       "when": 1790909059660,
       "tag": "0007_milky_praxagora",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1790997950725,
+      "tag": "0008_spotty_changeling",
+      "breakpoints": true
     }
   ]
 }

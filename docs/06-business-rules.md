@@ -2,9 +2,9 @@
 
 Unit 2 asks that we distinguish **functional requirement** ("what the system does"), **non-functional
 requirement** ("with what quality"), and **business rule** ("what domain condition must be honored").
-`docs/02-requirements.md` already numbers FR-1..FR-46 (functional) and NFR-1..NFR-6 (non-functional),
+`docs/02-requirements.md` already numbers FR-1..FR-48 (functional) and NFR-1..NFR-6 (non-functional),
 but several business rules are **embedded as prose inside the FRs**, without their own code. This
-document extracts the most important ones as RN-01..RN-11, in the format Unit 2 recommends (code,
+document extracts the most important ones as RN-01..RN-13, in the format Unit 2 recommends (code,
 description, source requirement, verification criterion) - so each one becomes an isolated, testable
 prompt, like the `AssessmentService.complete()` example in the course booklet.
 
@@ -23,9 +23,10 @@ exercise.
 | RN-07 | A retroactive correction directly overwrites that date's historical record; metrics must reflect the corrected version, not the original. | FR-23 | After a correction, a metric that sums that day uses the new values, not the old ones. |
 | RN-08 | In facial matching, if the two best candidates are both within the threshold and too close to each other, the result is "ambiguous" (a rejection) - never a guess. | FR-32 | Given a pair of embeddings that are both within the threshold and whose distances differ by less than the tie-break margin, the matching function returns `ambiguous`, not the closer candidate. |
 | RN-09 | A check-in is always recorded, with `turnstile_status` of `success` or `failed`, regardless of the outcome of the external turnstile call. | FR-33, FR-34 | Simulate a failure in the turnstile API and confirm the `f_check_ins` row is still created, tagged `failed`. |
-| RN-10 | A user's effective permission is the union of every non-expired `f_user_policy_on_user` row; a row with `effect = denied` always wins over a `granted` row for the same policy. | FR-42, docs/05-data-model.md | Granting and then denying the same policy to the same user must result in `ability.cannot(...)`. |
+| RN-10 | A user's effective permission is the union of every non-expired `f_user_policy_on_user` row and every policy of each non-expired `f_user_policy_group_on_user` membership; a direct row with `effect = denied` always wins over a `granted` policy for the same policy, whether that grant is direct or arrives through a group. | FR-42, FR-47, docs/05-data-model.md | Granting and then denying the same policy to the same user must result in `ability.cannot(...)`; so must denying directly a policy the user holds only through a group. An expired membership grants nothing. |
 | RN-11 | Trainer/admin accounts only ever exist via the seed script; no application code path can create one. | FR-41, FR-43 | There is no public "signup" mutation that writes a staff policy. |
 | RN-12 | A face embedding is never computed for a member without a prior recorded consent event. The consent event is recorded in the same transaction as the signup, before the embedding is computed, and a rejected photo rolls both back. | FR-46, docs/05-data-model.md `f_consent_events` | A signup submitted without consent must be refused; a signup whose photo is rejected must leave no `d_users` row and no `f_consent_events` row behind. |
+| RN-13 | Policy groups are read-only in the application, and an admin can never remove their own access to the staff area or to policy management, whether directly or by leaving the group that supplies it. | FR-43, FR-47 | No procedure creates, edits or deletes a `d_user_policy_group` or `d_user_policy_group_policy` row. Revoking or denying `read_staff_app` or `manage_policy_assignments` on yourself, or ending your only active group that supplies either, is refused. |
 
 ## How to use this in prompts
 

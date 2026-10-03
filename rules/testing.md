@@ -16,7 +16,7 @@ Pure, easy-to-get-subtly-wrong logic with no UI:
 - Face-match threshold/ambiguity decision (best vs. second-best candidate).
 - Retroactive correction overwrite behavior (FR-23) and that metrics reflect the corrected version.
 - Turnstile-call-failure still records a check-in, tagged `failed` (FR-33/34).
-- Effective-permission resolution (FR-42): building a user's CASL ability from `f_user_policy_on_user`/`d_user_policy` correctly excludes expired grants, applies `denied` as an override, and translates `scope: 'self'` into the right condition - a subtle bug here silently grants or denies the wrong thing.
+- Effective-permission resolution (FR-42): building a user's CASL ability from `f_user_policy_on_user`/`d_user_policy` and from group memberships (`f_user_policy_group_on_user`) correctly excludes expired grants and memberships, applies `denied` as an override (including over a policy that arrives through a group), and translates `scope: 'self'` into the right condition - a subtle bug here silently grants or denies the wrong thing.
 
 ## Conventions
 

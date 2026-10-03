@@ -19,8 +19,8 @@
 
 Table names are `snake_case` and prefixed by kind, fixed by `docs/05-data-model.md` - don't rename or reprefix them:
 
-- **`d_` - dimension**: relatively static reference/master data describing a *who* or *what* (`d_users`, `d_user_policy`, `d_exercises`, `d_gym_equipment`, `d_turnstile_config`). Includes bridge/join tables between two dimensions (`d_exercise_equipment`).
-- **`f_` - fact**: an event, transaction, or measurable occurrence tied to a point in time (`f_check_ins`, `f_training_plans`, `f_profile_events`, `f_user_policy_on_user`).
+- **`d_` - dimension**: relatively static reference/master data describing a *who* or *what* (`d_users`, `d_user_policy`, `d_user_policy_group`, `d_exercises`, `d_gym_equipment`, `d_turnstile_config`). Includes bridge/join tables between two dimensions (`d_exercise_equipment`, `d_user_policy_group_policy`).
+- **`f_` - fact**: an event, transaction, or measurable occurrence tied to a point in time (`f_check_ins`, `f_training_plans`, `f_profile_events`, `f_user_policy_on_user`, `f_user_policy_group_on_user`).
 
 This split is about grain and change-frequency, not mutability - a fact row can be updated in place (a retroactive plan correction, revoking a policy grant), it just tends to change or accumulate far more often than a dimension row does.
 
@@ -30,7 +30,7 @@ When adding a new table, classify it the same way before naming it: does it desc
 userId: uuid('user_id').references(() => dUsers.id)
 ```
 
-One exception to `uuid` primary keys: `d_user_policy.id` is a `text` slug (`manage_onboarding`, `read_aptitude`, …), since it's referenced directly as a stable identifier in code rather than looked up - see `rules/database.md`.
+One exception to `uuid` primary keys: `d_user_policy.id` and `d_user_policy_group.id` are `text` slugs (`manage_onboarding`, `read_aptitude`, `admin`, …), since it's referenced directly as a stable identifier in code rather than looked up - see `rules/database.md`.
 
 ## tRPC routers and procedures
 

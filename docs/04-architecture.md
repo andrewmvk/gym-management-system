@@ -12,7 +12,7 @@
 | ORM | Drizzle |
 | Database | PostgreSQL |
 | Auth | Custom JWT, delivered via httpOnly cookie (identity only - no role claim) |
-| Authorization | CASL (`@casl/ability` on both apps, `@casl/react` on the frontend), policy-driven via `d_user_policy`/`f_user_policy_on_user` (see §11) - no fixed role field |
+| Authorization | CASL (`@casl/ability` on both apps, `@casl/react` on the frontend), policy-driven via `d_user_policy`/`f_user_policy_on_user`, with policy groups (`d_user_policy_group`/`f_user_policy_group_on_user`) bundling them (see §11) - no fixed role field |
 | File storage | Local disk via Docker volume (path/URL stored in Postgres) |
 | AI provider | OpenRouter API, using a free-tier model (configurable) |
 | Email | Real transactional provider (e.g. Resend) for the onboarding invite link |
@@ -56,7 +56,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 4. Frontend includes credentials on every tRPC request (`fetch` with `credentials: 'include'`); CORS on the backend must allow the frontend's origin with credentials.
 5. Backend tRPC context middleware verifies the JWT on every request, attaching `{ userId }` to `ctx`, then builds a CASL `Ability` for that user from their active policy grants (§11) and attaches it as `ctx.ability`. Procedures check `ctx.ability.can(operation, resource)` as needed - there is no role to branch on.
 6. No login/authenticated route exists before aptitude clearance (see FR-9) - the JWT is only issued once an account exists and has a password set.
-7. Trainer/admin accounts are never created via a login-adjacent signup mutation - they only exist via the seed script (see §8). An existing account's policies (including whether it holds the trainer/admin policy set) can later change through the Admin policy-management feature (FR-43) without ever creating a new account.
+7. Trainer/admin accounts are never created via a login-adjacent signup mutation - they only exist via the seed script (see §8). An existing account's policies and groups (including whether it belongs to the trainer/admin group) can later change through the Admin policy-management feature (FR-43) without ever creating a new account.
 
 ## 4. AI Integration
 
@@ -90,8 +90,8 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 
 ## 8. Seed Data & Bootstrapping
 
-- A database seed script, run at first boot, first creates the full set of `d_user_policy` rows the app needs, then creates a fixed set of demo trainer and admin `d_users` rows with known credentials and grants each its staff-designated policies (documented in the project README) - this is the *only* way trainer/admin accounts and their access come into existence; there is no staff registration UI (FR-41), and beyond this seed the only other way an existing account's policies change is the Admin policy-management feature (FR-43).
-- The same seed script populates the initial exercise/equipment catalog and a batch of fake seeded members (with their member-designated policy grants), check-ins, and plans so that occupancy/equipment-demand metrics have realistic data to show in a demo (see [02-requirements.md](./02-requirements.md), Permitted Scopes).
+- A database seed script, run at first boot, first creates the full set of `d_user_policy` rows the app needs, then the `member`, `trainer` and `admin` policy groups with their policy lists, then a fixed set of demo trainer and admin `d_users` rows with known credentials, each given its staff group (documented in the project README) - this is the *only* way trainer/admin accounts and their access come into existence; there is no staff registration UI (FR-41), and beyond this seed the only other way an existing account's policies change is the Admin policy-management feature (FR-43).
+- The same seed script populates the initial exercise/equipment catalog and a batch of fake seeded members (with their `member` group membership), check-ins, and plans so that occupancy/equipment-demand metrics have realistic data to show in a demo (see [02-requirements.md](./02-requirements.md), Permitted Scopes).
 
 ## 9. Environment Variables (indicative)
 
@@ -128,20 +128,20 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 - **No checkout flow**: occupancy is deliberately a rolling-window estimate (FR-37) rather than an exact live count, avoiding the added kiosk complexity of an exit step for no real payoff in an academic demo.
 - **Turnstile failures never block check-in recording**: the external API is a best-effort call; the system's own attendance record does not depend on it succeeding (FR-33/FR-34).
 - **Single timezone**: all date/time logic ("today's" plan, the occupancy window, gym-open check) uses the server container's local system timezone - no per-user timezone handling (FR-39).
-- **Policy-driven authorization over a fixed role enum**: `d_user_policy` (dimension) + `f_user_policy_on_user` (fact) replace a `role` column entirely (§11). Granting a new capability, or promoting/demoting an existing account between member/trainer/admin, is a data change (via the Admin policy-management feature, FR-43) rather than a schema migration or a new signup path - `d_users` stays a single table for every person, since access differs by *policy*, not by *profile shape*.
+- **Policy-driven authorization over a fixed role enum**: `d_user_policy` (dimension) + `f_user_policy_on_user` (fact) replace a `role` column entirely (§11). Policy groups (`d_user_policy_group` + `f_user_policy_group_on_user`) are named, seeded bundles of policies, so the Admin sees at a glance who is a member, trainer or admin without a role field: a group is the source of truth with live membership, not a copy of its policies into per-user rows, so a user's group is a stored fact and a change to a group reaches every current member. Granting a new capability, or promoting/demoting an existing account between member/trainer/admin, is a data change (via the Admin policy-management feature, FR-43) rather than a schema migration or a new signup path - `d_users` stays a single table for every person, since access differs by *policy*, not by *profile shape*.
 
 ## 11. Authorization (CASL)
 
-Permissions are entirely data-driven - there is no `role` column anywhere. What a user (member, trainer, or admin - all the same `d_users` row shape, see [05-data-model.md](./05-data-model.md)) can do is the union of every non-expired policy currently granted to them (`f_user_policy_on_user` → `d_user_policy`), turned into a [CASL](https://casl.js.org/) `Ability`.
+Permissions are entirely data-driven - there is no `role` column anywhere. What a user (member, trainer, or admin - all the same `d_users` row shape, see [05-data-model.md](./05-data-model.md)) can do is the union of every non-expired policy currently granted to them directly (`f_user_policy_on_user` → `d_user_policy`) and every policy of each group they currently belong to (`f_user_policy_group_on_user` → `d_user_policy_group_policy` → `d_user_policy`), with a direct `denied` row overriding either, turned into a [CASL](https://casl.js.org/) `Ability`.
 
 **Core (shared, `packages/shared/src/auth/`)**:
 - `types.ts` - the closed set of CASL actions (`create`/`read`/`update`/`delete`/`manage`) and subjects (`TrainingPlan`, `MedicalCertificate`, `Catalog`, `UserPolicyAssignment`, `MemberApp`, `StaffApp`, etc.) both apps build abilities against.
 - `abilities.ts` - `defineAbilityFor(user, grants)`, building a CASL `Ability` from a user's resolved policy grants, plus `buildAbilityRules` (the serializable rules `auth.me` returns) and `createAppAbility(rules)` (rebuilds the ability from them) (see [05-data-model.md](./05-data-model.md)'s `f_user_policy_on_user` note for the grant→rule translation).
-- `constants/policies.ts` - well-known `d_user_policy.id` string constants (e.g. the ones that mark a user as "a member" for gating purposes, below), so no module hardcodes a raw policy-id string.
+- `constants/policies.ts` - well-known `d_user_policy.id` string constants (e.g. the ones that mark a user as "a member" for gating purposes, below), and the `d_user_policy_group.id` constants with each group's policy list (`MEMBER_POLICY_IDS`, `TRAINER_POLICY_IDS`, `ADMIN_POLICY_IDS`, which the seed writes into the database), so no module hardcodes a raw policy or group id string.
 - Split further by domain (`src/auth/aptitude/`, `src/auth/onboarding/`, `src/auth/catalog/`, …), mirroring the backend's domain modules (`rules/backend.md`), rather than one flat abilities file.
 
-**Backend (`apps/api`)**: `src/trpc/context.ts` builds the `Ability` once per request (right after JWT verification) from the requesting user's active grants. Routers check `ctx.ability.can(operation, resource)` before calling into the service - this is the only authorization gate; there is no role-based procedure builder.
+**Backend (`apps/api`)**: `src/trpc/context.ts` builds the `Ability` once per request (right after JWT verification) from the requesting user's active grants and group memberships. Routers check `ctx.ability.can(operation, resource)` before calling into the service - this is the only authorization gate; there is no role-based procedure builder.
 
 **Frontend (`apps/web`)**: `src/abilities.tsx` wraps `@casl/react` 7: it re-exports `AbilityProvider` and exposes a `Can` and a `useAppAbility()` typed to the shared `AppAbility`. `components/auth-guard.tsx` rebuilds the ability once per session from the rules `auth.me` returns (`createAppAbility(rules)`) and provides it via `<AbilityProvider>`. Components either render `<Can I="manage" a="TrainingPlan" />` or call `const ability = useAppAbility(); ability.can('manage', 'TrainingPlan')`.
 
-**The member gate, without a role field**: the aptitude/onboarding pipeline (FR-1–FR-14) and the `(member)` route group apply only to a user whose ability includes the member-designated permission(s) (e.g. `read_member_app`, granted the moment FR-9's clearance completes). A seeded trainer/admin account is granted staff-designated permissions (e.g. `read_staff_app`) instead, and is exempt from the member gate entirely - by construction, not by a special case checking who they are (FR-44).
+**The member gate, without a role field**: the aptitude/onboarding pipeline (FR-1–FR-14) and the `(member)` route group apply only to a user whose ability includes the member-designated permission(s) (e.g. `read_member_app`, which arrives with the `member` group the moment FR-9's clearance completes). A seeded trainer/admin account belongs to a staff group (`trainer`/`admin`, which carry e.g. `read_staff_app`) instead, and is exempt from the member gate entirely - by construction, not by a special case checking who they are (FR-44).

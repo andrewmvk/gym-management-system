@@ -32,7 +32,7 @@ Single gym, single physical location - no multi-tenancy in the data or auth mode
 
 ## Capabilities and Constraints
 
-Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-46) and `docs/03-features-and-flows.md`; durable constraints worth restating here:
+Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-48) and `docs/03-features-and-flows.md`; durable constraints worth restating here:
 
 - Signup gate: basic info + webcam reference photo (embedding computed server-side, raw photo never leaves the backend) → digital aptitude questionnaire → AI verdict (`cleared` / `not_cleared` / `pending_retry`) → medical certificate escalation if not cleared → every certificate result (all three states) routed to an Admin backstop queue regardless of AI confidence. No account/password/login exists before clearance; Admin override is the only recovery path for a wrongly-rejected member.
 - Onboarding (post-auth) feeds the first AI training plan; not one-time - can be extended later via chat.
@@ -42,7 +42,7 @@ Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-46) a
 - Kiosk performs 1:N face-embedding matching only; it fetches `{memberId, embedding}` pairs from a dedicated, kiosk-authenticated endpoint and never receives raw photos. Ambiguous matches (top two too close to call) are rejected, not guessed.
 - Turnstile hardware call is best-effort: check-in is always recorded with a success/failed tag regardless of whether the external API call succeeds.
 - No checkout event anywhere - occupancy is a rolling-window estimate, explicitly framed as such, not an exact headcount.
-- Trainer/admin accounts exist only via a first-boot seed script with fixed demo credentials - there is no staff self-signup UI anywhere. Permissions themselves are policy-driven (member/trainer/admin are granted policy sets, not a fixed role field), so an Admin can later change what an existing account can do without that being a self-signup path.
+- Trainer/admin accounts exist only via a first-boot seed script with fixed demo credentials - there is no staff self-signup UI anywhere. Permissions themselves are policy-driven (member/trainer/admin are seeded policy groups, a named bundle of policies a user belongs to, not a fixed role field), so an Admin can later change what an existing account can do without that being a self-signup path.
 - Explicitly out of scope: real payments/billing, building the turnstile API itself, a persisted/scrollable chat log, multi-location support, 1:1 trainer assignment, real biometric data from real people, a real checkout/exit flow, exercise deletion, password reset/account recovery, WCAG/i18n/offline/scale requirements, production infra hardening.
 
 ## Brand Commitments

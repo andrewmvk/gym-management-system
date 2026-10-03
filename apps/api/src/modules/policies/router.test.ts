@@ -1,5 +1,11 @@
 import { db, pool } from '@api/db/client';
-import { dUserPolicy, dUsers, fUserPolicyOnUser } from '@api/db/schema';
+import {
+  dUserPolicyGroup,
+  dUserPolicyGroupPolicy,
+  dUsers,
+  fUserPolicyGroupOnUser,
+  fUserPolicyOnUser,
+} from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
 import { findActiveGrants } from '@api/modules/auth/repository';
@@ -9,15 +15,21 @@ import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
 import {
+  ADMIN_GROUP,
   defineAbilityFor,
   LOCKOUT_PROTECTED_POLICY_IDS,
   MANAGE_CATALOG,
+  MANAGE_POLICY_ASSIGNMENTS,
+  MEMBER_GROUP,
   MEMBER_POLICY_IDS,
   READ_ALL_PLANS,
   READ_MEMBERS,
+  READ_STAFF_APP,
+  TRAINER_GROUP,
+  UPDATE_ALL_PLANS,
 } from '@cadence/shared/auth';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -38,12 +50,15 @@ async function tokenFor(email: string) {
   return signSessionToken((await userByEmail(email)).id);
 }
 
+async function createUser(email: string) {
+  const [user] = await db.insert(dUsers).values({ email, name: email }).returning();
+  return user!;
+}
+
 async function memberToken() {
-  const [member] = await db.insert(dUsers).values({ email: 'member@example.com', name: 'Member' }).returning();
-  await db
-    .insert(fUserPolicyOnUser)
-    .values(MEMBER_POLICY_IDS.map((policyId) => ({ userId: member!.id, policyId, effect: 'granted' as const })));
-  return signSessionToken(member!.id);
+  const member = await createUser('member@example.com');
+  await db.insert(fUserPolicyGroupOnUser).values({ userId: member.id, groupId: MEMBER_GROUP });
+  return signSessionToken(member.id);
 }
 
 async function abilityOf(userId: string) {
@@ -52,6 +67,14 @@ async function abilityOf(userId: string) {
 
 function inDays(days: number) {
   return new Date(Date.now() + days * DAY_MS).toISOString();
+}
+
+async function membershipOf(userId: string, groupId: string) {
+  const [row] = await db
+    .select()
+    .from(fUserPolicyGroupOnUser)
+    .where(and(eq(fUserPolicyGroupOnUser.userId, userId), eq(fUserPolicyGroupOnUser.groupId, groupId)));
+  return row;
 }
 
 afterAll(async () => {
@@ -64,25 +87,44 @@ describe('policies', () => {
     await seedBase();
   });
 
-  it('lists every policy and every user with their grants and whether each is active', async () => {
+  it('lists the policies, the groups with their policies, and every user with groups, grants and where each policy comes from', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const trainer = await userByEmail(SEED_TRAINER_EMAIL);
-    await db
-      .update(fUserPolicyOnUser)
-      .set({ expiresOn: new Date(Date.now() - DAY_MS) })
-      .where(eq(fUserPolicyOnUser.userId, trainer.id));
+    await caller.policies.grant({ userId: trainer.id, policyId: MANAGE_CATALOG });
+    await caller.policies.grant({ userId: trainer.id, policyId: READ_ALL_PLANS, effect: 'denied' });
 
     const result = await caller.policies.list();
 
-    expect(result.policies).toHaveLength((await db.select().from(dUserPolicy)).length);
-    const listedTrainer = result.users.find((user) => user.id === trainer.id);
-    expect(listedTrainer?.grants.length).toBeGreaterThan(0);
-    expect(listedTrainer?.grants.every((grant) => !grant.isActive)).toBe(true);
-    const listedAdmin = result.users.find((user) => user.email === SEED_ADMIN_EMAIL);
-    expect(listedAdmin?.grants.every((grant) => grant.isActive)).toBe(true);
+    expect(result.groups.map((group) => group.id)).toEqual([ADMIN_GROUP, MEMBER_GROUP, TRAINER_GROUP]);
+    expect(result.groups.find((group) => group.id === TRAINER_GROUP)?.policyIds).toContain(READ_ALL_PLANS);
+    const listed = result.users.find((user) => user.id === trainer.id)!;
+    expect(listed.groups).toEqual([{ groupId: TRAINER_GROUP, expiresOn: null, isActive: true }]);
+    expect(listed.grants.map((grant) => [grant.policyId, grant.effect, grant.isActive]).sort()).toEqual([
+      [MANAGE_CATALOG, 'granted', true],
+      [READ_ALL_PLANS, 'denied', true],
+    ]);
+    const effective = new Map(listed.effective.map((item) => [item.policyId, item]));
+    expect(effective.get(MANAGE_CATALOG)).toMatchObject({ sources: ['direct'], isDenied: false });
+    expect(effective.get(UPDATE_ALL_PLANS)).toMatchObject({ sources: [TRAINER_GROUP], isDenied: false });
+    expect(effective.get(READ_ALL_PLANS)).toMatchObject({ sources: [TRAINER_GROUP], isDenied: true });
   });
 
-  it('grants a policy so the ability appears, and upserts on the composite key', async () => {
+  it('shows an ended membership as inactive and no longer supplies its policies', async () => {
+    const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
+    const trainer = await userByEmail(SEED_TRAINER_EMAIL);
+    await db
+      .update(fUserPolicyGroupOnUser)
+      .set({ expiresOn: new Date(Date.now() - DAY_MS) })
+      .where(eq(fUserPolicyGroupOnUser.userId, trainer.id));
+
+    const listed = (await caller.policies.list()).users.find((user) => user.id === trainer.id)!;
+
+    expect(listed.groups).toMatchObject([{ groupId: TRAINER_GROUP, isActive: false }]);
+    expect(listed.effective).toEqual([]);
+    expect((await abilityOf(trainer.id)).can('read', 'StaffApp')).toBe(false);
+  });
+
+  it('grants a policy directly so the ability appears, and upserts on the composite key', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const trainer = await userByEmail(SEED_TRAINER_EMAIL);
     expect((await abilityOf(trainer.id)).can('manage', 'Catalog')).toBe(false);
@@ -92,107 +134,202 @@ describe('policies', () => {
 
     expect((await abilityOf(trainer.id)).can('manage', 'Catalog')).toBe(true);
     const rows = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, trainer.id));
-    expect(rows.filter((row) => row.policyId === MANAGE_CATALOG)).toHaveLength(1);
-    expect(rows.find((row) => row.policyId === MANAGE_CATALOG)?.expiresOn).not.toBeNull();
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.expiresOn).not.toBeNull();
   });
 
-  it('revokes in place by expiring the row, never deleting it', async () => {
+  it('revokes a direct grant in place by expiring the row, never deleting it, and extends it back', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const trainer = await userByEmail(SEED_TRAINER_EMAIL);
-    const before = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, trainer.id));
-    expect((await abilityOf(trainer.id)).can('read', 'TrainingPlan')).toBe(true);
+    await caller.policies.grant({ userId: trainer.id, policyId: MANAGE_CATALOG });
 
-    await caller.policies.revoke({ userId: trainer.id, policyId: READ_ALL_PLANS });
+    await caller.policies.revoke({ userId: trainer.id, policyId: MANAGE_CATALOG });
 
-    expect((await abilityOf(trainer.id)).can('read', 'TrainingPlan')).toBe(false);
-    const after = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, trainer.id));
-    expect(after).toHaveLength(before.length);
-    expect(after.find((row) => row.policyId === READ_ALL_PLANS)?.expiresOn).not.toBeNull();
-  });
+    expect((await abilityOf(trainer.id)).can('manage', 'Catalog')).toBe(false);
+    const rows = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, trainer.id));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.expiresOn).not.toBeNull();
 
-  it('extends a revoked grant back to active, with a date or indefinitely', async () => {
-    const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
-    const trainer = await userByEmail(SEED_TRAINER_EMAIL);
-    await caller.policies.revoke({ userId: trainer.id, policyId: READ_ALL_PLANS });
+    await caller.policies.extend({ userId: trainer.id, policyId: MANAGE_CATALOG, expiresOn: inDays(3) });
+    expect((await abilityOf(trainer.id)).can('manage', 'Catalog')).toBe(true);
 
-    await caller.policies.extend({ userId: trainer.id, policyId: READ_ALL_PLANS, expiresOn: inDays(3) });
-    expect((await abilityOf(trainer.id)).can('read', 'TrainingPlan')).toBe(true);
-
-    await caller.policies.extend({ userId: trainer.id, policyId: READ_ALL_PLANS, expiresOn: null });
-    const [row] = await db
-      .select()
-      .from(fUserPolicyOnUser)
-      .where(eq(fUserPolicyOnUser.userId, trainer.id))
-      .then((rows) => rows.filter((item) => item.policyId === READ_ALL_PLANS));
+    await caller.policies.extend({ userId: trainer.id, policyId: MANAGE_CATALOG, expiresOn: null });
+    const [row] = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, trainer.id));
     expect(row?.expiresOn).toBeNull();
   });
 
-  it('lets a denied override win over a granted policy', async () => {
+  it('cannot revoke a policy that only a group supplies, but a direct denial overrides it and the rest of the group stays', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const trainer = await userByEmail(SEED_TRAINER_EMAIL);
+
+    await expect(caller.policies.revoke({ userId: trainer.id, policyId: READ_ALL_PLANS })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
 
     await caller.policies.grant({ userId: trainer.id, policyId: READ_ALL_PLANS, effect: 'denied' });
 
-    expect((await abilityOf(trainer.id)).cannot('read', 'TrainingPlan')).toBe(true);
+    const ability = await abilityOf(trainer.id);
+    expect(ability.cannot('read', 'TrainingPlan')).toBe(true);
+    expect(ability.can('update', 'TrainingPlan')).toBe(true);
+    expect(ability.can('read', 'StaffApp')).toBe(true);
   });
 
-  it('rejects a past expiry, unknown users and policies, and extending or revoking a grant that does not exist', async () => {
+  it('assigns, revokes in place, and extends a group so the effective ability follows', async () => {
+    const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
+    const member = await createUser('plain@example.com');
+    expect((await abilityOf(member.id)).can('read', 'StaffApp')).toBe(false);
+
+    await caller.policies.assignGroup({ userId: member.id, groupId: TRAINER_GROUP });
+    await caller.policies.assignGroup({ userId: member.id, groupId: TRAINER_GROUP, expiresOn: inDays(5) });
+    expect((await abilityOf(member.id)).can('read', 'StaffApp')).toBe(true);
+    expect((await membershipOf(member.id, TRAINER_GROUP))?.expiresOn).not.toBeNull();
+
+    await caller.policies.revokeGroup({ userId: member.id, groupId: TRAINER_GROUP });
+    expect((await abilityOf(member.id)).can('read', 'StaffApp')).toBe(false);
+    expect(await membershipOf(member.id, TRAINER_GROUP)).toBeDefined();
+
+    await caller.policies.extendGroup({ userId: member.id, groupId: TRAINER_GROUP, expiresOn: inDays(2) });
+    expect((await abilityOf(member.id)).can('read', 'StaffApp')).toBe(true);
+
+    await caller.policies.extendGroup({ userId: member.id, groupId: TRAINER_GROUP, expiresOn: null });
+    expect((await membershipOf(member.id, TRAINER_GROUP))?.expiresOn).toBeNull();
+  });
+
+  it('unions several groups, and a direct denial wins over a policy two groups supply', async () => {
+    const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
+    const user = await createUser('both@example.com');
+    await caller.policies.assignGroup({ userId: user.id, groupId: TRAINER_GROUP });
+    await caller.policies.assignGroup({ userId: user.id, groupId: ADMIN_GROUP });
+
+    const ability = await abilityOf(user.id);
+    expect(ability.can('manage', 'PlanReview')).toBe(true);
+    expect(ability.can('manage', 'Catalog')).toBe(true);
+
+    await caller.policies.grant({ userId: user.id, policyId: READ_ALL_PLANS, effect: 'denied' });
+    expect((await abilityOf(user.id)).cannot('read', 'TrainingPlan')).toBe(true);
+  });
+
+  it('changing a group policy list reaches the next ability of an existing member', async () => {
+    const trainer = await userByEmail(SEED_TRAINER_EMAIL);
+    expect((await abilityOf(trainer.id)).can('manage', 'Catalog')).toBe(false);
+
+    await db.insert(dUserPolicyGroupPolicy).values({ groupId: TRAINER_GROUP, policyId: MANAGE_CATALOG });
+
+    expect((await abilityOf(trainer.id)).can('manage', 'Catalog')).toBe(true);
+  });
+
+  it('rejects a past expiry, unknown users, policies and groups, and revoking or extending what is not held', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const trainer = await userByEmail(SEED_TRAINER_EMAIL);
+    const unknownUser = crypto.randomUUID();
 
     await expect(
       caller.policies.grant({ userId: trainer.id, policyId: READ_MEMBERS, expiresOn: inDays(-1) }),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
-    await expect(caller.policies.grant({ userId: crypto.randomUUID(), policyId: READ_MEMBERS })).rejects.toMatchObject({
+    await expect(
+      caller.policies.assignGroup({ userId: trainer.id, groupId: ADMIN_GROUP, expiresOn: inDays(-1) }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.policies.grant({ userId: unknownUser, policyId: READ_MEMBERS })).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
     await expect(caller.policies.grant({ userId: trainer.id, policyId: 'nope' })).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
-    await expect(caller.policies.revoke({ userId: trainer.id, policyId: READ_MEMBERS })).rejects.toMatchObject({
+    await expect(caller.policies.assignGroup({ userId: unknownUser, groupId: ADMIN_GROUP })).rejects.toMatchObject({
       code: 'NOT_FOUND',
     });
+    await expect(caller.policies.assignGroup({ userId: trainer.id, groupId: 'nope' })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(caller.policies.revokeGroup({ userId: trainer.id, groupId: ADMIN_GROUP })).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+    });
+    await expect(
+      caller.policies.extendGroup({ userId: trainer.id, groupId: ADMIN_GROUP, expiresOn: null }),
+    ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     await expect(
       caller.policies.extend({ userId: trainer.id, policyId: READ_MEMBERS, expiresOn: null }),
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
   });
 
-  it('refuses to let an admin revoke or deny their own staff or policy-management access', async () => {
+  it('refuses an admin removing their own access by denying it, or by ending the only group that supplies it', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const admin = await userByEmail(SEED_ADMIN_EMAIL);
 
     for (const policyId of LOCKOUT_PROTECTED_POLICY_IDS) {
-      await expect(caller.policies.revoke({ userId: admin.id, policyId })).rejects.toMatchObject({
-        code: 'BAD_REQUEST',
-      });
       await expect(caller.policies.grant({ userId: admin.id, policyId, effect: 'denied' })).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
     }
+    await expect(caller.policies.revokeGroup({ userId: admin.id, groupId: ADMIN_GROUP })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
 
     const ability = await abilityOf(admin.id);
     expect(ability.can('manage', 'UserPolicyAssignment')).toBe(true);
     expect(ability.can('read', 'StaffApp')).toBe(true);
-    await caller.policies.revoke({ userId: admin.id, policyId: MANAGE_CATALOG });
-    expect((await abilityOf(admin.id)).can('manage', 'Catalog')).toBe(false);
+    expect((await membershipOf(admin.id, ADMIN_GROUP))?.expiresOn).toBeNull();
+    const denials = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, admin.id));
+    expect(denials).toHaveLength(0);
   });
 
-  it('never creates a user', async () => {
+  it('allows an admin to drop a redundant source of their own access, and to change another admin', async () => {
+    const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
+    const admin = await userByEmail(SEED_ADMIN_EMAIL);
+    await caller.policies.grant({ userId: admin.id, policyId: MANAGE_POLICY_ASSIGNMENTS });
+
+    await caller.policies.revoke({ userId: admin.id, policyId: MANAGE_POLICY_ASSIGNMENTS });
+    expect((await abilityOf(admin.id)).can('manage', 'UserPolicyAssignment')).toBe(true);
+
+    const other = await createUser('other-admin@example.com');
+    await caller.policies.assignGroup({ userId: other.id, groupId: ADMIN_GROUP });
+    await caller.policies.revokeGroup({ userId: other.id, groupId: ADMIN_GROUP });
+    expect((await abilityOf(other.id)).can('manage', 'UserPolicyAssignment')).toBe(false);
+  });
+
+  it('refuses revoking the only direct source of your own access when no group supplies it', async () => {
+    const [user] = await db.insert(dUsers).values({ email: 'direct-admin@example.com', name: 'Direct' }).returning();
+    await db.insert(fUserPolicyOnUser).values(
+      [READ_STAFF_APP, MANAGE_POLICY_ASSIGNMENTS].map((policyId) => ({
+        userId: user!.id,
+        policyId,
+        effect: 'granted' as const,
+      })),
+    );
+    const caller = await callerFor(await signSessionToken(user!.id));
+
+    await expect(
+      caller.policies.revoke({ userId: user!.id, policyId: MANAGE_POLICY_ASSIGNMENTS }),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+
+    expect((await abilityOf(user!.id)).can('manage', 'UserPolicyAssignment')).toBe(true);
+  });
+
+  it('never creates a user or edits a group', async () => {
     const caller = await callerFor(await tokenFor(SEED_ADMIN_EMAIL));
     const trainer = await userByEmail(SEED_TRAINER_EMAIL);
     const usersBefore = await db.select().from(dUsers);
+    const groupsBefore = await db.select().from(dUserPolicyGroup);
+    const bridgeBefore = await db.select().from(dUserPolicyGroupPolicy);
 
     await caller.policies.grant({ userId: trainer.id, policyId: READ_MEMBERS });
     await caller.policies.revoke({ userId: trainer.id, policyId: READ_MEMBERS });
+    await caller.policies.assignGroup({ userId: trainer.id, groupId: MEMBER_GROUP });
+    await caller.policies.revokeGroup({ userId: trainer.id, groupId: MEMBER_GROUP });
     await expect(caller.policies.grant({ userId: crypto.randomUUID(), policyId: READ_MEMBERS })).rejects.toThrow();
+    await expect(caller.policies.assignGroup({ userId: crypto.randomUUID(), groupId: MEMBER_GROUP })).rejects.toThrow();
 
     expect(await db.select().from(dUsers)).toHaveLength(usersBefore.length);
+    expect(await db.select().from(dUserPolicyGroup)).toEqual(groupsBefore);
+    expect(await db.select().from(dUserPolicyGroupPolicy)).toEqual(bridgeBefore);
   });
 
   it('answers FORBIDDEN to a trainer and a member on every procedure, and UNAUTHORIZED when signed out', async () => {
     const admin = await userByEmail(SEED_ADMIN_EMAIL);
     const target = { userId: admin.id, policyId: READ_MEMBERS };
+    const groupTarget = { userId: admin.id, groupId: MEMBER_GROUP };
     const grantsBefore = await db.select().from(fUserPolicyOnUser);
+    const membershipsBefore = await db.select().from(fUserPolicyGroupOnUser);
 
     for (const token of [await tokenFor(SEED_TRAINER_EMAIL), await memberToken()]) {
       const caller = await callerFor(token);
@@ -202,10 +339,22 @@ describe('policies', () => {
       await expect(caller.policies.extend({ ...target, expiresOn: null })).rejects.toMatchObject({
         code: 'FORBIDDEN',
       });
+      await expect(caller.policies.assignGroup(groupTarget)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(caller.policies.revokeGroup(groupTarget)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      await expect(caller.policies.extendGroup({ ...groupTarget, expiresOn: null })).rejects.toMatchObject({
+        code: 'FORBIDDEN',
+      });
     }
 
     await expect((await callerFor()).policies.list()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
-    const grantsAfter = await db.select().from(fUserPolicyOnUser);
-    expect(grantsAfter.length).toBe(grantsBefore.length + MEMBER_POLICY_IDS.length);
+    expect(await db.select().from(fUserPolicyOnUser)).toEqual(grantsBefore);
+    expect(await db.select().from(fUserPolicyGroupOnUser)).toHaveLength(membershipsBefore.length + 1);
+  });
+
+  it('keeps the member group size consistent with MEMBER_POLICY_IDS', async () => {
+    const member = await createUser('sized@example.com');
+    await db.insert(fUserPolicyGroupOnUser).values({ userId: member.id, groupId: MEMBER_GROUP });
+
+    expect(await findActiveGrants(member.id, new Date())).toHaveLength(MEMBER_POLICY_IDS.length);
   });
 });

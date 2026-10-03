@@ -5,15 +5,16 @@ Schema lives in `apps/api/src/db/schema/`, one file per table group (e.g. `users
 ## Conventions
 
 - Table names are `d_`/`f_`-prefixed per `rules/naming-conventions.md`; column names plain `snake_case` in Postgres; `camelCase` TS property with an explicit column mapping.
-- Every table: `uuid` primary key, `created_at timestamp` unless the table's entry in `docs/05-data-model.md` omits it deliberately. **One exception**: `d_user_policy.id` is a human-readable `text` slug (e.g. `manage_onboarding`), not a `uuid` - it's referenced directly as a stable identifier in code (`packages/shared/src/auth/constants/policies.ts`).
+- Every table: `uuid` primary key, `created_at timestamp` unless the table's entry in `docs/05-data-model.md` omits it deliberately. **One exception, shared by two tables**: `d_user_policy.id` and `d_user_policy_group.id` are human-readable `text` slugs (e.g. `manage_onboarding`, `admin`), not a `uuid` - they're referenced directly as stable identifiers in code (`packages/shared/src/auth/constants/policies.ts`).
 - Enums are real Postgres enums (`aptitude_status`, `ai_result`, `turnstile_status`, `f_user_policy_on_user.effect`, etc.) matching the doc's value sets exactly - don't loosen one to plain `text`. The exception is `d_user_policy.operation`/`.resource`/`.scope`, deliberately plain `text`: their vocabulary is owned by the shared TS types in `packages/shared/src/auth/types.ts`, not a Postgres enum, so a new policy recombining existing actions/resources is a seed insert, never a migration.
 - `jsonb` columns (`answers`, `payload`, `headers`, `medications`, etc.) are always paired with a zod schema in code that validates the shape on read and write - Postgres won't enforce their internal structure.
-- There is no `role` column anywhere. `d_users` is one table for every person (member, trainer, admin); what they can do comes entirely from `d_user_policy`/`f_user_policy_on_user` (see `rules/backend.md` and `docs/04-architecture.md` §11).
+- There is no `role` column anywhere. `d_users` is one table for every person (member, trainer, admin); what they can do comes entirely from `d_user_policy`/`f_user_policy_on_user` and from the policy groups they belong to (`d_user_policy_group`/`d_user_policy_group_policy`/`f_user_policy_group_on_user`; see `rules/backend.md` and `docs/04-architecture.md` §11).
 
 ## Add-only and singleton tables
 
 - `d_exercises` is add-only: no delete mutation exists anywhere, for anyone. Enforce this by never defining a `delete` procedure for it, not just by convention (FR-24).
 - `d_user_policy` is add-mostly: don't delete a policy once any `f_user_policy_on_user` row references it - revoke the grant (update `expires_on`) instead, the same way `f_training_plan_exercises` handles corrections in place rather than through deletion.
+- `d_user_policy_group` and `d_user_policy_group_policy` are seeded and read-only: the seed owns their contents and re-asserts them on every run, and no procedure creates, edits or deletes a group or its policy list (RN-13). Like policies, never delete a group once any `f_user_policy_group_on_user` row references it: end the membership by updating `expires_on`.
 - `d_turnstile_config` and `d_gym_settings` are effectively singleton rows: access them through a dedicated `getOrCreate`/upsert-by-known-id repository method, never a naive `findMany` that assumes one row will always exist.
 
 ## Migrations
@@ -29,4 +30,4 @@ There is no shared hosted database. Each developer runs PostgreSQL inside their 
 
 ## Retroactive corrections and mutable facts
 
-`f_training_plan_exercises` rows for a past date are updated directly, in place - there is no versioned/append-only history for this table (FR-23). `f_user_policy_on_user` works the same way: revoking or extending a grant updates its `expires_on` in place. Don't turn either into an append-only event log - a fact table in this schema is about grain and change-frequency, not immutability (`rules/naming-conventions.md`).
+`f_training_plan_exercises` rows for a past date are updated directly, in place - there is no versioned/append-only history for this table (FR-23). `f_user_policy_on_user` and `f_user_policy_group_on_user` work the same way: revoking or extending a grant or a membership updates its `expires_on` in place. Don't turn either into an append-only event log - a fact table in this schema is about grain and change-frequency, not immutability (`rules/naming-conventions.md`).

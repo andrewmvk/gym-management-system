@@ -14,7 +14,7 @@ catalog stay aligned.
 Goal: have something that boots and responds, with real data in the database, with no external
 dependency yet.
 
-- Seed script: full `d_user_policy` set + fixed trainer/admin accounts (FR-41, FR-42, FR-43).
+- Seed script: full `d_user_policy` set + fixed trainer/admin accounts (FR-41, FR-42, FR-43); the `member`/`trainer`/`admin` policy groups join it with P-23 (FR-47).
 - Minimal auth: password login, JWT in an httpOnly cookie, basic CASL ability (docs/04-architecture.md §3).
 - Catalog: `d_exercises`, `d_gym_equipment`, `d_exercise_equipment` - schema, admin CRUD, listing (FR-16, FR-17, FR-24).
 
@@ -54,7 +54,7 @@ Goal: nothing here changes a business rule, it only exposes data that already ex
 
 - Member metrics (FR-36).
 - Gym info page: occupancy, equipment demand (FR-37, FR-38, FR-39).
-- Admin policy management screen (FR-43, RN-10).
+- Admin policy management screen with policy groups (FR-43, FR-47, FR-48, RN-10, RN-13).
 
 **MVP 4 validation**: the numbers match what's in the database (verify manually against a direct SQL
 query).

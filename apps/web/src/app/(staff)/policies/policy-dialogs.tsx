@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { DatePicker } from '@/components/date-picker';
 import { SearchInput } from '@/components/search-input';
+import { SegmentedFilter } from '@/components/segmented-filter';
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -34,19 +35,42 @@ export interface PolicyOption {
   scope: string;
 }
 
+export interface GroupOption {
+  id: string;
+  description: string;
+  policyIds: string[];
+}
+
 export function policyMeta(policy: Pick<PolicyOption, 'operation' | 'resource' | 'scope'>) {
   return `${policy.operation} ${policy.resource}, ${policy.scope}`;
 }
 
+export function groupLabel(groupId: string) {
+  return groupId.charAt(0).toUpperCase() + groupId.slice(1);
+}
+
+export interface DialogTarget {
+  type: 'policy' | 'group';
+  id: string;
+  label: string;
+}
+
 export type PolicyDialogState =
-  | { kind: 'grant'; userId: string; userName: string; isSelf: boolean; heldPolicyIds: string[] }
-  | { kind: 'revoke'; userId: string; userName: string; policyId: string; policyLabel: string; effect: PolicyEffect }
+  | {
+      kind: 'grant';
+      userId: string;
+      userName: string;
+      isSelf: boolean;
+      heldPolicyIds: string[];
+      heldGroupIds: string[];
+      preset?: { policyId: string; effect: PolicyEffect };
+    }
+  | { kind: 'revoke'; userId: string; userName: string; target: DialogTarget; effect: PolicyEffect }
   | {
       kind: 'extend';
       userId: string;
       userName: string;
-      policyId: string;
-      policyLabel: string;
+      target: DialogTarget;
       effect: PolicyEffect;
       expiresOn: string | Date | null;
     };
@@ -54,6 +78,7 @@ export type PolicyDialogState =
 interface PolicyDialogsProps {
   state: PolicyDialogState | null;
   policies: PolicyOption[];
+  groups: GroupOption[];
   onClose: () => void;
 }
 
@@ -71,6 +96,12 @@ function errorMessage(error: { data?: { code?: string } | null; message: string 
     : "We couldn't save that change. Try again.";
 }
 
+function useRefreshList() {
+  const trpc = useTRPC();
+  const queryClient = useQueryClient();
+  return () => queryClient.invalidateQueries({ queryKey: trpc.policies.list.queryKey() });
+}
+
 function ExpiryField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   return (
     <Field>
@@ -83,7 +114,7 @@ function ExpiryField({ value, onChange }: { value: string; onChange: (value: str
         placeholder="No expiry"
         isClearable
       />
-      <FieldDescription>Leave empty for an indefinite grant. It ends at the close of that day.</FieldDescription>
+      <FieldDescription>Leave empty for no expiry. It ends at the close of that day.</FieldDescription>
     </Field>
   );
 }
@@ -134,27 +165,83 @@ function PolicyPicker({
   );
 }
 
+function GroupPicker({
+  groups,
+  heldGroupIds,
+  value,
+  onChange,
+}: {
+  groups: GroupOption[];
+  heldGroupIds: string[];
+  value: string;
+  onChange: (groupId: string) => void;
+}) {
+  return (
+    <ul aria-label="Groups" className="divide-y overflow-hidden rounded-md border">
+      {groups.map((group) => (
+        <li key={group.id}>
+          <button
+            type="button"
+            aria-pressed={group.id === value}
+            onClick={() => onChange(group.id)}
+            className={cn(
+              'flex w-full flex-col gap-0.5 px-3 py-2.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/45 focus-visible:ring-inset max-sm:min-h-11',
+              group.id === value ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted',
+            )}
+          >
+            <span className="text-sm font-medium">{groupLabel(group.id)}</span>
+            <span className="text-xs text-muted-foreground">
+              {group.description}
+              <span className="numerals text-sm font-semibold"> {group.policyIds.length}</span> policies
+              {heldGroupIds.includes(group.id) && ' · already a member, saving replaces the expiry'}
+            </span>
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function GrantDialogBody({
   state,
   policies,
+  groups,
   onClose,
 }: {
   state: Extract<PolicyDialogState, { kind: 'grant' }>;
   policies: PolicyOption[];
+  groups: GroupOption[];
   onClose: () => void;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const [policyId, setPolicyId] = useState('');
-  const [effect, setEffect] = useState<PolicyEffect>('granted');
+  const refreshList = useRefreshList();
+  const [type, setType] = useState<'group' | 'policy'>(state.preset ? 'policy' : 'group');
+  const [groupId, setGroupId] = useState('');
+  const [policyId, setPolicyId] = useState(state.preset?.policyId ?? '');
+  const [effect, setEffect] = useState<PolicyEffect>(state.preset?.effect ?? 'granted');
   const [expiry, setExpiry] = useState('');
   const isSelfLockout =
-    state.isSelf && effect === 'denied' && (LOCKOUT_PROTECTED_POLICY_IDS as readonly string[]).includes(policyId);
+    type === 'policy' &&
+    state.isSelf &&
+    effect === 'denied' &&
+    (LOCKOUT_PROTECTED_POLICY_IDS as readonly string[]).includes(policyId);
+  const expiresOn = expiry ? endOfDayIso(expiry) : null;
+
+  const assignGroup = useMutation(
+    trpc.policies.assignGroup.mutationOptions({
+      onSuccess: async (_data, variables) => {
+        await refreshList();
+        toast.success(`Added ${state.userName} to the ${groupLabel(variables.groupId)} group.`);
+        onClose();
+      },
+      onError: (error) => toast.error(errorMessage(error)),
+    }),
+  );
 
   const grant = useMutation(
     trpc.policies.grant.mutationOptions({
       onSuccess: async (_data, variables) => {
-        await queryClient.invalidateQueries({ queryKey: trpc.policies.list.queryKey() });
+        await refreshList();
         const label = policies.find((policy) => policy.id === variables.policyId)?.description ?? variables.policyId;
         toast.success(
           variables.effect === 'denied'
@@ -167,64 +254,88 @@ function GrantDialogBody({
     }),
   );
 
+  const isPending = assignGroup.isPending || grant.isPending;
+  const isReady = type === 'group' ? Boolean(groupId) : Boolean(policyId) && !isSelfLockout;
+
   return (
     <>
       <AlertDialogHeader>
-        <AlertDialogTitle>Grant a policy</AlertDialogTitle>
+        <AlertDialogTitle>Add access</AlertDialogTitle>
         <AlertDialogDescription>
-          Changes what {state.userName} can do. Granting a policy they already hold replaces its effect and expiry.
+          Changes what {state.userName} can do. Adding something they already have replaces its expiry
+          {type === 'policy' ? ' and effect' : ''}.
         </AlertDialogDescription>
       </AlertDialogHeader>
 
       <div className="flex flex-col gap-4">
-        <Field>
-          <FieldLabel>Policy</FieldLabel>
-          <PolicyPicker
-            policies={policies}
-            heldPolicyIds={state.heldPolicyIds}
-            value={policyId}
-            onChange={setPolicyId}
-          />
-        </Field>
+        <SegmentedFilter
+          label="What to add"
+          value={type}
+          onChange={setType}
+          options={[
+            { value: 'group', label: 'A group' },
+            { value: 'policy', label: 'A policy' },
+          ]}
+          className="w-full"
+        />
 
-        <Field>
-          <FieldLabel htmlFor="policy-effect">Effect</FieldLabel>
-          <Select value={effect} onValueChange={(value) => setEffect(value as typeof effect)}>
-            <SelectTrigger id="policy-effect" className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="granted">Granted</SelectItem>
-              <SelectItem value="denied">Denied</SelectItem>
-            </SelectContent>
-          </Select>
-          <FieldDescription>
-            {effect === 'denied'
-              ? 'A denial wins over every grant of the same permission, whatever other policies they hold.'
-              : 'The user can do what this policy covers, unless a denial says otherwise.'}
-          </FieldDescription>
-          {isSelfLockout && (
-            <FieldError>You can't deny your own access to the staff area or to policy management.</FieldError>
-          )}
-        </Field>
+        {type === 'group' ? (
+          <Field>
+            <FieldLabel>Group</FieldLabel>
+            <GroupPicker groups={groups} heldGroupIds={state.heldGroupIds} value={groupId} onChange={setGroupId} />
+            <FieldDescription>
+              A group gives every policy it contains. To take one away from this user, deny that policy afterwards.
+            </FieldDescription>
+          </Field>
+        ) : (
+          <>
+            <Field>
+              <FieldLabel>Policy</FieldLabel>
+              <PolicyPicker
+                policies={policies}
+                heldPolicyIds={state.heldPolicyIds}
+                value={policyId}
+                onChange={setPolicyId}
+              />
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="policy-effect">Effect</FieldLabel>
+              <Select value={effect} onValueChange={(value) => setEffect(value as typeof effect)}>
+                <SelectTrigger id="policy-effect" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="granted">Granted</SelectItem>
+                  <SelectItem value="denied">Denied</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {effect === 'denied'
+                  ? 'A denial wins over every grant of the same permission, even one that comes from a group.'
+                  : 'The user can do what this policy covers, unless a denial says otherwise.'}
+              </FieldDescription>
+              {isSelfLockout && (
+                <FieldError>You can't deny your own access to the staff area or to policy management.</FieldError>
+              )}
+            </Field>
+          </>
+        )}
 
         <ExpiryField value={expiry} onChange={setExpiry} />
       </div>
 
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={grant.isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
         <Button
-          disabled={!policyId || isSelfLockout || grant.isPending}
+          disabled={!isReady || isPending}
           onClick={() =>
-            grant.mutate({
-              userId: state.userId,
-              policyId,
-              effect,
-              expiresOn: expiry ? endOfDayIso(expiry) : null,
-            })
+            type === 'group'
+              ? assignGroup.mutate({ userId: state.userId, groupId, expiresOn })
+              : grant.mutate({ userId: state.userId, policyId, effect, expiresOn })
           }
         >
-          {grant.isPending ? 'Saving...' : 'Save policy'}
+          {isPending ? 'Saving...' : 'Save'}
         </Button>
       </AlertDialogFooter>
     </>
@@ -239,41 +350,54 @@ function RevokeDialogBody({
   onClose: () => void;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const refreshList = useRefreshList();
+  const { target } = state;
+  const isGroup = target.type === 'group';
+  const isDenial = state.effect === 'denied';
 
-  const revoke = useMutation(
-    trpc.policies.revoke.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: trpc.policies.list.queryKey() });
-        toast.success(
-          state.effect === 'denied'
-            ? `Lifted the denial of "${state.policyLabel}" for ${state.userName}.`
-            : `Revoked "${state.policyLabel}" for ${state.userName}.`,
-        );
-        onClose();
-      },
-      onError: (error) => toast.error(errorMessage(error)),
-    }),
-  );
+  const onSuccess = async () => {
+    await refreshList();
+    toast.success(
+      isGroup
+        ? `Removed ${state.userName} from the ${target.label} group.`
+        : isDenial
+          ? `Lifted the denial of "${target.label}" for ${state.userName}.`
+          : `Revoked "${target.label}" for ${state.userName}.`,
+    );
+    onClose();
+  };
+  const onError = (error: Parameters<typeof errorMessage>[0]) => toast.error(errorMessage(error));
+
+  const revokePolicy = useMutation(trpc.policies.revoke.mutationOptions({ onSuccess, onError }));
+  const revokeGroup = useMutation(trpc.policies.revokeGroup.mutationOptions({ onSuccess, onError }));
+  const isPending = revokePolicy.isPending || revokeGroup.isPending;
 
   return (
     <>
       <AlertDialogHeader>
-        <AlertDialogTitle>{state.effect === 'denied' ? 'Lift this denial?' : 'Revoke this policy?'}</AlertDialogTitle>
+        <AlertDialogTitle>
+          {isGroup ? 'Remove from this group?' : isDenial ? 'Lift this denial?' : 'Revoke this policy?'}
+        </AlertDialogTitle>
         <AlertDialogDescription>
-          {state.effect === 'denied'
-            ? `The denial of "${state.policyLabel}" for ${state.userName} ends right away. Anything else they hold for it applies again.`
-            : `${state.userName} loses "${state.policyLabel}" right away. It stays on their record and can be extended later.`}
+          {isGroup
+            ? `${state.userName} loses everything the ${target.label} group gives them, unless another group or a direct grant also provides it. The membership stays on their record and can be extended later.`
+            : isDenial
+              ? `The denial of "${target.label}" for ${state.userName} ends right away. Anything else they hold for it applies again.`
+              : `${state.userName} loses "${target.label}" right away, unless a group still provides it. It stays on their record and can be extended later.`}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={revoke.isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
         <Button
-          variant={state.effect === 'denied' ? 'default' : 'destructive'}
-          disabled={revoke.isPending}
-          onClick={() => revoke.mutate({ userId: state.userId, policyId: state.policyId })}
+          variant={isDenial && !isGroup ? 'default' : 'destructive'}
+          disabled={isPending}
+          onClick={() =>
+            isGroup
+              ? revokeGroup.mutate({ userId: state.userId, groupId: target.id })
+              : revokePolicy.mutate({ userId: state.userId, policyId: target.id })
+          }
         >
-          {revoke.isPending ? 'Saving...' : state.effect === 'denied' ? 'Lift denial' : 'Revoke'}
+          {isPending ? 'Saving...' : isGroup ? 'Remove' : isDenial ? 'Lift denial' : 'Revoke'}
         </Button>
       </AlertDialogFooter>
     </>
@@ -288,34 +412,46 @@ function ExtendDialogBody({
   onClose: () => void;
 }) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
+  const refreshList = useRefreshList();
+  const { target } = state;
+  const isGroup = target.type === 'group';
   const current = state.expiresOn ? new Date(state.expiresOn) : null;
   const isCurrentlyEnded = current !== null && current.getTime() <= Date.now();
   const [mode, setMode] = useState<'date' | 'indefinite'>(state.expiresOn === null ? 'indefinite' : 'date');
   const [expiry, setExpiry] = useState(current && !isCurrentlyEnded ? toIsoDate(current) : '');
   const nextExpiry = mode === 'indefinite' ? null : expiry ? endOfDayIso(expiry) : undefined;
 
-  const extend = useMutation(
-    trpc.policies.extend.mutationOptions({
-      onSuccess: async () => {
-        await queryClient.invalidateQueries({ queryKey: trpc.policies.list.queryKey() });
-        toast.success(`Updated the expiry of "${state.policyLabel}" for ${state.userName}.`);
-        onClose();
-      },
-      onError: (error) => toast.error(errorMessage(error)),
-    }),
-  );
+  const onSuccess = async () => {
+    await refreshList();
+    toast.success(
+      isGroup
+        ? `Updated the ${target.label} membership of ${state.userName}.`
+        : `Updated the expiry of "${target.label}" for ${state.userName}.`,
+    );
+    onClose();
+  };
+  const onError = (error: Parameters<typeof errorMessage>[0]) => toast.error(errorMessage(error));
+
+  const extendPolicy = useMutation(trpc.policies.extend.mutationOptions({ onSuccess, onError }));
+  const extendGroup = useMutation(trpc.policies.extendGroup.mutationOptions({ onSuccess, onError }));
+  const isPending = extendPolicy.isPending || extendGroup.isPending;
 
   return (
     <>
       <AlertDialogHeader>
         <AlertDialogTitle>
-          {state.effect === 'denied' ? 'Change the denial period' : 'Extend this policy'}
+          {isGroup
+            ? 'Extend this membership'
+            : state.effect === 'denied'
+              ? 'Change the denial period'
+              : 'Extend this policy'}
         </AlertDialogTitle>
         <AlertDialogDescription>
-          {state.effect === 'denied'
-            ? `"${state.policyLabel}" is denied for ${state.userName}.`
-            : `"${state.policyLabel}" for ${state.userName}.`}{' '}
+          {isGroup
+            ? `${state.userName} in the ${target.label} group.`
+            : state.effect === 'denied'
+              ? `"${target.label}" is denied for ${state.userName}.`
+              : `"${target.label}" for ${state.userName}.`}{' '}
           {isCurrentlyEnded
             ? `It expired ${formatDateTime(state.expiresOn as string | Date)}. Saving a new period makes it active again.`
             : current
@@ -348,33 +484,48 @@ function ExtendDialogBody({
       )}
 
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={extend.isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
         <Button
-          disabled={nextExpiry === undefined || extend.isPending}
-          onClick={() =>
-            nextExpiry !== undefined &&
-            extend.mutate({ userId: state.userId, policyId: state.policyId, expiresOn: nextExpiry })
-          }
+          disabled={nextExpiry === undefined || isPending}
+          onClick={() => {
+            if (nextExpiry === undefined) return;
+            if (isGroup) extendGroup.mutate({ userId: state.userId, groupId: target.id, expiresOn: nextExpiry });
+            else extendPolicy.mutate({ userId: state.userId, policyId: target.id, expiresOn: nextExpiry });
+          }}
         >
-          {extend.isPending ? 'Saving...' : 'Save expiry'}
+          {isPending ? 'Saving...' : 'Save expiry'}
         </Button>
       </AlertDialogFooter>
     </>
   );
 }
 
-export function PolicyDialogs({ state, policies, onClose }: PolicyDialogsProps) {
+export function PolicyDialogs({ state, policies, groups, onClose }: PolicyDialogsProps) {
   return (
     <AlertDialog open={state !== null} onOpenChange={(open) => !open && onClose()}>
       <AlertDialogContent className="max-h-[calc(100dvh-2rem)] overflow-y-auto">
         {state?.kind === 'grant' && (
-          <GrantDialogBody key={`${state.kind}:${state.userId}`} state={state} policies={policies} onClose={onClose} />
+          <GrantDialogBody
+            key={`grant:${state.userId}:${state.preset?.policyId ?? ''}`}
+            state={state}
+            policies={policies}
+            groups={groups}
+            onClose={onClose}
+          />
         )}
         {state?.kind === 'revoke' && (
-          <RevokeDialogBody key={`${state.kind}:${state.userId}:${state.policyId}`} state={state} onClose={onClose} />
+          <RevokeDialogBody
+            key={`revoke:${state.userId}:${state.target.type}:${state.target.id}`}
+            state={state}
+            onClose={onClose}
+          />
         )}
         {state?.kind === 'extend' && (
-          <ExtendDialogBody key={`${state.kind}:${state.userId}:${state.policyId}`} state={state} onClose={onClose} />
+          <ExtendDialogBody
+            key={`extend:${state.userId}:${state.target.type}:${state.target.id}`}
+            state={state}
+            onClose={onClose}
+          />
         )}
       </AlertDialogContent>
     </AlertDialog>

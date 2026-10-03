@@ -4,7 +4,7 @@ Node.js + Express hosting the tRPC HTTP adapter. Express itself stays a thin hos
 
 ## Module structure
 
-Organize by domain, not by technical layer: `src/modules/<domain>/` for each of `aptitude`, `onboarding`, `plans`, `catalog`, `chat`, `checkins`, `turnstile`, `ai`, `auth`, `policies` (FR-42/43: viewing/granting/revoking `d_user_policy`/`f_user_policy_on_user`). Each domain module has:
+Organize by domain, not by technical layer: `src/modules/<domain>/` for each of `aptitude`, `onboarding`, `plans`, `catalog`, `chat`, `checkins`, `turnstile`, `ai`, `auth`, `policies` (FR-42/43/47/48: viewing, granting and revoking `d_user_policy`/`f_user_policy_on_user` and assigning policy groups through `f_user_policy_group_on_user`). Each domain module has:
 
 - `router.ts` - tRPC procedures + zod input schemas. Thin: no direct DB queries here.
 - `service.ts` - business logic, orchestrates repository calls and the AI module.
@@ -12,11 +12,11 @@ Organize by domain, not by technical layer: `src/modules/<domain>/` for each of 
 
 ## Authorization (CASL)
 
-JWT is verified once in tRPC context middleware, attaching `{ userId }` to `ctx` - no `role`. The same middleware then builds a CASL `Ability` for that user (`apps/api/src/trpc/context.ts`), loading their active `f_user_policy_on_user` grants and translating each into a CASL rule (`docs/05-data-model.md`), and attaches it as `ctx.ability`. Routers check `ctx.ability.can(operation, resource)` before calling into the service - this is the only authorization gate; don't reintroduce a role-based procedure builder or scatter inline `if (ctx.user.role !== 'admin')` checks.
+JWT is verified once in tRPC context middleware, attaching `{ userId }` to `ctx` - no `role`. The same middleware then builds a CASL `Ability` for that user (`apps/api/src/trpc/context.ts`), loading their active `f_user_policy_on_user` grants plus the policies of their active `f_user_policy_group_on_user` memberships and translating each into a CASL rule (`docs/05-data-model.md`), and attaches it as `ctx.ability`. Routers check `ctx.ability.can(operation, resource)` before calling into the service - this is the only authorization gate; don't reintroduce a role-based procedure builder or scatter inline `if (ctx.user.role !== 'admin')` checks.
 
 The shared `Action`/`Subject` types, the `defineAbilityFor(user)` builder, and well-known policy-id constants live in `packages/shared/src/auth/` (`types.ts`, `abilities.ts`, `constants/policies.ts`), split further by domain (`packages/shared/src/auth/aptitude/`, `.../onboarding/`, `.../catalog/`, …) mirroring the module list above - both apps build a user's ability from the exact same vocabulary.
 
-Whether a user is subject to the aptitude/onboarding gate, and which route group they land in, is derived from whether their ability includes the member-designated permission (e.g. `read_member_app`) - never a role field (`docs/04-architecture.md` §11). Seeded trainer/admin accounts are granted staff-designated permissions instead and are exempt from that gate entirely.
+Whether a user is subject to the aptitude/onboarding gate, and which route group they land in, is derived from whether their ability includes the member-designated permission (e.g. `read_member_app`) - never a role field (`docs/04-architecture.md` §11). Seeded trainer/admin accounts belong to a staff group (`trainer`/`admin`) instead and are exempt from that gate entirely.
 
 The kiosk endpoint is a **separate** trust boundary gated by a static `KIOSK_API_KEY` header check, unrelated to user auth/ability entirely; don't reuse the ability-building middleware for it (per `docs/04-architecture.md` §5).
 

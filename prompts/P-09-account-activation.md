@@ -9,6 +9,7 @@ Task: implement the moment an applicant who is cleared sets a password and becom
 Context:
 - FR-9 in docs/02-requirements.md and rule RN-03 in docs/06-business-rules.md: a member with a final rejection never receives a password or authenticated access. Authentication only exists after clearance.
 - The session cookie, ability building, and policy constants come from P-02 and P-03. The MEMBER_POLICY_IDS group lists what a new member receives.
+- P-23 later replaces these direct grants with membership of the `member` policy group (FR-47) and updates this prompt's tests accordingly; the criteria below describe the behavior as first built.
 
 Permitted scope:
 - Only the files in Artifacts. No new dependencies.

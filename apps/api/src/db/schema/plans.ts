@@ -1,6 +1,19 @@
-import { dExercises } from '@api/db/schema/catalog';
+import { dExercises, muscle } from '@api/db/schema/catalog';
 import { dUsers } from '@api/db/schema/users';
-import { boolean, date, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, uuid } from 'drizzle-orm/pg-core';
+import {
+  boolean,
+  date,
+  integer,
+  jsonb,
+  pgEnum,
+  pgTable,
+  primaryKey,
+  smallint,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from 'drizzle-orm/pg-core';
 
 export const planStatus = pgEnum('plan_status', ['ai_published', 'trainer_edited']);
 
@@ -11,6 +24,7 @@ export const profileEventType = pgEnum('profile_event_type', [
   'life_event',
   'state_update',
   'plan_adjustment_request',
+  'muscle_focus_changed',
 ]);
 
 // One row per member per date (FR-15/FR-18). Regenerating replaces this row in place rather than
@@ -82,3 +96,21 @@ export const fProfileEvents = pgTable('f_profile_events', {
 });
 
 export type ProfileEvent = typeof fProfileEvents.$inferSelect;
+
+// The member's current muscle emphasis (-2 much less to +2 much more). A missing row means normal, so
+// resetting a muscle deletes its row. Each change is also appended to f_profile_events so the history
+// the AI reasons from stays complete.
+export const fMemberMuscleFocus = pgTable(
+  'f_member_muscle_focus',
+  {
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => dUsers.id),
+    muscle: muscle('muscle').notNull(),
+    bias: smallint('bias').notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (table) => [primaryKey({ columns: [table.userId, table.muscle] })],
+);
+
+export type MemberMuscleFocusRow = typeof fMemberMuscleFocus.$inferSelect;

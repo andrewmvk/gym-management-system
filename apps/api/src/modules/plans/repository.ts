@@ -11,7 +11,10 @@ import {
   type TrainingPlan,
   type TrainingPlanExercise,
 } from '@api/db/schema';
-import { and, asc, desc, eq, gte, lte } from 'drizzle-orm';
+import { findMusclesByExerciseIds } from '@api/modules/catalog/repository';
+import type { ExerciseMuscle } from '@cadence/shared/schemas/muscles';
+import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 export async function findPlanByUserAndDate(
   userId: string,
@@ -59,18 +62,18 @@ export interface PlanExerciseInput {
 
 export interface PlanExerciseDetail extends TrainingPlanExercise {
   exerciseName: string;
-  muscleGroup: string;
+  muscles: ExerciseMuscle[];
   instructions: string;
 }
 
-// Joined to d_exercises for display (name/instructions/muscle group) - isPerformable is computed by
+// Joined to d_exercises for display (name/instructions/muscles) - isPerformable is computed by
 // the service layer from the catalog's current availability, not stored here. Used by both the member
 // plan view and the trainer review detail page.
-export function findExercisesForPlanWithDetails(
+export async function findExercisesForPlanWithDetails(
   trainingPlanId: string,
   executor: DatabaseExecutor = db,
 ): Promise<PlanExerciseDetail[]> {
-  return executor
+  const rows = await executor
     .select({
       id: fTrainingPlanExercises.id,
       trainingPlanId: fTrainingPlanExercises.trainingPlanId,
@@ -82,13 +85,18 @@ export function findExercisesForPlanWithDetails(
       completed: fTrainingPlanExercises.completed,
       notes: fTrainingPlanExercises.notes,
       exerciseName: dExercises.name,
-      muscleGroup: dExercises.muscleGroup,
       instructions: dExercises.instructions,
     })
     .from(fTrainingPlanExercises)
     .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
     .where(eq(fTrainingPlanExercises.trainingPlanId, trainingPlanId))
     .orderBy(asc(fTrainingPlanExercises.orderIndex));
+
+  const muscles = await findMusclesByExerciseIds(
+    rows.map((row) => row.exerciseId),
+    executor,
+  );
+  return rows.map((row) => ({ ...row, muscles: muscles.get(row.exerciseId) ?? [] }));
 }
 
 export async function findPlanDatesInRange(
@@ -181,6 +189,8 @@ export async function replacePlan(input: {
 export interface PlanQueueEntry extends TrainingPlan {
   memberName: string;
   lastNote: string | null;
+  // Plain trainer notes, not the entries an edit leaves behind: a plan can hold notes without being edited.
+  noteCount: number;
 }
 
 // "Recent" per the prompt's own wording, with no artificial cap - this is a demo-scale dataset. The
@@ -206,11 +216,66 @@ export async function findPlansQueue(executor: DatabaseExecutor = db): Promise<P
   ]);
 
   const lastNoteByPlanId = new Map<string, string>();
+  const noteCountByPlanId = new Map<string, number>();
   for (const review of reviews) {
     if (!lastNoteByPlanId.has(review.trainingPlanId)) lastNoteByPlanId.set(review.trainingPlanId, review.note);
+    if (!review.isEdit) {
+      noteCountByPlanId.set(review.trainingPlanId, (noteCountByPlanId.get(review.trainingPlanId) ?? 0) + 1);
+    }
   }
 
-  return plans.map((plan) => ({ ...plan, lastNote: lastNoteByPlanId.get(plan.id) ?? null }));
+  return plans.map((plan) => ({
+    ...plan,
+    lastNote: lastNoteByPlanId.get(plan.id) ?? null,
+    noteCount: noteCountByPlanId.get(plan.id) ?? 0,
+  }));
+}
+
+export function findExerciseRowsForPlans(planIds: readonly string[], executor: DatabaseExecutor = db) {
+  if (planIds.length === 0) return Promise.resolve([]);
+  return executor
+    .select({
+      trainingPlanId: fTrainingPlanExercises.trainingPlanId,
+      exerciseId: fTrainingPlanExercises.exerciseId,
+      sets: fTrainingPlanExercises.sets,
+    })
+    .from(fTrainingPlanExercises)
+    .where(inArray(fTrainingPlanExercises.trainingPlanId, [...planIds]));
+}
+
+export interface RecentReviewEntry {
+  id: string;
+  trainingPlanId: string;
+  planDate: string;
+  note: string;
+  isEdit: boolean;
+  createdAt: Date;
+  authorName: string;
+  memberName: string;
+}
+
+// Newest first, across every plan: the trainers' shared pool has no assignment, so "who already looked
+// at this" is the only coordination signal there is.
+export async function findRecentReviews(limit: number, executor: DatabaseExecutor = db): Promise<RecentReviewEntry[]> {
+  const author = alias(dUsers, 'author');
+  const member = alias(dUsers, 'member');
+  return executor
+    .select({
+      id: fPlanReviews.id,
+      trainingPlanId: fPlanReviews.trainingPlanId,
+      planDate: fTrainingPlans.planDate,
+      note: fPlanReviews.note,
+      isEdit: fPlanReviews.isEdit,
+      createdAt: fPlanReviews.createdAt,
+      authorName: author.name,
+      memberName: member.name,
+    })
+    .from(fPlanReviews)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fPlanReviews.trainingPlanId))
+    .innerJoin(author, eq(author.id, fPlanReviews.userId))
+    .innerJoin(member, eq(member.id, fTrainingPlans.userId))
+    .orderBy(desc(fPlanReviews.createdAt))
+    .limit(limit);
 }
 
 export interface PlanWithMember extends TrainingPlan {
@@ -273,22 +338,33 @@ export async function insertReview(
 
 export interface PlanExerciseForDate {
   exerciseName: string;
-  muscleGroup: string;
+  sets: number;
+  muscles: ExerciseMuscle[];
 }
 
-// FR-29: selects only the exercise's own name/muscle group - no user_id or any other identifying
+// FR-29: selects only the exercise's own name, sets and muscles - no user_id or any other identifying
 // column ever leaves this query, so the aggregate it feeds can't leak a member's identity even by
 // mistake further up the call chain.
-export function findExercisesForDate(
+export async function findExercisesForDate(
   planDate: string,
   executor: DatabaseExecutor = db,
 ): Promise<PlanExerciseForDate[]> {
-  return executor
-    .select({ exerciseName: dExercises.name, muscleGroup: dExercises.muscleGroup })
+  const rows = await executor
+    .select({ exerciseId: dExercises.id, exerciseName: dExercises.name, sets: fTrainingPlanExercises.sets })
     .from(fTrainingPlanExercises)
     .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
     .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
     .where(eq(fTrainingPlans.planDate, planDate));
+
+  const muscles = await findMusclesByExerciseIds(
+    rows.map((row) => row.exerciseId),
+    executor,
+  );
+  return rows.map(({ exerciseId, exerciseName, sets }) => ({
+    exerciseName,
+    sets,
+    muscles: muscles.get(exerciseId) ?? [],
+  }));
 }
 
 // A direct trainer edit (FR-19): replaces the exercise list, flips status to trainer_edited, and

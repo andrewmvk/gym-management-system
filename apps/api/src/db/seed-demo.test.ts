@@ -94,6 +94,6 @@ describe('seedDemo', () => {
 
     const info = await getGymInfo(NOW);
     expect(info.occupancyEstimate).toBe(DEMO_RECENT_CHECK_IN_MINUTES.length);
-    expect(info.demand.muscleGroups.length).toBeGreaterThan(0);
+    expect(Object.keys(info.demand.muscleLoad).length).toBeGreaterThan(0);
   });
 });

@@ -1,6 +1,7 @@
 import { db, pool } from '@api/db/client';
 import {
   dExerciseEquipment,
+  dExerciseMuscles,
   dExercises,
   dGymEquipment,
   dUsers,
@@ -12,6 +13,7 @@ import { seedBase } from '@api/db/seed';
 import { getGymAdminDetail, getGymInfo, getNextChange } from '@api/modules/gym/service';
 import { resetTestDatabase } from '@api/test/database';
 import { DEFAULT_OPENING_HOURS, OCCUPANCY_WINDOW_MINUTES } from '@cadence/shared/schemas/gym';
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 // Local-time constructors: 2026-03-02 is a Monday, 2026-03-07 a Saturday and 2026-03-08 a Sunday.
@@ -32,8 +34,9 @@ async function checkIn(userId: string, when: Date) {
   await db.insert(fCheckIns).values({ userId, checkedInAt: when, turnstileStatus: 'success' });
 }
 
-async function createExercise(name: string, muscleGroup: string, equipment: { name: string; isAvailable: boolean }[]) {
-  const [exercise] = await db.insert(dExercises).values({ name, muscleGroup, instructions: 'Do it' }).returning();
+async function createExercise(name: string, muscle: MuscleId, equipment: { name: string; isAvailable: boolean }[]) {
+  const [exercise] = await db.insert(dExercises).values({ name, instructions: 'Do it' }).returning();
+  await db.insert(dExerciseMuscles).values({ exerciseId: exercise!.id, muscle, role: 'primary' });
   for (const item of equipment) {
     const [created] = await db.insert(dGymEquipment).values(item).returning();
     await db.insert(dExerciseEquipment).values({ exerciseId: exercise!.id, equipmentId: created!.id });
@@ -141,7 +144,7 @@ describe('gym info service', () => {
   });
 
   describe('demand today', () => {
-    it('counts muscle groups and available equipment for members checked in today only', async () => {
+    it('weighs muscles and counts available equipment for members checked in today only', async () => {
       const now = at(MONDAY, '12:00:00');
       const present = await createMember('present@example.com');
       const absent = await createMember('absent@example.com');
@@ -150,8 +153,8 @@ describe('gym info service', () => {
       await checkIn(present.id, at(MONDAY, '11:00:00'));
       await checkIn(yesterdayOnly.id, at('2026-03-01', '18:00:00'));
 
-      const bench = await createExercise('Gym bench press', 'Test chest', [{ name: 'Gym bench', isAvailable: true }]);
-      const squat = await createExercise('Gym squat', 'Test legs', [{ name: 'Gym rack', isAvailable: true }]);
+      const bench = await createExercise('Gym bench press', 'chest', [{ name: 'Gym bench', isAvailable: true }]);
+      const squat = await createExercise('Gym squat', 'quads', [{ name: 'Gym rack', isAvailable: true }]);
       await addPlan(present.id, MONDAY, [bench.id, squat.id]);
       await addPlan(absent.id, MONDAY, [bench.id]);
       await addPlan(yesterdayOnly.id, MONDAY, [bench.id]);
@@ -159,10 +162,7 @@ describe('gym info service', () => {
 
       const { demand } = await getGymInfo(now);
 
-      expect(demand.muscleGroups).toEqual([
-        { name: 'Test chest', count: 1 },
-        { name: 'Test legs', count: 1 },
-      ]);
+      expect(demand.muscleLoad).toEqual({ chest: 3, quads: 3 });
       expect(demand.equipment).toEqual([
         { name: 'Gym bench', count: 1 },
         { name: 'Gym rack', count: 1 },
@@ -172,20 +172,20 @@ describe('gym info service', () => {
     it('never counts an exercise whose only equipment is unavailable', async () => {
       const member = await createMember('broken@example.com');
       await checkIn(member.id, at(MONDAY, '08:00:00'));
-      const broken = await createExercise('Gym press', 'Test shoulders', [
+      const broken = await createExercise('Gym press', 'front-deltoid', [
         { name: 'Broken machine', isAvailable: false },
       ]);
       await addPlan(member.id, MONDAY, [broken.id]);
 
       const { demand } = await getGymInfo(at(MONDAY, '12:00:00'));
 
-      expect(demand).toEqual({ muscleGroups: [], equipment: [] });
+      expect(demand).toEqual({ muscleLoad: {}, equipment: [] });
     });
 
     it('counts an exercise with one available alternative but not its unavailable equipment', async () => {
       const member = await createMember('alternative@example.com');
       await checkIn(member.id, at(MONDAY, '08:00:00'));
-      const row = await createExercise('Gym row', 'Test back', [
+      const row = await createExercise('Gym row', 'lats', [
         { name: 'Cable row', isAvailable: true },
         { name: 'Broken row', isAvailable: false },
       ]);
@@ -193,19 +193,19 @@ describe('gym info service', () => {
 
       const { demand } = await getGymInfo(at(MONDAY, '12:00:00'));
 
-      expect(demand.muscleGroups).toEqual([{ name: 'Test back', count: 1 }]);
+      expect(demand.muscleLoad).toEqual({ lats: 3 });
       expect(demand.equipment).toEqual([{ name: 'Cable row', count: 1 }]);
     });
 
-    it('counts a bodyweight exercise as a muscle group but adds no equipment', async () => {
+    it('counts a bodyweight exercise toward its muscle but adds no equipment', async () => {
       const member = await createMember('bodyweight@example.com');
       await checkIn(member.id, at(MONDAY, '08:00:00'));
-      const pushUp = await createExercise('Gym push up', 'Test chest', []);
+      const pushUp = await createExercise('Gym push up', 'chest', []);
       await addPlan(member.id, MONDAY, [pushUp.id]);
 
       const { demand } = await getGymInfo(at(MONDAY, '12:00:00'));
 
-      expect(demand).toEqual({ muscleGroups: [{ name: 'Test chest', count: 1 }], equipment: [] });
+      expect(demand).toEqual({ muscleLoad: { chest: 3 }, equipment: [] });
     });
   });
 

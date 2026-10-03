@@ -5,7 +5,7 @@ import { todayLocal } from '@api/lib/dates';
 import type { AdjustPlanResult, ChatContext, EvaluateChat, EvaluateCorrection } from '@api/modules/chat/service';
 import { adjustPlan, buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
 import { resetTestDatabase } from '@api/test/database';
-import type { ProfileEventFact, ProfileEventType } from '@cadence/shared/schemas/profile-events';
+import type { ProfileEventFact } from '@cadence/shared/schemas/profile-events';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -17,7 +17,7 @@ async function createMember(email = 'chat-member@example.com') {
   return user!;
 }
 
-function factsFor(...eventTypes: ProfileEventType[]): ProfileEventFact[] {
+function factsFor(...eventTypes: ProfileEventFact['eventType'][]): ProfileEventFact[] {
   return eventTypes.map((eventType) => ({ eventType, payload: { description: `a ${eventType} event` } }));
 }
 
@@ -300,8 +300,18 @@ describe('chat', () => {
           status: 'ai_published',
           exercises: [{ exerciseName: 'Barbell Back Squat', sets: 5, reps: 5, completed: false } as never],
         } as never,
-        availableExercises: [{ id: 'ex-1', name: 'Bodyweight Squat', muscleGroup: 'legs' }],
-        aggregate: { topExercises: [{ name: 'Push-Up', count: 4 }], topMuscleGroups: [{ name: 'legs', count: 6 }] },
+        availableExercises: [
+          {
+            id: 'ex-1',
+            name: 'Bodyweight Squat',
+            muscles: [
+              { muscle: 'quads', role: 'primary' },
+              { muscle: 'glutes', role: 'secondary' },
+            ],
+          },
+        ],
+        muscleFocus: [{ muscle: 'quads', bias: 2 }],
+        aggregate: { topExercises: [{ name: 'Push-Up', count: 4 }], topMuscles: [{ name: 'Quads', count: 6 }] },
       };
 
       const prompt = buildChatUserPrompt(context, 'Should I train legs today?');
@@ -314,7 +324,9 @@ describe('chat', () => {
       expect(prompt).toContain('sore left knee');
       expect(prompt).toContain('Bodyweight Squat');
       expect(prompt).toContain('Push-Up (4)');
-      expect(prompt).toContain('legs (6)');
+      expect(prompt).toContain('Quads (6)');
+      expect(prompt).toContain('primary: quads | secondary: glutes');
+      expect(prompt).toContain('quads: +2 (much more)');
       expect(prompt).toContain('5 older events not shown in detail: 5 life_event.');
       expect(prompt).toContain('Should I train legs today?');
     });
@@ -329,7 +341,8 @@ describe('chat', () => {
         olderEventsSummary: null,
         todayPlan: null,
         availableExercises: [],
-        aggregate: { topExercises: [], topMuscleGroups: [] },
+        muscleFocus: [],
+        aggregate: { topExercises: [], topMuscles: [] },
       };
 
       const prompt = buildChatUserPrompt(context, 'Hi');
@@ -340,7 +353,8 @@ describe('chat', () => {
       expect(prompt).toContain('- none reported');
       expect(prompt).toContain('- none yet');
       expect(prompt).toContain('Top exercises: none yet');
-      expect(prompt).toContain('Top muscle groups: none yet');
+      expect(prompt).toContain('Top muscles: none yet');
+      expect(prompt).toContain('- none set');
     });
   });
 });

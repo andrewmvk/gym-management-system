@@ -53,12 +53,11 @@ async function addPlan(
   return plan!;
 }
 
-// Two catalog exercises from different muscle groups.
+// Two catalog exercises with different primary muscles: chest and lats.
 async function pickExercises() {
-  const all = await db.select().from(dExercises);
-  const first = all[0]!;
-  const second = all.find((exercise) => exercise.muscleGroup !== first.muscleGroup)!;
-  return { first, second };
+  const [first] = await db.select().from(dExercises).where(eq(dExercises.name, 'Barbell Bench Press'));
+  const [second] = await db.select().from(dExercises).where(eq(dExercises.name, 'Lat Pulldown'));
+  return { first: first!, second: second! };
 }
 
 describe('metrics router', () => {
@@ -123,10 +122,16 @@ describe('metrics router', () => {
       { name: first.name, completed: 2 },
       { name: second.name, completed: 1 },
     ]);
-    expect(metrics.exerciseBreakdown.byMuscleGroup).toEqual([
-      { name: first.muscleGroup, completed: 2 },
-      { name: second.muscleGroup, completed: 1 },
-    ]);
+    // Completed work only: bench press 3 + 3 sets (chest primary, triceps and front delts secondary), lat
+    // pulldown 5 sets (lats primary, biceps and rear delts secondary).
+    expect(metrics.exerciseBreakdown.muscleLoad).toEqual({
+      chest: 6,
+      triceps: 3,
+      'front-deltoid': 3,
+      lats: 5,
+      biceps: 2.5,
+      'rear-deltoid': 2.5,
+    });
     expect(metrics.goalProgress).toEqual({
       plannedExercises: 4,
       completedExercises: 3,
@@ -165,6 +170,29 @@ describe('metrics router', () => {
     expect(corrected.goalProgress).toMatchObject({ completedExercises: 4, completionRate: 1 });
   });
 
+  it('lists the days with a check-in and the latest check-in of a range, for the caller only', async () => {
+    const member = await createMember('week-member@example.com');
+    const other = await createMember('week-other@example.com');
+    await checkIn(member.id, '2026-03-02T08:00:00');
+    await checkIn(member.id, '2026-03-02T18:30:00');
+    await checkIn(member.id, '2026-03-04T10:00:00');
+    await checkIn(member.id, '2026-03-09T00:00:00');
+    await checkIn(other.id, '2026-03-05T09:00:00');
+    const caller = await callerFor(signSessionToken(member.id));
+
+    const week = await caller.metrics.week(RANGE);
+
+    expect(week.trainedDates).toEqual(['2026-03-02', '2026-03-04']);
+    expect(week.lastCheckInAt).toEqual(new Date('2026-03-04T10:00:00'));
+  });
+
+  it('returns an empty week for a member who never checked in', async () => {
+    const member = await createMember('week-empty@example.com');
+    const caller = await callerFor(signSessionToken(member.id));
+
+    expect(await caller.metrics.week(RANGE)).toEqual({ trainedDates: [], lastCheckInAt: null });
+  });
+
   it('returns zeros and no goals for a member with no data', async () => {
     const member = await createMember('empty@example.com');
     const caller = await callerFor(signSessionToken(member.id));
@@ -173,7 +201,7 @@ describe('metrics router', () => {
       ...RANGE,
       daysTrained: 0,
       trainingFrequency: 0,
-      exerciseBreakdown: { byExercise: [], byMuscleGroup: [] },
+      exerciseBreakdown: { byExercise: [], muscleLoad: {} },
       trainingVolume: 0,
       goalProgress: { plannedExercises: 0, completedExercises: 0, completionRate: 0, goals: null },
     });

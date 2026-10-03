@@ -32,18 +32,18 @@ Single gym, single physical location - no multi-tenancy in the data or auth mode
 
 ## Capabilities and Constraints
 
-Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-48) and `docs/03-features-and-flows.md`; durable constraints worth restating here:
+Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-56) and `docs/03-features-and-flows.md`; durable constraints worth restating here:
 
 - Signup gate: basic info + webcam reference photo (embedding computed server-side, raw photo never leaves the backend) → digital aptitude questionnaire → AI verdict (`cleared` / `not_cleared` / `pending_retry`) → medical certificate escalation if not cleared → every certificate result (all three states) routed to an Admin backstop queue regardless of AI confidence. No account/password/login exists before clearance; Admin override is the only recovery path for a wrongly-rejected member.
 - Onboarding (post-auth) feeds the first AI training plan; not one-time - can be extended later via chat.
 - Plans publish immediately, never blocked on trainer review (preserves 24/7 value prop); trainer review is asynchronous, shared-pool (not 1:1), and multi-note (later notes never overwrite earlier ones). Regenerating a trainer-edited plan requires member confirmation first.
-- Exercises come from a curated, add-only library (never deleted, so historical plans always resolve); an exercise is includable only if it needs no equipment or at least one linked equipment item is currently available.
+- Exercises come from a curated, add-only library (never deleted, so historical plans always resolve); an exercise is includable only if it needs no equipment or at least one linked equipment item is currently available. Every exercise carries a muscle map (primary and supporting muscles from one fixed list of 22), which drives the muscle heat maps for plans, metrics, gym demand and catalog coverage, and the per-muscle focus a member sets to steer future plans (a preference that safety and health history always override).
 - Chat is stateless/session-less in the UI (FR-25/26) - no persisted visible chat log - but every message is mined for structured facts persisted permanently to the member's history; this is what "remembers" the member across future plan generations.
 - Kiosk performs 1:N face-embedding matching only; it fetches `{memberId, embedding}` pairs from a dedicated, kiosk-authenticated endpoint and never receives raw photos. Ambiguous matches (top two too close to call) are rejected, not guessed.
 - Turnstile hardware call is best-effort: check-in is always recorded with a success/failed tag regardless of whether the external API call succeeds.
 - No checkout event anywhere - occupancy is a rolling-window estimate, explicitly framed as such, not an exact headcount.
 - Trainer/admin accounts exist only via a first-boot seed script with fixed demo credentials - there is no staff self-signup UI anywhere. Permissions themselves are policy-driven (member/trainer/admin are seeded policy groups, a named bundle of policies a user belongs to, not a fixed role field), so an Admin can later change what an existing account can do without that being a self-signup path.
-- Explicitly out of scope: real payments/billing, building the turnstile API itself, a persisted/scrollable chat log, multi-location support, 1:1 trainer assignment, real biometric data from real people, a real checkout/exit flow, exercise deletion, password reset/account recovery, WCAG/i18n/offline/scale requirements, production infra hardening.
+- Explicitly out of scope: real payments/billing, building the turnstile API itself, a persisted/scrollable chat log, multi-location support, 1:1 trainer assignment, real biometric data from real people, a real checkout/exit flow, exercise deletion or editing an exercise's muscle map after creation, password reset/account recovery, WCAG/i18n/offline/scale requirements, production infra hardening.
 
 ## Brand Commitments
 

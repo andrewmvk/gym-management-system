@@ -1,9 +1,11 @@
 'use client';
 
+import { computeEquipmentImpact } from '@cadence/shared/schemas/muscle-heat';
+import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, WrenchIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -39,7 +41,17 @@ function EquipmentListSkeleton() {
   );
 }
 
-function EquipmentToggle({ id, name, isAvailable }: { id: string; name: string; isAvailable: boolean }) {
+function EquipmentToggle({
+  id,
+  name,
+  isAvailable,
+  affects,
+}: {
+  id: string;
+  name: string;
+  isAvailable: boolean;
+  affects?: string;
+}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
 
@@ -64,6 +76,7 @@ function EquipmentToggle({ id, name, isAvailable }: { id: string; name: string; 
         <span className="font-semibold">{name}</span>
         <span className="text-sm text-muted-foreground">
           {isAvailable ? 'Available on the floor' : 'Out of service'}
+          {affects && ` · takes out ${affects}`}
         </span>
       </span>
       <Switch
@@ -138,6 +151,12 @@ function EquipmentSectionRoot() {
   const ability = useAppAbility();
   const canManage = ability.can('manage', 'Catalog');
   const query = useQuery(trpc.catalog.listEquipment.queryOptions());
+  const exercisesQuery = useQuery(trpc.catalog.list.queryOptions());
+  const impact = useMemo(() => computeEquipmentImpact(exercisesQuery.data ?? []), [exercisesQuery.data]);
+  const affectsOf = (id: string) => {
+    const entry = impact.find((candidate) => candidate.equipmentId === id);
+    return entry ? entry.muscles.map((muscle) => muscleLabel(muscle).toLowerCase()).join(', ') : undefined;
+  };
 
   let list: ReactNode;
   if (query.isPending) {
@@ -166,11 +185,21 @@ function EquipmentSectionRoot() {
         {query.data.map((item) =>
           canManage ? (
             <li key={item.id}>
-              <EquipmentToggle id={item.id} name={item.name} isAvailable={item.isAvailable} />
+              <EquipmentToggle
+                id={item.id}
+                name={item.name}
+                isAvailable={item.isAvailable}
+                affects={affectsOf(item.id)}
+              />
             </li>
           ) : (
             <li key={item.id} className="flex min-h-15 items-center justify-between gap-4 px-5 sm:px-6">
-              <span className="font-semibold">{item.name}</span>
+              <span className="flex flex-col">
+                <span className="font-semibold">{item.name}</span>
+                {affectsOf(item.id) && (
+                  <span className="text-sm text-muted-foreground">Takes out {affectsOf(item.id)}</span>
+                )}
+              </span>
               <Badge variant={item.isAvailable ? 'live' : 'unavailable'}>
                 {item.isAvailable ? 'Available' : 'Unavailable'}
               </Badge>

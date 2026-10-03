@@ -1,6 +1,7 @@
 'use client';
 
 import type { ComponentProps, ReactNode } from 'react';
+import { CoverageSection } from '@/app/(staff)/catalog/coverage-section';
 import { EquipmentSection } from '@/app/(staff)/catalog/equipment-section';
 import { ExerciseSection } from '@/app/(staff)/catalog/exercise-section';
 import { GuardedContent } from '@/components/guarded-content';
@@ -13,22 +14,29 @@ const TITLE = 'Catalog';
 const DESCRIPTION =
   'The exercises plans are built from. An exercise is performable when it needs no equipment or at least one linked item is available.';
 
-const CATALOG_TABS = ['exercises', 'equipment'] as const;
+const CATALOG_TABS = ['exercises', 'equipment', 'coverage'] as const;
 type CatalogTab = (typeof CATALOG_TABS)[number];
 
 function CatalogTabs({
   exercises,
   equipment,
+  coverage,
   ...tabsProps
-}: { exercises: ReactNode; equipment: ReactNode } & Pick<ComponentProps<typeof Tabs>, 'value' | 'onValueChange'>) {
+}: {
+  exercises: ReactNode;
+  equipment: ReactNode;
+  coverage: ReactNode;
+} & Pick<ComponentProps<typeof Tabs>, 'value' | 'onValueChange'>) {
   return (
     <Tabs defaultValue="exercises" {...tabsProps}>
       <TabsList>
         <TabsTrigger value="exercises">Exercises</TabsTrigger>
         <TabsTrigger value="equipment">Equipment</TabsTrigger>
+        <TabsTrigger value="coverage">Coverage</TabsTrigger>
       </TabsList>
       <TabsContent value="exercises">{exercises}</TabsContent>
       <TabsContent value="equipment">{equipment}</TabsContent>
+      <TabsContent value="coverage">{coverage}</TabsContent>
     </Tabs>
   );
 }
@@ -37,7 +45,7 @@ function CatalogSkeleton() {
   return (
     <PageContainer>
       <PageHeading title={TITLE} description={DESCRIPTION} />
-      <CatalogTabs exercises={<ExerciseSection.Skeleton />} equipment={<EquipmentSection.Skeleton />} />
+      <CatalogTabs exercises={<ExerciseSection.Skeleton />} equipment={<EquipmentSection.Skeleton />} coverage={null} />
     </PageContainer>
   );
 }
@@ -53,6 +61,7 @@ function CatalogContent() {
         onValueChange={(value) => setTab(value as CatalogTab)}
         exercises={<ExerciseSection />}
         equipment={<EquipmentSection />}
+        coverage={<CoverageSection />}
       />
     </PageContainer>
   );

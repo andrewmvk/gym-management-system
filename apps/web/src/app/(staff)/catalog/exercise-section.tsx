@@ -1,5 +1,6 @@
 'use client';
 
+import { type ExerciseMuscle, ExerciseMusclesSchema, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DumbbellIcon, PlusIcon, SearchXIcon } from 'lucide-react';
@@ -10,6 +11,7 @@ import { z } from 'zod';
 import { useAppAbility } from '@/abilities';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { MuscleSelector } from '@/components/muscle-map/muscle-selector';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
 import { SearchInput } from '@/components/search-input';
@@ -30,18 +32,26 @@ const PAGE_SIZE = 12;
 
 const CreateExerciseSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  muscleGroup: z.string().trim().min(1, 'Muscle group is required'),
   instructions: z.string().trim().min(1, 'Instructions are required'),
+  muscles: ExerciseMusclesSchema,
   equipmentIds: z.array(z.string()),
 });
 type CreateExerciseInput = z.infer<typeof CreateExerciseSchema>;
+
+// Primary muscles by name, with a count of the supporting ones so the cell stays one line.
+function describeMuscles(muscles: readonly ExerciseMuscle[]) {
+  const primary = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
+  const supporting = muscles.length - primary.length;
+  if (primary.length === 0) return 'No muscles tagged';
+  return supporting > 0 ? `${primary.join(', ')} + ${supporting}` : primary.join(', ');
+}
 
 function ExerciseTableHead() {
   return (
     <TableHeader>
       <TableRow>
         <TableHead>Exercise</TableHead>
-        <TableHead className="hidden sm:table-cell">Muscle group</TableHead>
+        <TableHead className="hidden sm:table-cell">Muscles</TableHead>
         <TableHead className="text-right">Status</TableHead>
       </TableRow>
     </TableHeader>
@@ -79,7 +89,7 @@ function CreateExerciseForm() {
 
   const form = useForm<CreateExerciseInput>({
     resolver: zodResolver(CreateExerciseSchema),
-    defaultValues: { name: '', muscleGroup: '', instructions: '', equipmentIds: [] },
+    defaultValues: { name: '', instructions: '', muscles: [], equipmentIds: [] },
   });
 
   const create = useMutation(
@@ -119,22 +129,6 @@ function CreateExerciseForm() {
               )}
             />
             <Controller
-              name="muscleGroup"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="exercise-muscle-group">Muscle group</FieldLabel>
-                  <Input
-                    {...field}
-                    id="exercise-muscle-group"
-                    placeholder="e.g. Chest"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
               name="instructions"
               control={form.control}
               render={({ field, fieldState }) => (
@@ -145,6 +139,22 @@ function CreateExerciseForm() {
                     id="exercise-instructions"
                     className="min-h-16"
                     aria-invalid={fieldState.invalid}
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+            <Controller
+              name="muscles"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel id="exercise-muscles-label">Muscles trained</FieldLabel>
+                  <MuscleSelector
+                    value={field.value}
+                    onChange={field.onChange}
+                    isInvalid={fieldState.invalid}
+                    labelledBy="exercise-muscles-label"
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -226,7 +236,9 @@ function ExerciseSectionRoot() {
   const term = search.trim().toLowerCase();
   const filtered = (query.data ?? []).filter(
     (exercise) =>
-      !term || exercise.name.toLowerCase().includes(term) || exercise.muscleGroup.toLowerCase().includes(term),
+      !term ||
+      exercise.name.toLowerCase().includes(term) ||
+      exercise.muscles.some((entry) => muscleLabel(entry.muscle).toLowerCase().includes(term)),
   );
   const pagination = usePagination(filtered, PAGE_SIZE);
 
@@ -266,12 +278,12 @@ function ExerciseSectionRoot() {
                 setSearch(value);
                 pagination.setPage(1);
               }}
-              placeholder="Search exercises or muscle groups"
+              placeholder="Search exercises or muscles"
               className="sm:w-80"
             />
           </div>
           {filtered.length === 0 ? (
-            <EmptyState icon={SearchXIcon} title="No matches" description="Try another name or muscle group." />
+            <EmptyState icon={SearchXIcon} title="No matches" description="Try another name or muscle." />
           ) : (
             <Table>
               <ExerciseTableHead />
@@ -280,9 +292,9 @@ function ExerciseSectionRoot() {
                   <TableRow key={exercise.id}>
                     <TableCell>
                       <p className="font-semibold">{exercise.name}</p>
-                      <p className="text-muted-foreground sm:hidden">{exercise.muscleGroup}</p>
+                      <p className="text-muted-foreground sm:hidden">{describeMuscles(exercise.muscles)}</p>
                     </TableCell>
-                    <TableCell className="hidden capitalize sm:table-cell">{exercise.muscleGroup}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{describeMuscles(exercise.muscles)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={exercise.isAvailable ? 'live' : 'unavailable'}>
                         {exercise.isAvailable ? 'Available' : 'Unavailable'}

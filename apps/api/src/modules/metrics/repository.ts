@@ -1,5 +1,6 @@
 import { type DatabaseExecutor, db } from '@api/db/client';
 import { dExercises, fCheckIns, fOnboardingSubmissions, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
+import { findMusclesByExerciseIds } from '@api/modules/catalog/repository';
 import { and, desc, eq, gte, lt, lte } from 'drizzle-orm';
 
 // Every check-in instant in [from, to), whatever its turnstile status: the member was physically there (FR-36).
@@ -12,17 +13,16 @@ export async function findCheckInTimes(userId: string, from: Date, to: Date, exe
 }
 
 // Reads the plan tables as they are now, so a retroactive correction (RN-07) is already reflected.
-export function findPlanExercisesInRange(
+export async function findPlanExercisesInRange(
   userId: string,
   fromDate: string,
   toDate: string,
   executor: DatabaseExecutor = db,
 ) {
-  return executor
+  const rows = await executor
     .select({
       exerciseId: dExercises.id,
       exerciseName: dExercises.name,
-      muscleGroup: dExercises.muscleGroup,
       sets: fTrainingPlanExercises.sets,
       reps: fTrainingPlanExercises.reps,
       completed: fTrainingPlanExercises.completed,
@@ -37,6 +37,12 @@ export function findPlanExercisesInRange(
         lte(fTrainingPlans.planDate, toDate),
       ),
     );
+
+  const muscles = await findMusclesByExerciseIds(
+    rows.map((row) => row.exerciseId),
+    executor,
+  );
+  return rows.map((row) => ({ ...row, muscles: muscles.get(row.exerciseId) ?? [] }));
 }
 
 export async function findLatestGoals(userId: string, executor: DatabaseExecutor = db) {

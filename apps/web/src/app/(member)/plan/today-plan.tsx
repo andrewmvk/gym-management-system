@@ -1,10 +1,14 @@
 'use client';
 
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { DumbbellIcon, SparklesIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { type ReactNode, useState } from 'react';
 import { toast } from 'sonner';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
+import { NeedsReviewNotice } from '@/app/(member)/plan/needs-review-notice';
+import { PlanMusclePanel } from '@/app/(member)/plan/plan-muscle-panel';
+import { useToggleExercise } from '@/app/(member)/plan/use-toggle-exercise';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -49,18 +53,32 @@ function ProgressSegments({ states }: { states: boolean[] }) {
   );
 }
 
+function PlanLayout({ plan, aside }: { plan: ReactNode; aside?: ReactNode }) {
+  return (
+    <div className={aside ? 'grid items-start gap-4 lg:grid-cols-3' : undefined}>
+      <div className="min-w-0 lg:col-span-2">{plan}</div>
+      {aside}
+    </div>
+  );
+}
+
 // h-12 is the line box of the text-5xl tally at leading-none.
 function TodayPlanSkeleton() {
   return (
-    <PlanShell tally={<Skeleton className="h-12 w-24 bg-white/12" />}>
-      <div className="border-b px-5 py-3 sm:px-6">
-        <Skeleton className="h-2 w-full" />
-      </div>
-      {Array.from({ length: 4 }, (_, index) => (
-        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
-        <ExerciseRow.Skeleton key={index} />
-      ))}
-    </PlanShell>
+    <PlanLayout
+      plan={
+        <PlanShell tally={<Skeleton className="h-12 w-24 bg-white/12" />}>
+          <div className="border-b px-5 py-3 sm:px-6">
+            <Skeleton className="h-2 w-full" />
+          </div>
+          {Array.from({ length: 4 }, (_, index) => (
+            // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
+            <ExerciseRow.Skeleton key={index} />
+          ))}
+        </PlanShell>
+      }
+      aside={<PlanMusclePanel.Skeleton />}
+    />
   );
 }
 
@@ -68,6 +86,7 @@ function TodayPlanRoot() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const todayQuery = useQuery(trpc.plans.getToday.queryOptions());
+  const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
 
   const generate = useMutation(
     trpc.plans.generateToday.mutationOptions({
@@ -76,30 +95,7 @@ function TodayPlanRoot() {
     }),
   );
 
-  const toggle = useMutation(
-    trpc.plans.markExerciseCompleted.mutationOptions({
-      onMutate: async (input) => {
-        await queryClient.cancelQueries({ queryKey: trpc.plans.getToday.queryKey() });
-        const previous = queryClient.getQueryData(trpc.plans.getToday.queryKey());
-        queryClient.setQueryData(trpc.plans.getToday.queryKey(), (old) =>
-          old
-            ? {
-                ...old,
-                exercises: old.exercises.map((exercise) =>
-                  exercise.id === input.planExerciseId ? { ...exercise, completed: input.completed } : exercise,
-                ),
-              }
-            : old,
-        );
-        return { previous };
-      },
-      onError: (_error, _input, context) => {
-        if (context?.previous !== undefined) queryClient.setQueryData(trpc.plans.getToday.queryKey(), context.previous);
-        toast.error("We couldn't update that exercise. Try again.");
-      },
-      onSettled: () => queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() }),
-    }),
-  );
+  const toggle = useToggleExercise();
 
   if (todayQuery.isPending) {
     return (
@@ -146,40 +142,66 @@ function TodayPlanRoot() {
   const remaining = plan.exercises.length - doneCount;
 
   return (
-    <PlanShell
-      tally={
-        <p className="numerals text-5xl leading-none font-extrabold" aria-live="polite">
-          {doneCount}
-          <span className="text-kit-muted">/{plan.exercises.length}</span>
-          <span className="sr-only"> exercises done</span>
-        </p>
+    <PlanLayout
+      plan={
+        <PlanShell
+          tally={
+            <p className="numerals text-5xl leading-none font-extrabold" aria-live="polite">
+              {doneCount}
+              <span className="text-kit-muted">/{plan.exercises.length}</span>
+              <span className="sr-only"> exercises done</span>
+            </p>
+          }
+          aside={
+            <>
+              {plan.status === 'trainer_edited' && <Badge variant="tape">Edited by a trainer</Badge>}
+              <p className="text-sm text-kit-muted">
+                {remaining === 0 ? 'All done. Nice work.' : `${remaining} to go`}
+              </p>
+            </>
+          }
+        >
+          {plan.needsReview && (
+            <NeedsReviewNotice
+              exercises={plan.exercises}
+              planStatus={plan.status}
+              hasCompleted={doneCount > 0}
+              className="border-b"
+            />
+          )}
+          {plan.exercises.length > 0 && <ProgressSegments states={doneStates} />}
+          {plan.exercises.map((exercise, index) => (
+            <ExerciseRow
+              key={exercise.id}
+              index={index}
+              name={exercise.exerciseName}
+              muscles={exercise.muscles}
+              isDimmed={selectedMuscle !== null && !exercise.muscles.some((entry) => entry.muscle === selectedMuscle)}
+              instructions={exercise.instructions}
+              sets={exercise.sets}
+              reps={exercise.reps}
+              load={exercise.load}
+              notes={exercise.notes}
+              completed={exercise.completed}
+              isPerformable={exercise.isPerformable}
+              equipmentDown={exercise.equipmentDown}
+              disabled={toggle.isPending}
+              onToggle={(completed) => toggle.mutate({ planExerciseId: exercise.id, completed })}
+            />
+          ))}
+        </PlanShell>
       }
       aside={
-        <>
-          {plan.status === 'trainer_edited' && <Badge variant="tape">Edited by a trainer</Badge>}
-          <p className="text-sm text-kit-muted">{remaining === 0 ? 'All done. Nice work.' : `${remaining} to go`}</p>
-        </>
-      }
-    >
-      {plan.exercises.length > 0 && <ProgressSegments states={doneStates} />}
-      {plan.exercises.map((exercise, index) => (
-        <ExerciseRow
-          key={exercise.id}
-          index={index}
-          name={exercise.exerciseName}
-          muscleGroup={exercise.muscleGroup}
-          instructions={exercise.instructions}
-          sets={exercise.sets}
-          reps={exercise.reps}
-          load={exercise.load}
-          notes={exercise.notes}
-          completed={exercise.completed}
-          isPerformable={exercise.isPerformable}
-          disabled={toggle.isPending}
-          onToggle={(completed) => toggle.mutate({ planExerciseId: exercise.id, completed })}
+        <PlanMusclePanel
+          muscleLoad={plan.muscleLoad}
+          exercises={plan.exercises}
+          planStatus={plan.status}
+          hasCompleted={doneCount > 0}
+          selected={selectedMuscle}
+          onSelectedChange={setSelectedMuscle}
         />
-      ))}
-    </PlanShell>
+      }
+    />
   );
 }
 

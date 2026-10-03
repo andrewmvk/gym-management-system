@@ -10,6 +10,7 @@ import {
   GYM_SETTINGS_ID,
   type GymSettings,
 } from '@api/db/schema';
+import { findMusclesByExerciseIds } from '@api/modules/catalog/repository';
 import { and, count, eq, gte, inArray, lt, lte } from 'drizzle-orm';
 
 export async function getOrCreateSettings(executor: DatabaseExecutor = db): Promise<GymSettings> {
@@ -48,12 +49,18 @@ export async function findPlannedExercisesOfCheckedInMembers(
     .from(fCheckIns)
     .where(and(gte(fCheckIns.checkedInAt, from), lt(fCheckIns.checkedInAt, to)));
 
-  return executor
-    .select({ exerciseId: dExercises.id, muscleGroup: dExercises.muscleGroup })
+  const rows = await executor
+    .select({ exerciseId: dExercises.id, sets: fTrainingPlanExercises.sets })
     .from(fTrainingPlanExercises)
     .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
     .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
     .where(and(eq(fTrainingPlans.planDate, planDate), inArray(fTrainingPlans.userId, checkedInMembers)));
+
+  const muscles = await findMusclesByExerciseIds(
+    rows.map((row) => row.exerciseId),
+    executor,
+  );
+  return rows.map((row) => ({ ...row, muscles: muscles.get(row.exerciseId) ?? [] }));
 }
 
 export function findEquipmentForExercises(exerciseIds: string[], executor: DatabaseExecutor = db) {

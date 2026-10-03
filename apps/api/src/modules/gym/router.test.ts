@@ -28,7 +28,7 @@ describe('gym router', () => {
   it('serves gym.info to a signed-out visitor', async () => {
     const info = await (await callerFor()).gym.info();
 
-    expect(info).toMatchObject({ isEstimate: true, occupancyEstimate: 0, demand: { muscleGroups: [], equipment: [] } });
+    expect(info).toMatchObject({ isEstimate: true, occupancyEstimate: 0, demand: { muscleLoad: {}, equipment: [] } });
     expect(typeof info.isOpen).toBe('boolean');
   });
 

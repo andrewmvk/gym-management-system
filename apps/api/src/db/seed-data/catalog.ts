@@ -1,5 +1,6 @@
 import type { Transaction } from '@api/db/client';
-import { dExerciseEquipment, dExercises, dGymEquipment } from '@api/db/schema';
+import { dExerciseEquipment, dExerciseMuscles, dExercises, dGymEquipment } from '@api/db/schema';
+import type { ExerciseMuscle, MuscleId } from '@cadence/shared/schemas/muscles';
 import { eq } from 'drizzle-orm';
 
 interface EquipmentSeed {
@@ -9,9 +10,16 @@ interface EquipmentSeed {
 
 interface ExerciseSeed {
   name: string;
-  muscleGroup: string;
+  muscles: readonly ExerciseMuscle[];
   instructions: string;
   equipment: readonly string[];
+}
+
+function tag(primary: readonly MuscleId[], secondary: readonly MuscleId[] = []): ExerciseMuscle[] {
+  return [
+    ...primary.map((muscle): ExerciseMuscle => ({ muscle, role: 'primary' })),
+    ...secondary.map((muscle): ExerciseMuscle => ({ muscle, role: 'secondary' })),
+  ];
 }
 
 // Rowing Machine and Stationary Bike start unavailable on purpose, so the seeded data shows both
@@ -33,162 +41,164 @@ const EQUIPMENT: readonly EquipmentSeed[] = [
 
 // About a third need no equipment at all; a few (back squat, chest press, chest fly) link more than
 // one piece, and the two unavailable machines above each back exactly one exercise, so both branches
-// of the availability rule show up in the seeded catalog.
+// of the availability rule show up in the seeded catalog. The muscle maps leave neck, rotator cuff and
+// forearm extensors untrained on purpose, so the staff coverage map has real gaps to show.
 const EXERCISES: readonly ExerciseSeed[] = [
   {
     name: 'Bodyweight Squat',
-    muscleGroup: 'legs',
+    muscles: tag(['quads'], ['glutes', 'hamstrings', 'calves']),
     instructions: 'Feet shoulder-width apart, lower until thighs are parallel to the floor, drive back up.',
     equipment: [],
   },
   {
     name: 'Barbell Back Squat',
-    muscleGroup: 'legs',
+    muscles: tag(['quads', 'glutes'], ['hamstrings', 'lower-back', 'abductors']),
     instructions: 'Bar racked across the upper back, squat to depth, drive up through the heels.',
     equipment: ['Barbell', 'Squat Rack'],
   },
   {
     name: 'Leg Press',
-    muscleGroup: 'legs',
+    muscles: tag(['quads'], ['glutes', 'hamstrings', 'quads-outer']),
     instructions: 'Feet on the platform shoulder-width apart, lower under control, press back to start.',
     equipment: ['Leg Press Machine'],
   },
   {
     name: 'Walking Lunge',
-    muscleGroup: 'legs',
+    muscles: tag(['quads', 'glutes'], ['hamstrings', 'abductors', 'calves']),
     instructions: 'Step forward into a lunge, alternate legs while moving across the floor.',
     equipment: [],
   },
   {
     name: 'Push-Up',
-    muscleGroup: 'chest',
+    muscles: tag(['chest'], ['front-deltoid', 'triceps', 'abs']),
     instructions: 'Hands under shoulders, lower the chest to the floor, press back up.',
     equipment: [],
   },
   {
     name: 'Barbell Bench Press',
-    muscleGroup: 'chest',
+    muscles: tag(['chest'], ['triceps', 'front-deltoid']),
     instructions: 'Lie on the bench, lower the bar to the chest, press to full extension.',
     equipment: ['Barbell', 'Bench'],
   },
   {
     name: 'Dumbbell Chest Fly',
-    muscleGroup: 'chest',
+    muscles: tag(['chest'], ['front-deltoid']),
     instructions: 'Lie on the bench, arc the dumbbells out and back with a slight elbow bend.',
     equipment: ['Dumbbells', 'Bench'],
   },
   {
     name: 'Cable Chest Press',
-    muscleGroup: 'chest',
+    muscles: tag(['chest'], ['triceps', 'front-deltoid']),
     instructions: 'Set cables at chest height, press both handles forward until arms extend.',
     equipment: ['Cable Machine'],
   },
   {
     name: 'Pull-Up',
-    muscleGroup: 'back',
+    muscles: tag(['lats'], ['biceps', 'rear-deltoid', 'forearm-flexors']),
     instructions: 'Grip the bar shoulder-width, pull the chin above the bar, lower under control.',
     equipment: ['Pull-up Bar'],
   },
   {
     name: 'Bent-Over Barbell Row',
-    muscleGroup: 'back',
+    muscles: tag(['lats', 'trapezius'], ['rear-deltoid', 'biceps', 'lower-back']),
     instructions: 'Hinge at the hips, pull the bar to the lower ribs, lower with control.',
     equipment: ['Barbell'],
   },
   {
     name: 'Lat Pulldown',
-    muscleGroup: 'back',
+    muscles: tag(['lats'], ['biceps', 'rear-deltoid']),
     instructions: 'Grip the bar wide, pull down to the upper chest, control the return.',
     equipment: ['Lat Pulldown Machine'],
   },
   {
     name: 'Superman Hold',
-    muscleGroup: 'back',
+    muscles: tag(['lower-back'], ['glutes', 'trapezius', 'rear-deltoid']),
     instructions: 'Lie face down, lift arms and legs off the floor, hold briefly.',
     equipment: [],
   },
   {
     name: 'Overhead Dumbbell Press',
-    muscleGroup: 'shoulders',
+    muscles: tag(['front-deltoid', 'lateral-deltoid'], ['triceps', 'trapezius']),
     instructions: 'Press dumbbells from shoulder height to full overhead extension.',
     equipment: ['Dumbbells'],
   },
   {
     name: 'Pike Push-Up',
-    muscleGroup: 'shoulders',
+    muscles: tag(['front-deltoid'], ['triceps', 'lateral-deltoid', 'chest']),
     instructions: 'Hips high in a pike position, lower the head toward the floor, press back up.',
     equipment: [],
   },
   {
     name: 'Cable Lateral Raise',
-    muscleGroup: 'shoulders',
+    muscles: tag(['lateral-deltoid'], ['trapezius']),
     instructions: 'Raise the cable handle out to shoulder height, lower under control.',
     equipment: ['Cable Machine'],
   },
   {
     name: 'Diamond Push-Up',
-    muscleGroup: 'arms',
+    muscles: tag(['triceps'], ['chest', 'front-deltoid']),
     instructions: 'Hands together under the chest forming a diamond, lower and press up.',
     equipment: [],
   },
   {
     name: 'Barbell Bicep Curl',
-    muscleGroup: 'arms',
+    muscles: tag(['biceps'], ['forearm-flexors']),
     instructions: 'Curl the bar from thighs to shoulders, keeping the elbows fixed.',
     equipment: ['Barbell'],
   },
   {
     name: 'Dumbbell Hammer Curl',
-    muscleGroup: 'arms',
+    muscles: tag(['biceps'], ['forearm-flexors']),
     instructions: 'Curl the dumbbells with a neutral grip from thighs to shoulders.',
     equipment: ['Dumbbells'],
   },
   {
     name: 'Kettlebell Overhead Tricep Extension',
-    muscleGroup: 'arms',
+    muscles: tag(['triceps'], ['abs']),
     instructions: 'Hold the kettlebell overhead, lower behind the head, extend back up.',
     equipment: ['Kettlebell'],
   },
   {
     name: 'Plank',
-    muscleGroup: 'core',
+    muscles: tag(['abs'], ['obliques', 'lower-back', 'front-deltoid']),
     instructions: 'Forearms and toes on the floor, hold a straight line from head to heels.',
     equipment: [],
   },
   {
     name: 'Bicycle Crunch',
-    muscleGroup: 'core',
+    muscles: tag(['abs', 'obliques'], ['abs-lower']),
     instructions: 'Alternate bringing elbow to opposite knee in a pedaling motion.',
     equipment: [],
   },
   {
     name: 'Cable Woodchopper',
-    muscleGroup: 'core',
+    muscles: tag(['obliques'], ['abs', 'lateral-deltoid']),
     instructions: 'Pull the cable diagonally across the body from high to low, or low to high.',
     equipment: ['Cable Machine'],
   },
   {
     name: 'Treadmill Run',
-    muscleGroup: 'cardio',
+    muscles: tag(['quads', 'hamstrings', 'calves'], ['glutes']),
     instructions: 'Sustained run at a steady, conversational pace.',
     equipment: ['Treadmill'],
   },
   {
     name: 'Stationary Bike Ride',
-    muscleGroup: 'cardio',
+    muscles: tag(['quads'], ['calves', 'hamstrings', 'glutes']),
     instructions: 'Steady-state cycling at a moderate, sustainable resistance.',
     equipment: ['Stationary Bike'],
   },
   {
     name: 'Rowing Machine Sprint',
-    muscleGroup: 'cardio',
+    muscles: tag(['lats', 'quads'], ['hamstrings', 'glutes', 'biceps', 'lower-back', 'rear-deltoid']),
     instructions: 'Alternate short, hard rowing intervals with easy recovery strokes.',
     equipment: ['Rowing Machine'],
   },
 ];
 
 // Insert-if-missing, like ensureStaffAccount in seed.ts: re-running the seed must not undo an admin's
-// later edits (a renamed exercise, a manually toggled equipment item).
+// later edits (a renamed exercise, a manually toggled equipment item). An exercise that already exists
+// without any muscle map (a database from before muscle maps) only gets the map filled in.
 export async function seedCatalog(tx: Transaction) {
   const equipmentIdByName = new Map<string, string>();
 
@@ -207,12 +217,28 @@ export async function seedCatalog(tx: Transaction) {
 
   for (const item of EXERCISES) {
     const [existing] = await tx.select({ id: dExercises.id }).from(dExercises).where(eq(dExercises.name, item.name));
-    if (existing) continue;
+    if (existing) {
+      const [hasMuscles] = await tx
+        .select({ muscle: dExerciseMuscles.muscle })
+        .from(dExerciseMuscles)
+        .where(eq(dExerciseMuscles.exerciseId, existing.id))
+        .limit(1);
+      if (!hasMuscles) {
+        await tx
+          .insert(dExerciseMuscles)
+          .values(item.muscles.map(({ muscle, role }) => ({ exerciseId: existing.id, muscle, role })));
+      }
+      continue;
+    }
 
     const [exercise] = await tx
       .insert(dExercises)
-      .values({ name: item.name, muscleGroup: item.muscleGroup, instructions: item.instructions })
+      .values({ name: item.name, instructions: item.instructions })
       .returning();
+
+    await tx
+      .insert(dExerciseMuscles)
+      .values(item.muscles.map(({ muscle, role }) => ({ exerciseId: exercise!.id, muscle, role })));
 
     if (item.equipment.length > 0) {
       await tx.insert(dExerciseEquipment).values(

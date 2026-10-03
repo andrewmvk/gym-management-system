@@ -1,9 +1,12 @@
 'use client';
 
+import { computeMuscleLoad } from '@cadence/shared/schemas/muscle-heat';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MessageSquareIcon, PencilLineIcon, PlusIcon, Trash2Icon } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
 import { toast } from 'sonner';
+import { BlockedBanner } from '@/app/(staff)/reviews/[planId]/blocked-banner';
+import { PlanMusclePreview } from '@/app/(staff)/reviews/[planId]/plan-muscle-preview';
 import { Deferred } from '@/components/deferred';
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
@@ -40,13 +43,26 @@ const CELL = {
   action: 'col-span-2 justify-self-end sm:col-span-1',
 };
 
-function DetailLayout({ heading, editor, history }: { heading: ReactNode; editor: ReactNode; history: ReactNode }) {
+function DetailLayout({
+  heading,
+  editor,
+  preview,
+  history,
+}: {
+  heading: ReactNode;
+  editor: ReactNode;
+  preview: ReactNode;
+  history: ReactNode;
+}) {
   return (
     <PageContainer>
       {heading}
       <div className="grid items-start gap-6 lg:grid-cols-3">
         <div className="min-w-0 lg:col-span-2">{editor}</div>
-        {history}
+        <div className="flex min-w-0 flex-col gap-6">
+          {preview}
+          {history}
+        </div>
       </div>
     </PageContainer>
   );
@@ -69,6 +85,7 @@ function DetailSkeleton() {
           </CardContent>
         </Card>
       }
+      preview={<PlanMusclePreview.Skeleton />}
       history={
         <Card>
           <CardHeader>
@@ -174,7 +191,14 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
       </PageContainer>
     );
   } else {
-    const { plan, reviews, catalog } = planQuery.data;
+    const { plan, reviews, catalog, recentMuscleLoad, muscleFocus, blocked } = planQuery.data;
+    // The preview follows the rows being edited; exercises that cannot be done today are left out, as in the member's view.
+    const planLoad = computeMuscleLoad(
+      (exercises ?? []).flatMap((exercise) => {
+        const details = catalog.find((entry) => entry.id === exercise.exerciseId);
+        return details?.isAvailable ? [{ sets: exercise.sets, muscles: details.muscles }] : [];
+      }),
+    );
 
     content = (
       <DetailLayout
@@ -197,121 +221,134 @@ export function PlanReviewDetail({ planId }: { planId: string }) {
           />
         }
         editor={
-          <Card className="gap-0 pb-0">
-            <CardHeader className="border-b">
-              <CardTitle>Exercises</CardTitle>
-              <CardDescription>Changes publish to the member as soon as you save.</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col py-2">
-              <div
-                className={`${ROW_GRID} border-b py-2 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase sm:border-b-0`}
-              >
-                <span className={`${CELL.name} hidden sm:block`}>Exercise</span>
-                <span className={CELL.count}>Sets</span>
-                <span className={CELL.count}>Reps</span>
-                <span className={CELL.load}>Load</span>
-                <span className={CELL.action} />
-              </div>
-              {exercises?.map((exercise, index) => {
-                const details = catalog.find((c) => c.id === exercise.exerciseId);
-                return (
-                  <div key={exercise.key} className={`${ROW_GRID} border-b py-3 last:border-b-0`}>
-                    <span className={`${CELL.name} flex min-w-0 items-center gap-2 font-semibold`}>
-                      <span className="numerals text-lg text-muted-foreground">{index + 1}</span>
-                      <span className="truncate">{details?.name ?? 'Unknown exercise'}</span>
-                      {details && !details.isAvailable && <Badge variant="unavailable">Unavailable</Badge>}
-                    </span>
-                    <Input
-                      type="number"
-                      min={1}
-                      className={`${CELL.count} numerals text-lg`}
-                      value={exercise.sets}
-                      onChange={(e) => updateExercise(index, { sets: Number(e.target.value) })}
-                      aria-label={`Sets for ${details?.name ?? 'exercise'}`}
-                    />
-                    <Input
-                      type="number"
-                      min={1}
-                      className={`${CELL.count} numerals text-lg`}
-                      value={exercise.reps}
-                      onChange={(e) => updateExercise(index, { reps: Number(e.target.value) })}
-                      aria-label={`Reps for ${details?.name ?? 'exercise'}`}
-                    />
-                    <Input
-                      className={CELL.load}
-                      placeholder="Load"
-                      value={exercise.load}
-                      onChange={(e) => updateExercise(index, { load: e.target.value })}
-                      aria-label={`Load for ${details?.name ?? 'exercise'}`}
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon-sm"
-                      className={`${CELL.action} text-muted-foreground hover:text-destructive`}
-                      onClick={() => removeExercise(index)}
-                    >
-                      <Trash2Icon />
-                      <span className="sr-only">Remove {details?.name ?? 'exercise'}</span>
-                    </Button>
-                  </div>
-                );
-              })}
+          <div className="flex flex-col gap-6">
+            {blocked.length > 0 && <BlockedBanner blocked={blocked} />}
+            <Card className="gap-0 pb-0">
+              <CardHeader className="border-b">
+                <CardTitle>Exercises</CardTitle>
+                <CardDescription>Changes publish to the member as soon as you save.</CardDescription>
+              </CardHeader>
+              <CardContent className="flex flex-col py-2">
+                <div
+                  className={`${ROW_GRID} border-b py-2 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase sm:border-b-0`}
+                >
+                  <span className={`${CELL.name} hidden sm:block`}>Exercise</span>
+                  <span className={CELL.count}>Sets</span>
+                  <span className={CELL.count}>Reps</span>
+                  <span className={CELL.load}>Load</span>
+                  <span className={CELL.action} />
+                </div>
+                {exercises?.map((exercise, index) => {
+                  const details = catalog.find((c) => c.id === exercise.exerciseId);
+                  return (
+                    <div key={exercise.key} className={`${ROW_GRID} border-b py-3 last:border-b-0`}>
+                      <span className={`${CELL.name} flex min-w-0 items-center gap-2 font-semibold`}>
+                        <span className="numerals text-lg text-muted-foreground">{index + 1}</span>
+                        <span className="truncate">{details?.name ?? 'Unknown exercise'}</span>
+                        {details && !details.isAvailable && (
+                          <Badge variant="unavailable">
+                            Unavailable
+                            {details.equipment.some((item) => !item.isAvailable) &&
+                              `: ${details.equipment
+                                .filter((item) => !item.isAvailable)
+                                .map((item) => item.name)
+                                .join(', ')}`}
+                          </Badge>
+                        )}
+                      </span>
+                      <Input
+                        type="number"
+                        min={1}
+                        className={`${CELL.count} numerals text-lg`}
+                        value={exercise.sets}
+                        onChange={(e) => updateExercise(index, { sets: Number(e.target.value) })}
+                        aria-label={`Sets for ${details?.name ?? 'exercise'}`}
+                      />
+                      <Input
+                        type="number"
+                        min={1}
+                        className={`${CELL.count} numerals text-lg`}
+                        value={exercise.reps}
+                        onChange={(e) => updateExercise(index, { reps: Number(e.target.value) })}
+                        aria-label={`Reps for ${details?.name ?? 'exercise'}`}
+                      />
+                      <Input
+                        className={CELL.load}
+                        placeholder="Load"
+                        value={exercise.load}
+                        onChange={(e) => updateExercise(index, { load: e.target.value })}
+                        aria-label={`Load for ${details?.name ?? 'exercise'}`}
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className={`${CELL.action} text-muted-foreground hover:text-destructive`}
+                        onClick={() => removeExercise(index)}
+                      >
+                        <Trash2Icon />
+                        <span className="sr-only">Remove {details?.name ?? 'exercise'}</span>
+                      </Button>
+                    </div>
+                  );
+                })}
 
-              <div className="flex items-center gap-2 py-4">
-                <Select value={selectedExerciseId} onValueChange={setSelectedExerciseId}>
-                  <SelectTrigger className="flex-1" aria-label="Exercise to add">
-                    <SelectValue placeholder="Add an exercise from the catalog" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {catalog.map((exercise) => (
-                      <SelectItem key={exercise.id} value={exercise.id}>
-                        {exercise.name} {!exercise.isAvailable && '(unavailable)'}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <Button type="button" variant="outline" onClick={addExercise} disabled={!selectedExerciseId}>
-                  <PlusIcon data-icon="inline-start" />
-                  Add
+                <div className="flex items-center gap-2 py-4">
+                  <Select value={selectedExerciseId} onValueChange={setSelectedExerciseId}>
+                    <SelectTrigger className="flex-1" aria-label="Exercise to add">
+                      <SelectValue placeholder="Add an exercise from the catalog" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {catalog.map((exercise) => (
+                        <SelectItem key={exercise.id} value={exercise.id}>
+                          {exercise.name} {!exercise.isAvailable && '(unavailable)'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Button type="button" variant="outline" onClick={addExercise} disabled={!selectedExerciseId}>
+                    <PlusIcon data-icon="inline-start" />
+                    Add
+                  </Button>
+                </div>
+              </CardContent>
+              <CardFooter className="flex-col items-stretch gap-3">
+                <Field>
+                  <FieldLabel htmlFor="edit-note">
+                    Note for this edit <span className="font-normal text-muted-foreground">(optional)</span>
+                  </FieldLabel>
+                  <Textarea
+                    id="edit-note"
+                    className="min-h-16"
+                    placeholder="Why you changed it, for the next trainer"
+                    value={editNote}
+                    onChange={(e) => setEditNote(e.target.value)}
+                  />
+                </Field>
+                <Button
+                  className="self-end"
+                  disabled={editPlan.isPending || !exercises}
+                  onClick={() =>
+                    exercises &&
+                    editPlan.mutate({
+                      planId,
+                      exercises: exercises.map(({ exerciseId, sets, reps, load }) => ({
+                        exerciseId,
+                        sets,
+                        reps,
+                        load: load.trim() || undefined,
+                      })),
+                      note: editNote.trim() || undefined,
+                    })
+                  }
+                >
+                  {editPlan.isPending ? 'Saving...' : 'Save changes'}
                 </Button>
-              </div>
-            </CardContent>
-            <CardFooter className="flex-col items-stretch gap-3">
-              <Field>
-                <FieldLabel htmlFor="edit-note">
-                  Note for this edit <span className="font-normal text-muted-foreground">(optional)</span>
-                </FieldLabel>
-                <Textarea
-                  id="edit-note"
-                  className="min-h-16"
-                  placeholder="Why you changed it, for the next trainer"
-                  value={editNote}
-                  onChange={(e) => setEditNote(e.target.value)}
-                />
-              </Field>
-              <Button
-                className="self-end"
-                disabled={editPlan.isPending || !exercises}
-                onClick={() =>
-                  exercises &&
-                  editPlan.mutate({
-                    planId,
-                    exercises: exercises.map(({ exerciseId, sets, reps, load }) => ({
-                      exerciseId,
-                      sets,
-                      reps,
-                      load: load.trim() || undefined,
-                    })),
-                    note: editNote.trim() || undefined,
-                  })
-                }
-              >
-                {editPlan.isPending ? 'Saving...' : 'Save changes'}
-              </Button>
-            </CardFooter>
-          </Card>
+              </CardFooter>
+            </Card>
+          </div>
         }
+        preview={<PlanMusclePreview planLoad={planLoad} recentLoad={recentMuscleLoad} focus={muscleFocus} />}
         history={
           <Card className="gap-0 pb-0">
             <CardHeader className="border-b">

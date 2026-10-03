@@ -47,17 +47,19 @@ A prompt is a specification, not a contract. If the implementation has to deviat
 | [P-26](./P-26-demo-data-readme-and-docs-sync.md) | Demo data, README and docs sync | the demo data described in docs/04-architecture.md §8, and the "Keeping docs in sync" rule in AGENTS.md | 5 | all other prompts | Heitor |
 | [P-27](./P-27-signup-gender-field.md) | Signup gender field (fixes P-07) | FR-45 | 2 | none | Heitor |
 | [P-28](./P-28-biometric-consent.md) | Biometric consent (fixes P-07) | FR-46, RN-12 | 2 | none | Heitor |
+| [P-29](./P-29-muscle-map.md) | Muscle map | FR-49, FR-50, FR-51, FR-52 (and the rewording of FR-16, FR-20, FR-24, FR-36, FR-38) | 4 | P-06, P-13, P-14, P-24, P-25 | Heitor |
+| [P-30](./P-30-must-review-and-overview.md) | Must-review plans, plan review preview, member Now and staff Overview | FR-53, FR-54, FR-55, FR-56, RN-14 | 4 | P-29, P-15, P-14 | Heitor |
 
 `P-27` and `P-28` are correction prompts (`Fixes: P-07`, see `_template.md` and `docs/09-audit-log.md` findings 11-12): FR-45 and FR-46 didn't exist in the original 44 requirements, so these were added later rather than fitting into the original wave plan below.
 
 ## Distribution (requirements and stages)
 
-Total: 28 prompts covering all 48 functional requirements exactly once (44 original + 2 added by `P-27`/`P-28` + 2 added by the policy groups amendment of `P-23`, see `docs/09-audit-log.md`).
+Total: 30 prompts covering all 56 functional requirements (44 original + 2 added by `P-27`/`P-28` + 2 added by the policy groups amendment of `P-23` + 4 added by `P-29` + 4 added by `P-30`, see `docs/09-audit-log.md`). `P-29` also rewords five existing requirements, which stay counted under their original prompts.
 
 | Owner | Prompts | Functional requirements | Non-functional requirements (primary) |
 |---|---|---|---|
-| Andrew | 10 | 12 of 48 | NFR-1, NFR-3, NFR-5 |
-| Heitor | 18 | 36 of 48 | none as primary |
+| Andrew | 10 | 12 of 56 | NFR-1, NFR-3, NFR-5 |
+| Heitor | 20 | 44 of 56 | none as primary |
 
 NFR-1 (responsive UI) is listed once, on the foundation prompt P-03, but it applies to every screen of every prompt. NFR-2 has no dedicated work. NFR-4 and NFR-6 are explicit non-goals.
 
@@ -66,7 +68,7 @@ NFR-1 (responsive UI) is listed once, on the foundation prompt P-03, but it appl
 | MVP 1 | 3 | 1 | 4 |
 | MVP 2 | 2 | 9 | 11 |
 | MVP 3 | 4 | 5 | 9 |
-| MVP 4 | 1 | 2 | 3 |
+| MVP 4 | 1 | 4 | 5 |
 | MVP 5 | 0 | 1 | 1 |
 
 Counting requirements alone understates the base work: P-01 to P-05 have no functional requirement of their own but every other prompt depends on them.
@@ -83,4 +85,5 @@ A wave only needs prompts from earlier waves, so everything inside a wave can ru
 - **Wave 5**: P-08, P-13, P-20
 - **Wave 6**: P-09, P-14, P-15, P-16, P-21
 - **Wave 7**: P-10, P-12, P-17, P-18, P-23 (it moved here from wave 3 once it began replacing P-09's direct member grants with the member group), P-24, P-25
-- **Wave 8**: P-26
+- **Wave 8**: P-26, P-29
+- **Wave 9**: P-30

@@ -1,5 +1,6 @@
 'use client';
 
+import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { CheckIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,7 +10,8 @@ import { cn } from '@/lib/utils';
 interface ExerciseRowProps {
   index: number;
   name: string;
-  muscleGroup: string;
+  muscles: readonly ExerciseMuscle[];
+  isDimmed?: boolean;
   instructions: string;
   sets: number;
   reps: number;
@@ -17,6 +19,7 @@ interface ExerciseRowProps {
   notes: string | null;
   completed: boolean;
   isPerformable: boolean;
+  equipmentDown?: readonly string[];
   onToggle?: (completed: boolean) => void;
   disabled?: boolean;
 }
@@ -25,7 +28,8 @@ interface ExerciseRowProps {
 function ExerciseRowRoot({
   index,
   name,
-  muscleGroup,
+  muscles,
+  isDimmed,
   instructions,
   sets,
   reps,
@@ -33,13 +37,22 @@ function ExerciseRowRoot({
   notes,
   completed,
   isPerformable,
+  equipmentDown,
   onToggle,
   disabled,
 }: ExerciseRowProps) {
+  const primaryLabels = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
+  const secondaryLabels = muscles
+    .filter((entry) => entry.role === 'secondary')
+    .map((entry) => muscleLabel(entry.muscle));
+
   return (
     <div
       data-done={completed}
-      className="flex items-start gap-3 border-b px-5 py-4 transition-colors duration-300 last:border-b-0 data-[done=true]:bg-muted/50 sm:gap-4 sm:px-6"
+      className={cn(
+        'flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 sm:gap-4 sm:px-6',
+        isDimmed && 'opacity-45',
+      )}
     >
       {onToggle ? (
         <Checkbox
@@ -76,7 +89,10 @@ function ExerciseRowRoot({
               {name}
             </p>
             <p className="font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-              {muscleGroup}
+              {primaryLabels.join(', ')}
+              {secondaryLabels.length > 0 && (
+                <span className="font-sans tracking-normal normal-case"> + {secondaryLabels.join(', ')}</span>
+              )}
             </p>
           </div>
           <p
@@ -94,7 +110,9 @@ function ExerciseRowRoot({
         </div>
         {!isPerformable && (
           <Badge variant="outline" className="text-muted-foreground">
-            Equipment unavailable right now
+            {equipmentDown?.length
+              ? `${equipmentDown.join(', ')} ${equipmentDown.length === 1 ? 'is' : 'are'} out of service`
+              : 'Equipment unavailable right now'}
           </Badge>
         )}
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">{instructions}</p>

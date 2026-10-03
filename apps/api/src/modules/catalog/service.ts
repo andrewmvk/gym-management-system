@@ -1,5 +1,6 @@
 import type { GymEquipment } from '@api/db/schema';
 import * as repository from '@api/modules/catalog/repository';
+import type { ExerciseMuscle } from '@cadence/shared/schemas/muscles';
 
 // FR-17 / RN-04: an exercise needs no piece of equipment linked to it (bodyweight), or at least one
 // linked item must currently be available. Pure so plan generation, plan-resolvability checks, and
@@ -19,8 +20,8 @@ export function listEquipment() {
 
 export function createExercise(input: {
   name: string;
-  muscleGroup: string;
   instructions: string;
+  muscles: readonly ExerciseMuscle[];
   equipmentIds: readonly string[];
 }) {
   return repository.insertExercise(input);

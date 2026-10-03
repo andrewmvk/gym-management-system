@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
 import { PanelSection } from '@/components/panel-section';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
@@ -222,7 +223,13 @@ function GymInfoSkeleton() {
     <div className="flex flex-col gap-8">
       <StatusPanelSkeleton />
       <div className="grid gap-8 lg:grid-cols-2">
-        <SectionSkeleton />
+        <div className="overflow-hidden rounded-lg border bg-card">
+          <div className="flex flex-col gap-1 border-b px-5 py-4 sm:px-6">
+            <Skeleton className="h-7 w-48" />
+            <Skeleton className="h-5 w-64" />
+          </div>
+          <MuscleLoadView.Skeleton className="px-5 py-5 sm:px-6" />
+        </div>
         <SectionSkeleton />
       </div>
     </div>
@@ -260,7 +267,7 @@ export function GymInfo() {
     minute: '2-digit',
   });
   const isStale = info.isError;
-  const hasDemand = data.demand.muscleGroups.length > 0 || data.demand.equipment.length > 0;
+  const hasDemand = Object.keys(data.demand.muscleLoad).length > 0 || data.demand.equipment.length > 0;
 
   return (
     <div className="flex flex-col gap-8">
@@ -280,10 +287,15 @@ export function GymInfo() {
       {hasDemand ? (
         <div className="grid gap-8 lg:grid-cols-2">
           <PanelSection
-            title="Muscle groups in demand"
-            description="Exercises planned today by members who have checked in."
+            title="Muscles in demand"
+            description="Sets planned today by members who have checked in. Out-of-service equipment is left out."
           >
-            <DemandBars entries={data.demand.muscleGroups} />
+            <MuscleLoadView
+              load={data.demand.muscleLoad}
+              label="Muscles in demand today"
+              emptyNote="No muscle work planned yet."
+              className="px-5 py-5 sm:px-6"
+            />
           </PanelSection>
           <PanelSection
             title="Equipment in demand"
@@ -297,7 +309,7 @@ export function GymInfo() {
           <EmptyState
             icon={FlameIcon}
             title="No demand yet"
-            description="Nobody has checked in with a plan today. Muscle groups and equipment show up here as members arrive."
+            description="Nobody has checked in with a plan today. Muscles and equipment show up here as members arrive."
           />
         </PanelSection>
       )}

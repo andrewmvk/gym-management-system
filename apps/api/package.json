@@ -15,6 +15,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx src/db/cli.ts migrate",
     "db:seed": "tsx src/db/cli.ts seed",
+    "db:seed:demo": "tsx src/db/cli.ts seed:demo",
     "db:reset": "tsx src/db/cli.ts reset",
     "db:studio": "drizzle-kit studio"
   },

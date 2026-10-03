@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-01T12:00:00Z",
+  "generatedAt": "2026-10-03T18:00:00Z",
   "title": "Design System: Cadence",
   "extensions": {
     "colorMeta": {
@@ -155,7 +155,8 @@
       "**Do** use the shared tokens for depth and hover (`shadow-popover`, `bg-primary-hover`); add a new token in `globals.css` if the system genuinely needs one.",
       "**Do** give every state its own form: solid for settled, dashed for pending or failed, struck for unavailable.",
       "**Do** keep every page in the same 72rem container as the header.",
-      "**Do** design both themes at once; every color is a role token that `.dark` redefines."
+      "**Do** design both themes at once; every color is a role token that `.dark` redefines.",
+      "**Do** build charts with the shadcn Chart component and the role tokens (`var(--primary)`, ink at 60%), and give each one a text summary."
     ],
     "donts": [
       "**Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.",
@@ -164,7 +165,8 @@
       "**Don't** put a shadow on a card that sits on the page.",
       "**Don't** use Pace Tape for a primary in-app action, or Kit Cobalt for decoration.",
       "**Don't** show the app header on sign-in or sign-up, or a theme toggle there; those pages follow the system theme.",
-      "**Don't** use spinners or \"Loading...\" text for data; use matching skeletons behind the 200ms delay."
+      "**Don't** use spinners or \"Loading...\" text for data; use matching skeletons behind the 200ms delay.",
+      "**Don't** leave a broken image icon where an uploaded file is missing; show the dashed \"File not found\" tile."
     ]
   }
 }

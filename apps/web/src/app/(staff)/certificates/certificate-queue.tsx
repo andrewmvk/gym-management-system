@@ -1,7 +1,8 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, ExternalLinkIcon, FileCheck2Icon, LockIcon, XIcon } from 'lucide-react';
+import { CheckIcon, ExternalLinkIcon, FileCheck2Icon, ImageOffIcon, LockIcon, XIcon } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 import { useAppAbility } from '@/abilities';
 import { AptitudeResultBadge } from '@/components/aptitude-result-badge';
@@ -23,6 +24,45 @@ const PAGE_SIZE = 8;
 const REVIEW_FILTERS = ['open', 'reviewed', 'all'] as const;
 type ReviewFilter = (typeof REVIEW_FILTERS)[number];
 
+function formatUploadedAt(uploadedAt: Date | string) {
+  return new Date(uploadedAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+}
+
+// An uploaded file can be missing from storage; say so instead of showing a broken image.
+function CertificatePreview({ fileUrl, applicantName }: { fileUrl: string; applicantName: string }) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return (
+      <div className="flex size-28 shrink-0 flex-col items-center justify-center gap-1 rounded-md border border-dashed bg-muted p-2 text-center text-muted-foreground">
+        <ImageOffIcon className="size-5" aria-hidden />
+        <p className="text-xs text-balance">File not found</p>
+      </div>
+    );
+  }
+
+  return (
+    <a
+      href={fileUrl}
+      target="_blank"
+      rel="noreferrer"
+      className="group relative size-28 shrink-0 overflow-hidden rounded-md border bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
+    >
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={fileUrl}
+        alt={`Certificate from ${applicantName}`}
+        onError={() => setFailed(true)}
+        className="size-full object-cover"
+      />
+      <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
+        <ExternalLinkIcon className="size-5" />
+        <span className="sr-only">Open full size</span>
+      </span>
+    </a>
+  );
+}
+
 function CertificateRowSkeleton() {
   return (
     <li className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:px-6">
@@ -30,6 +70,7 @@ function CertificateRowSkeleton() {
       <div className="flex flex-1 flex-col gap-2">
         <Skeleton className="h-5 w-40" />
         <Skeleton className="h-4 w-56" />
+        <Skeleton className="h-4 w-44" />
         <Skeleton className="h-6 w-32" />
         <Skeleton className="h-4 w-full max-w-md" />
       </div>
@@ -140,27 +181,14 @@ function CertificateQueueRoot() {
             const fileUrl = `${API_URL}/files/${entry.filePath}`;
             return (
               <li key={entry.id} className="flex flex-col gap-4 px-5 py-5 sm:flex-row sm:px-6">
-                <a
-                  href={fileUrl}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group relative size-28 shrink-0 overflow-hidden rounded-md border bg-muted outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={fileUrl}
-                    alt={`Certificate from ${entry.applicantName}`}
-                    className="size-full object-cover"
-                  />
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                    <ExternalLinkIcon className="size-5" />
-                    <span className="sr-only">Open full size</span>
-                  </span>
-                </a>
+                <CertificatePreview fileUrl={fileUrl} applicantName={entry.applicantName} />
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div>
                     <p className="font-semibold">{entry.applicantName}</p>
                     <p className="truncate text-sm text-muted-foreground">{entry.applicantEmail}</p>
+                    <p className="text-sm text-muted-foreground">
+                      Uploaded <span className="numerals">{formatUploadedAt(entry.uploadedAt)}</span>
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     <AptitudeResultBadge source="AI" result={entry.aiResult} />
@@ -177,6 +205,11 @@ function CertificateQueueRoot() {
                   {entry.aiNotes && (
                     <p className="max-w-prose text-sm text-pretty text-muted-foreground">{entry.aiNotes}</p>
                   )}
+                  {!isReviewed && entry.aiResult === 'pending_retry' && (
+                    <p className="text-sm text-muted-foreground">
+                      The AI couldn't evaluate this one, so there's nothing to confirm. Clear or reject it yourself.
+                    </p>
+                  )}
                   {!isReviewed && (
                     <div className="mt-1 flex flex-wrap gap-2">
                       <Button
@@ -184,11 +217,6 @@ function CertificateQueueRoot() {
                         variant="outline"
                         disabled={entry.aiResult === 'pending_retry' || isPending}
                         onClick={() => review.mutate({ certificateId: entry.id, result: 'confirm' })}
-                        title={
-                          entry.aiResult === 'pending_retry'
-                            ? "The AI couldn't evaluate this one, so there's nothing to confirm."
-                            : undefined
-                        }
                       >
                         Confirm AI
                       </Button>

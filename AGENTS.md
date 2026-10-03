@@ -37,6 +37,7 @@ rules/            Code-level conventions for AI agents - see table below
 | `pnpm db:generate` | Generate a Drizzle migration from schema changes |
 | `pnpm db:migrate` | Apply pending migrations |
 | `pnpm db:seed` | Load the seed data |
+| `pnpm db:seed:demo` | Run the base seed, then load the fake demo data (members, check-ins, plans, certificates); idempotent |
 | `pnpm db:reset` | Drop and recreate the schema, then re-migrate and re-seed |
 | `pnpm db:studio` | Open Drizzle Studio to browse the database |
 
@@ -90,4 +91,4 @@ Every change should respect these (from `PRODUCT.md`):
 ## Before you start
 
 - Don't invent scope beyond FR-1..FR-48 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
-- No code exists yet at the time this file was written - when scaffolding the repo, follow the layout above rather than improvising a different structure.
+- Follow the repo layout above rather than improvising a different structure.

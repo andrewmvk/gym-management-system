@@ -17,6 +17,7 @@
     "db:generate": "pnpm --filter @cadence/api db:generate",
     "db:migrate": "pnpm --filter @cadence/api db:migrate",
     "db:seed": "pnpm --filter @cadence/api db:seed",
+    "db:seed:demo": "pnpm --filter @cadence/api db:seed:demo",
     "db:reset": "pnpm --filter @cadence/api db:reset",
     "db:studio": "pnpm --filter @cadence/api db:studio"
   },

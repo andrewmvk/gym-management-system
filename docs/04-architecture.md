@@ -16,7 +16,7 @@
 | File storage | Local disk via Docker volume (path/URL stored in Postgres) |
 | AI provider | OpenRouter API, using a free-tier model (configurable) |
 | Email | Real transactional provider (e.g. Resend) for the onboarding invite link |
-| Face recognition | Face detection/embedding library (e.g. face-api.js). The signup reference embedding is computed on the backend; the kiosk computes its probe embedding in the browser and runs the 1:N match against the embedding dataset. Both sides must use the same model and weights (see §5) |
+| Face recognition | Face detection/embedding library (`@vladmandic/face-api`, a maintained fork of face-api.js; the backend runs it on the TensorFlow.js WASM backend). The signup reference embedding is computed on the backend; the kiosk computes its probe embedding in the browser and runs the 1:N match against the embedding dataset. Both sides must use the same model and weights (see §5) |
 | Containerization | Docker Compose: two containers, `frontend` and `backend` (the Node API and PostgreSQL run together in the second one). This split is a course requirement |
 
 ## 2. Container Architecture
@@ -70,7 +70,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 ## 5. Face Recognition & Embedding Distribution
 
 - Reference photos captured at signup are processed **on the backend** into a face embedding (a fixed-length numeric vector) using the recognition library's embedding model; the browser only captures and uploads the photo at signup. The raw photo is stored only on the backend's upload volume for audit/recompute purposes and is **never** sent to the kiosk or any other client.
-- The kiosk computes its probe embedding in the browser, so the backend and the browser must run the same embedding model with the same weights (for face-api.js, the same face recognition net producing 128-dimensional descriptors). Vectors from different models or versions are not comparable, and the match would silently fail.
+- The kiosk computes its probe embedding in the browser, so the backend and the browser must run the same embedding model with the same weights (for face-api.js, the same face recognition net producing 128-dimensional descriptors, and the same `@vladmandic/face-api` version on both sides). Vectors from different models or versions are not comparable, and the match would silently fail.
 - The kiosk fetches only the embedding dataset (`{ memberId, embedding }` pairs, no images) from a dedicated backend endpoint gated by a static `KIOSK_API_KEY`, rather than being open to arbitrary callers.
 - Matching uses a similarity/distance threshold to decide "is this a match at all," plus a margin check between the best and second-best candidate to reject ambiguous ties - the member is asked to retry rather than the system guessing (FR-32).
 - This reduces exposure relative to shipping raw photos, but the full embedding dataset is still present in the kiosk's browser memory/network traffic; the kiosk is assumed to run on a trusted, non-public local network for this academic project - a real deployment would need a more hardened kiosk boundary (explicitly out of scope here, see [02-requirements.md](./02-requirements.md)).
@@ -112,7 +112,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | `EMAIL_MODE` | backend | `resend` sends through the provider; `log` writes each e-mail to the API log (default `log`) |
 | `RESEND_API_KEY` | backend | Email provider auth; required unless `EMAIL_MODE` is `log` |
 | `EMAIL_FROM` | backend | Sender address (defaults to Resend's sandbox sender) |
-| `FACE_EMBEDDING_MODE` | backend | `stub` derives a deterministic 128-number vector from the photo bytes; `real` runs the face-api.js model from `packages/shared/face-models/` (default `stub`) |
+| `FACE_EMBEDDING_MODE` | backend | `stub` derives a deterministic 128-number vector from the photo bytes; `real` runs the face-api.js model (the `@vladmandic/face-api` fork on the TensorFlow.js WASM backend) from `packages/shared/face-models/` (default `stub`) |
 | `UPLOADS_DIR` | backend | Path inside container to the mounted uploads volume |
 | `KIOSK_API_KEY` | backend + kiosk client | Authenticates the kiosk's fetch of the face-embedding dataset |
 | `TURNSTILE_API_*` | backend (DB-backed, admin-editable) | Not a static env var - configured at runtime by whoever holds the turnstile-config permission and stored in the `d_turnstile_config` table, since it must be editable without a redeploy |

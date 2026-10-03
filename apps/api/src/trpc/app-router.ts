@@ -6,6 +6,7 @@ import { chatRouter } from '@api/modules/chat/router';
 import { onboardingRouter } from '@api/modules/onboarding/router';
 import { reviewsRouter } from '@api/modules/plans/reviews-router';
 import { plansRouter } from '@api/modules/plans/router';
+import { policiesRouter } from '@api/modules/policies/router';
 import { systemRouter } from '@api/modules/system/router';
 import { turnstileRouter } from '@api/modules/turnstile/router';
 import { router } from '@api/trpc/procedures';
@@ -18,6 +19,7 @@ export const appRouter = router({
   chat: chatRouter,
   onboarding: onboardingRouter,
   plans: plansRouter,
+  policies: policiesRouter,
   reviews: reviewsRouter,
   system: systemRouter,
   turnstile: turnstileRouter,

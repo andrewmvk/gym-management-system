@@ -152,6 +152,9 @@ export const POLICY_CATALOG: readonly PolicyDefinition[] = [
   { id: READ_CHECKINS, description: 'View every check-in', operation: 'read', resource: 'CheckIn', scope: 'all' },
 ];
 
+// Removing one of these from your own account locks you out of the staff area or of policy management.
+export const LOCKOUT_PROTECTED_POLICY_IDS: readonly PolicyId[] = [READ_STAFF_APP, MANAGE_POLICY_ASSIGNMENTS];
+
 export const MEMBER_POLICY_IDS = [
   READ_MEMBER_APP,
   MANAGE_OWN_ONBOARDING,

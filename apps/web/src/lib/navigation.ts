@@ -25,6 +25,11 @@ export const NAV_ITEMS: Record<AppArea, NavItem[]> = {
     },
     { href: '/catalog', label: 'Catalog' },
     {
+      href: '/policies',
+      label: 'Policies',
+      isVisible: (ability) => ability.can('manage', 'UserPolicyAssignment'),
+    },
+    {
       href: '/settings/turnstile',
       label: 'Turnstile',
       isVisible: (ability) => ability.can('manage', 'TurnstileConfig'),

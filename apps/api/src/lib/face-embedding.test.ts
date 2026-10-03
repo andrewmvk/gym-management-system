@@ -1,4 +1,7 @@
-import { createFaceEmbedder, FACE_EMBEDDING_LENGTH } from '@api/lib/face-embedding';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { createFaceEmbedder, FACE_EMBEDDING_LENGTH, FACE_MODELS_DIR } from '@api/lib/face-embedding';
+import { PNG } from 'pngjs';
 import { describe, expect, it } from 'vitest';
 
 const image = new Uint8Array([0xff, 0xd8, 0xff, 1, 2, 3, 4, 5]);
@@ -29,8 +32,30 @@ describe('computeFaceEmbedding stub', () => {
   });
 });
 
+const weightsPresent = existsSync(path.join(FACE_MODELS_DIR, 'ssd_mobilenetv1_model-weights_manifest.json'));
+
+function blankPng(width = 160, height = 160) {
+  const png = new PNG({ width, height });
+  png.data.fill(255);
+  return new Uint8Array(PNG.sync.write(png));
+}
+
 describe('computeFaceEmbedding real mode', () => {
-  it('reports unavailable until the real model is wired in', async () => {
+  it('reports unavailable when the weights are missing instead of throwing', async () => {
+    const compute = createFaceEmbedder('real', { modelsDir: path.join(FACE_MODELS_DIR, 'missing') });
+
+    await expect(compute(blankPng())).resolves.toEqual({ ok: false, reason: 'unavailable' });
+  });
+
+  it('reports unavailable for bytes that are not a supported image', async () => {
     await expect(createFaceEmbedder('real')(image)).resolves.toEqual({ ok: false, reason: 'unavailable' });
   });
+
+  it.skipIf(!weightsPresent)(
+    'reports no_face for a blank image',
+    async () => {
+      await expect(createFaceEmbedder('real')(blankPng())).resolves.toEqual({ ok: false, reason: 'no_face' });
+    },
+    60_000,
+  );
 });

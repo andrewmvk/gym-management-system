@@ -20,4 +20,14 @@ The `weights/` folder of the face-api.js repository: <https://github.com/justadu
 
 ## Status
 
-Until the real backend implementation lands (P-22), the backend runs with `FACE_EMBEDDING_MODE=stub`, which derives a deterministic vector from the image bytes and needs none of these files. P-22 picks the face-api.js package and TensorFlow backend and records that choice here; if it switches to a package that expects a different weight format, it updates the file list above so the kiosk and the backend keep loading the same files.
+`FACE_EMBEDDING_MODE=stub` (the default) derives a deterministic vector from the image bytes and needs none of these files. `FACE_EMBEDDING_MODE=real` runs the three nets above on the backend.
+
+## Library choice (backend and kiosk)
+
+Both sides use `@vladmandic/face-api` 1.7.15 (a maintained fork of face-api.js that reads these same weight files) with TensorFlow.js 4.22:
+
+- **Kiosk**: the browser build, with the default WebGL or CPU backend.
+- **Backend**: the `face-api.node-wasm.js` build with `@tensorflow/tfjs-backend-wasm`. The WASM backend ships its binary inside the npm package, so it installs on Windows and in the backend container without native compilation (the native `tfjs-node` addon needs build tools). It is slower than native, which is fine for one signup photo at a time.
+- **Image decoding**: `jpeg-js` and `pngjs` (pure JavaScript) turn the uploaded photo into the RGB tensor, so no canvas or native image library is needed. The upload validation already restricts reference photos to JPEG and PNG.
+
+Keep the `@vladmandic/face-api` version equal on the backend (`apps/api/package.json`) and the kiosk (`apps/web/package.json`) so descriptors stay comparable.

@@ -1,6 +1,7 @@
 import { env } from '@api/config/env';
 import { db, pool, runMigrations } from '@api/db/client';
 import { seedBase } from '@api/db/seed';
+import { seedDemo } from '@api/db/seed-demo';
 import { logger } from '@api/lib/logger';
 import { sql } from 'drizzle-orm';
 
@@ -12,6 +13,11 @@ const COMMANDS = {
   seed: async () => {
     await seedBase();
     logger.info('base seed applied');
+  },
+  'seed:demo': async () => {
+    await seedBase();
+    await seedDemo();
+    logger.info('demo seed applied');
   },
   reset: async () => {
     if (env.NODE_ENV === 'production') {

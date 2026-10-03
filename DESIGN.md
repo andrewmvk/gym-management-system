@@ -318,6 +318,12 @@ Explains a label without a visible second line. Opens on hover and keyboard focu
 ### Group Matrix (signature table)
 The policies-by-groups comparison on the policy screen's second tab: one row per policy, one column per group, a Kit Cobalt tick where the group includes it and a faint dash where it doesn't. Group headers are Title typography with a help tooltip for the description and the group's tally in numerals ("8 of 18") underneath; the first header, "Policy", is the same size and vertically centered with them. Rows holding the same set of groups sit together, widest first, and a 4px Bench Gray rule marks each new cluster, so every group reads as a block of ticks down its column. Each row leads with the policy's description and, under it, its permission in caption type. Each cell has an off-screen label for screen readers. It scrolls horizontally inside its card on a phone.
 
+### Chart
+Data is drawn with shadcn's Chart component (`components/ui/chart.tsx`, Recharts underneath), never hand-built bars. The check-ins-per-hour bar chart on the gym page is the pattern: a `ChartContainer` 12rem tall inside a card section, horizontal Hairline grid lines only, no axis lines or tick marks, count labels on the left and hour labels every six hours at the bottom, in the muted gray and numerals. Bars have 2px top corners and are Locker Ink at 60% for past hours; the current hour is Kit Cobalt, because it is live state. The tooltip is the Popover pattern (Card-colored, Hairline border, Popover shadow) and gives "07:00 to 07:59" with the count, on hover, tap and keyboard focus (`accessibilityLayer`). A one-line summary in body type above the chart (peak hour and total) carries the reading for anyone who skips the graphic. Demand lists on the same page stay as simple CSS bars: they rank names, not a time series.
+
+### Certificate Preview
+The 7rem square thumbnail of an uploaded certificate in the review queue: a 6px-cornered, hairline-bordered tile that opens the file full size, with an ink veil and an open icon on hover and focus. If the file is missing from storage, the tile becomes a dashed Bench Gray square with a "File not found" label, since a dashed stroke already means failed-to-load. Each row also shows when it was uploaded, in numerals.
+
 ### Loading
 Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they replace. They wait 200ms before appearing, so fast loads never flash. When a parameter changes (a history date), the previous result stays until the new one arrives or 200ms pass.
 
@@ -330,6 +336,7 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 - **Do** give every state its own form: solid for settled, dashed for pending or failed, struck for unavailable.
 - **Do** keep every page in the same 72rem container as the header.
 - **Do** design both themes at once; every color is a role token that `.dark` redefines.
+- **Do** build charts with the shadcn Chart component and the role tokens (`var(--primary)`, ink at 60%), and give each one a text summary.
 
 ### Don't:
 - **Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.
@@ -340,3 +347,4 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 - **Don't** use Pace Tape for a primary in-app action, or Kit Cobalt for decoration.
 - **Don't** show the app header on sign-in or sign-up, or a theme toggle there; those pages follow the system theme.
 - **Don't** use spinners or "Loading..." text for data; use matching skeletons behind the 200ms delay.
+- **Don't** leave a broken image icon where an uploaded file is missing; show the dashed "File not found" tile.

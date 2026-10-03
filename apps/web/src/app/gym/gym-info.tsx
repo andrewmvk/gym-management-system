@@ -3,12 +3,14 @@
 import { createAppAbility } from '@cadence/shared/auth';
 import { useQuery } from '@tanstack/react-query';
 import { DoorClosedIcon, DoorOpenIcon, FlameIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, XAxis, YAxis } from 'recharts';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { PanelSection } from '@/components/panel-section';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
+import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -18,6 +20,8 @@ const HOUR_LABEL_EVERY = 6;
 // A lone check-in should read as small, not as a full bar.
 const MIN_BAR_SCALE = 5;
 const SKELETON_ROWS = ['a', 'b', 'c', 'd'];
+const BAR_FILL = 'color-mix(in oklch, var(--foreground) 60%, transparent)';
+const HOURLY_CHART_CONFIG = { count: { label: 'Check-ins', color: 'var(--primary)' } } satisfies ChartConfig;
 
 interface DemandEntry {
   name: string;
@@ -68,65 +72,46 @@ function DemandBars({ entries }: { entries: DemandEntry[] }) {
 }
 
 function HourlyCheckIns({ hours, currentHour }: { hours: { hour: number; count: number }[]; currentHour: number }) {
-  const [selected, setSelected] = useState<number | null>(null);
   const max = Math.max(...hours.map((entry) => entry.count));
   const total = hours.reduce((sum, entry) => sum + entry.count, 0);
   const peak = hours.find((entry) => entry.count === max)!;
-  const shown = selected === null ? null : hours[selected]!;
 
   return (
     <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
-      <p aria-live="polite" className="text-sm">
-        {shown ? (
-          <>
-            <span className="numerals font-semibold">
-              {pad(shown.hour)}:00 to {pad(shown.hour)}:59
-            </span>
-            : {shown.count} {plural(shown.count, 'check-in', 'check-ins')}
-          </>
-        ) : (
-          <>
-            Peak <span className="numerals font-semibold">{pad(peak.hour)}:00</span> with {peak.count}{' '}
-            {plural(peak.count, 'check-in', 'check-ins')}. {total} {plural(total, 'check-in', 'check-ins')} so far
-            today.
-          </>
-        )}
+      <p className="text-sm">
+        Peak <span className="numerals font-semibold">{pad(peak.hour)}:00</span> with {peak.count}{' '}
+        {plural(peak.count, 'check-in', 'check-ins')}. {total} {plural(total, 'check-in', 'check-ins')} so far today.
       </p>
-      <ul className="flex h-40 items-end gap-0.5 sm:gap-1">
-        {hours.map(({ hour, count }) => {
-          const isFuture = hour > currentHour;
-          return (
-            <li key={hour} className="h-full flex-1">
-              <button
-                type="button"
-                aria-pressed={selected === hour}
-                aria-label={`${pad(hour)}:00, ${count} ${plural(count, 'check-in', 'check-ins')}`}
-                onClick={() => setSelected(selected === hour ? null : hour)}
-                className="flex h-full w-full flex-col justify-end rounded-xs outline-none focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    'block w-full',
-                    count > 0 && (hour === currentHour ? 'rounded-t-xs bg-primary' : 'rounded-t-xs bg-foreground/60'),
-                    count === 0 && !isFuture && 'h-px bg-foreground/40',
-                    count === 0 && isFuture && 'border-t border-dashed border-foreground/30',
-                    selected === hour && 'ring-2 ring-ring',
-                  )}
-                  style={count > 0 ? { height: `${(count / max) * 100}%` } : undefined}
-                />
-              </button>
-            </li>
-          );
-        })}
-      </ul>
-      <ul aria-hidden className="flex gap-0.5 sm:gap-1">
-        {hours.map(({ hour }) => (
-          <li key={hour} className="numerals flex-1 text-center text-xs text-muted-foreground">
-            {hour % HOUR_LABEL_EVERY === 0 ? pad(hour) : ''}
-          </li>
-        ))}
-      </ul>
+      <ChartContainer config={HOURLY_CHART_CONFIG} className="aspect-auto h-48 w-full">
+        <BarChart accessibilityLayer data={hours} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
+          <CartesianGrid vertical={false} />
+          <XAxis
+            dataKey="hour"
+            interval={0}
+            tickLine={false}
+            axisLine={false}
+            tickFormatter={(hour: number) => (hour % HOUR_LABEL_EVERY === 0 ? pad(hour) : '')}
+          />
+          <YAxis allowDecimals={false} width={28} tickLine={false} axisLine={false} />
+          <ChartTooltip
+            cursor={false}
+            content={
+              <ChartTooltipContent
+                hideIndicator
+                labelFormatter={(_, payload) => {
+                  const hour = payload[0]?.payload.hour as number;
+                  return `${pad(hour)}:00 to ${pad(hour)}:59`;
+                }}
+              />
+            }
+          />
+          <Bar dataKey="count" radius={[2, 2, 0, 0]}>
+            {hours.map(({ hour }) => (
+              <Cell key={hour} fill={hour === currentHour ? 'var(--primary)' : BAR_FILL} />
+            ))}
+          </Bar>
+        </BarChart>
+      </ChartContainer>
     </div>
   );
 }
@@ -226,7 +211,7 @@ function HourlySkeleton() {
       </div>
       <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
         <Skeleton className="h-5 w-80 max-w-full" />
-        <Skeleton className="h-40 w-full" />
+        <Skeleton className="h-48 w-full" />
       </div>
     </div>
   );
@@ -325,7 +310,10 @@ export function GymInfo() {
         <QueryError title="Hourly detail unavailable" onRetry={() => detail.refetch()} isRetrying={detail.isFetching} />
       )}
       {detail.data && (
-        <PanelSection title="Check-ins per hour" description="Today, by hour of the day. Tap a bar for its count.">
+        <PanelSection
+          title="Check-ins per hour"
+          description="Today, by hour of the day. Hover or tap a bar for its count."
+        >
           {detail.data.checkInsPerHour.every((entry) => entry.count === 0) ? (
             <EmptyState icon={FlameIcon} title="No check-ins yet today" />
           ) : (

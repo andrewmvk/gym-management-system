@@ -6,7 +6,7 @@
 |---|---|
 | Language and tooling | TypeScript 7 (the native compiler) in every workspace, pnpm workspaces |
 | Frontend framework | Next.js, TypeScript (`.tsx`) |
-| Styling / UI | Tailwind CSS + shadcn/ui |
+| Styling / UI | Tailwind CSS + shadcn/ui (charts through shadcn's Chart component, Recharts underneath) |
 | Backend framework | Node.js + Express (tRPC HTTP adapter) |
 | API layer | tRPC (end-to-end typed, shared types between frontend and backend) |
 | ORM | Drizzle |
@@ -92,7 +92,8 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 
 - A database seed script, run at first boot, first creates the full set of `d_user_policy` rows the app needs, then the `member`, `trainer` and `admin` policy groups with their policy lists, then a fixed set of demo trainer and admin `d_users` rows with known credentials, each given its staff group (documented in the project README) - this is the *only* way trainer/admin accounts and their access come into existence; there is no staff registration UI (FR-41), and beyond this seed the only other way an existing account's policies change is the Admin policy-management feature (FR-43).
 - The seed also creates one demo member, `student@example.com`, already activated (aptitude cleared, membership active, in the `member` group), with `apps/api/src/test/fixtures/faces/valid/reference.jpg` stored as the reference photo and its embedding computed through the same face-embedding module as signup. It lets the member screens be used without going through signup. Like the staff rows, it is insert-if-missing, so a re-run never recreates the photo.
-- The same seed script populates the initial exercise/equipment catalog and a batch of fake seeded members (with their `member` group membership), check-ins, and plans so that occupancy/equipment-demand metrics have realistic data to show in a demo (see [02-requirements.md](./02-requirements.md), Permitted Scopes).
+- The same seed script populates the initial exercise/equipment catalog. It runs on every container boot.
+- The demo data is a separate, explicit step, `pnpm db:seed:demo` (`apps/api/src/db/seed-demo.ts`, which runs the base seed first). It creates 25 fake cleared members `demo1@example.com` to `demo25@example.com` (every fifth with an inactive membership, in the `member` group, with stub embeddings and no photo), an onboarding submission each, plans for the last 21 days plus today with some trainer-edited ones and review notes, check-ins over the same days with morning and evening peaks plus four in the last 90 minutes, and four certificate applicants `demo-applicant1@example.com` to `demo-applicant4@example.com` covering every AI result (including `pending_retry`) with a placeholder file each. It is idempotent and only replaces the history of its own accounts. The recent check-ins age out of the occupancy window, so it is re-run before a demo; the placeholder files are written under the `UPLOADS_DIR` of the process that ran it, so it must run in the same environment as the API (see the README).
 
 ## 9. Environment Variables (indicative)
 
@@ -110,6 +111,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | `OPENROUTER_API_KEY` | backend | AI provider auth; required unless `AI_MODE` is `mock` |
 | `OPENROUTER_MODEL` | backend | Selected free model id; required unless `AI_MODE` is `mock` |
 | `AI_MOCK_APTITUDE` / `AI_MOCK_CERTIFICATE` | backend | Mock verdict for each signup evaluation: `cleared`, `not_cleared`, or `unavailable` (default `cleared`) |
+| `PLAN_GENERATOR` | backend | `ai` or `placeholder`; unset means `placeholder` when `AI_MODE` is `mock` and `ai` otherwise |
 | `EMAIL_MODE` | backend | `resend` sends through the provider; `log` writes each e-mail to the API log (default `log`) |
 | `RESEND_API_KEY` | backend | Email provider auth; required unless `EMAIL_MODE` is `log` |
 | `EMAIL_FROM` | backend | Sender address (defaults to Resend's sandbox sender) |

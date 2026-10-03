@@ -25,6 +25,7 @@ const EnvSchema = z
     TEST_DATABASE_URL: optionalText.pipe(z.url().optional()),
     SEED_TRAINER_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
     SEED_ADMIN_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
+    SEED_STUDENT_PASSWORD: requiredText.pipe(z.string().min(8, 'must be at least 8 characters')),
     JWT_SECRET: requiredText.pipe(z.string().min(32, 'must be at least 32 characters')),
     KIOSK_API_KEY: requiredText.pipe(z.string().min(16, 'must be at least 16 characters')),
     UPLOADS_DIR: requiredText,

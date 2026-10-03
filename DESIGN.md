@@ -296,6 +296,7 @@ The wall-mounted check-in screen is the one surface with its own layout, because
 - **Disabled:** Bench Gray fill at 60% opacity.
 - **Checkbox / Radio:** 20px with a 2px border, filling Kit Cobalt when checked; option cards that wrap one tint to Cobalt Wash when checked.
 - **Date picker:** an input-styled trigger with a calendar icon opening a 288px month grid (40px day cells, numerals, today underlined in cobalt, selection filled cobalt), month/year selects for birthdates, Today/Clear in the footer.
+- **Date range picker:** the same input-styled trigger, showing the preset name when the range matches one (otherwise just the dates). It opens a popover with a column of presets (Today, Last 7 days, Last 30 days, This month, Last 3 months, Last 6 months, This year, Last 12 months; a scrollable row above the grid on phones) next to the same month grid. A preset applies and closes at once; on the grid the first click sets the start, the second completes the range, and the days between are tinted. Both ends are filled cobalt like a single selection.
 - **File dropzone:** a 2px dashed field that tints Cobalt Wash on hover and drag.
 
 ### Navigation

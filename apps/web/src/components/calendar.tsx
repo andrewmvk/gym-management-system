@@ -10,6 +10,9 @@ import { cn } from '@/lib/utils';
 interface CalendarProps {
   selected: Date | null;
   onSelect: (date: Date) => void;
+  // Range mode highlighting: both ends are drawn as selected and the days between them are tinted.
+  rangeFrom?: Date | null;
+  rangeTo?: Date | null;
   min?: Date;
   max?: Date;
   captionLayout?: 'label' | 'dropdown';
@@ -36,8 +39,18 @@ function clamp(date: Date, min?: Date, max?: Date) {
   return date;
 }
 
-export function Calendar({ selected, onSelect, min, max, captionLayout = 'label', fromYear, toYear }: CalendarProps) {
-  const initial = selected ?? clamp(new Date(), min, max);
+export function Calendar({
+  selected,
+  onSelect,
+  rangeFrom = null,
+  rangeTo = null,
+  min,
+  max,
+  captionLayout = 'label',
+  fromYear,
+  toYear,
+}: CalendarProps) {
+  const initial = selected ?? rangeTo ?? rangeFrom ?? clamp(new Date(), min, max);
   const [month, setMonth] = useState(startOfMonth(initial));
   const [focused, setFocused] = useState(initial);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -152,7 +165,12 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
         ))}
         {days.map((date) => {
           const isOutside = date.getMonth() !== month.getMonth();
-          const isSelected = selected !== null && isSameDay(date, selected);
+          const iso = toIsoDate(date);
+          const isRangeEnd =
+            (rangeFrom !== null && isSameDay(date, rangeFrom)) || (rangeTo !== null && isSameDay(date, rangeTo));
+          const isSelected = (selected !== null && isSameDay(date, selected)) || isRangeEnd;
+          const isInRange =
+            rangeFrom !== null && rangeTo !== null && iso > toIsoDate(rangeFrom) && iso < toIsoDate(rangeTo);
           const isToday = isSameDay(date, today);
           return (
             <button
@@ -173,7 +191,7 @@ export function Calendar({ selected, onSelect, min, max, captionLayout = 'label'
               onClick={() => onSelect(date)}
               className={cn(
                 'numerals relative flex size-10 items-center justify-center rounded-sm text-base font-semibold transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45 disabled:pointer-events-none disabled:opacity-30',
-                isSelected ? 'bg-primary text-primary-foreground' : 'hover:bg-muted',
+                isSelected ? 'bg-primary text-primary-foreground' : isInRange ? 'bg-primary/10' : 'hover:bg-muted',
                 isOutside && !isSelected && 'text-muted-foreground/60',
                 isToday &&
                   !isSelected &&

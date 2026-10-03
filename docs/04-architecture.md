@@ -91,6 +91,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 ## 8. Seed Data & Bootstrapping
 
 - A database seed script, run at first boot, first creates the full set of `d_user_policy` rows the app needs, then the `member`, `trainer` and `admin` policy groups with their policy lists, then a fixed set of demo trainer and admin `d_users` rows with known credentials, each given its staff group (documented in the project README) - this is the *only* way trainer/admin accounts and their access come into existence; there is no staff registration UI (FR-41), and beyond this seed the only other way an existing account's policies change is the Admin policy-management feature (FR-43).
+- The seed also creates one demo member, `student@example.com`, already activated (aptitude cleared, membership active, in the `member` group), with `apps/api/src/test/fixtures/faces/valid/reference.jpg` stored as the reference photo and its embedding computed through the same face-embedding module as signup. It lets the member screens be used without going through signup. Like the staff rows, it is insert-if-missing, so a re-run never recreates the photo.
 - The same seed script populates the initial exercise/equipment catalog and a batch of fake seeded members (with their `member` group membership), check-ins, and plans so that occupancy/equipment-demand metrics have realistic data to show in a demo (see [02-requirements.md](./02-requirements.md), Permitted Scopes).
 
 ## 9. Environment Variables (indicative)
@@ -102,7 +103,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | backend container | Credentials and database name the entrypoint initializes PostgreSQL with; compose builds the in-container `DATABASE_URL` from them |
 | `API_PORT` | backend | Port the API listens on (4000) |
 | `WEB_ORIGIN` | backend | The web app URL: the only origin CORS allows with credentials, and the base for links in e-mails |
-| `SEED_TRAINER_PASSWORD` / `SEED_ADMIN_PASSWORD` | backend (seed) | Passwords of the fixed demo trainer and admin accounts the seed creates |
+| `SEED_TRAINER_PASSWORD` / `SEED_ADMIN_PASSWORD` / `SEED_STUDENT_PASSWORD` | backend (seed) | Passwords of the fixed demo trainer, admin and student (member) accounts the seed creates |
 | `JWT_SECRET` | backend | Signing secret for auth JWTs |
 | `NODE_ENV` | backend | Gates the `Secure` cookie flag (production only) |
 | `AI_MODE` | backend | `live` calls OpenRouter; `mock` returns deterministic fixtures with no network call (default `mock`) |

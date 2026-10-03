@@ -19,7 +19,7 @@ Schema lives in `apps/api/src/db/schema/`, one file per table group (e.g. `users
 
 ## Migrations
 
-Every schema change goes through `drizzle-kit generate`, producing a committed migration file - never a manual `ALTER TABLE` applied outside that flow. The seed script (`apps/api/src/db/seed.ts`) is the only code path that creates the fixed demo trainer/admin `d_users` rows and grants their policies (FR-41); keep it safe to re-run in local dev without duplicating the fixed demo accounts, the policy catalog, or the exercise/equipment catalog.
+Every schema change goes through `drizzle-kit generate`, producing a committed migration file - never a manual `ALTER TABLE` applied outside that flow. The seed script (`apps/api/src/db/seed.ts`) is the only code path that creates the fixed demo trainer/admin `d_users` rows and grants their policies (FR-41), plus the demo member `student@example.com` (activated, in the `member` group, with its reference photo and embedding); keep it safe to re-run in local dev without duplicating the fixed demo accounts, the policy catalog, or the exercise/equipment catalog.
 
 ## Local databases
 

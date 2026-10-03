@@ -51,7 +51,7 @@ Working product name: **Cadence** - chosen during this session (2026-09-06) from
 
 ## Evidence on Hand
 
-None real, by design. All member records, check-ins, training plans, medical certificates, and the turnstile API are mocked or seeded for an academic demo - future work must not fabricate real testimonials, case studies, benchmarks, pricing, or biometric data from real people. A seed script is the source of demo data (fixed trainer/admin accounts, initial exercise/equipment catalog, fake members/check-ins/plans for realistic occupancy/demand numbers).
+None real, by design. All member records, check-ins, training plans, medical certificates, and the turnstile API are mocked or seeded for an academic demo - future work must not fabricate real testimonials, case studies, benchmarks, pricing, or biometric data from real people. A seed script is the source of demo data (fixed trainer/admin accounts and a demo student member, initial exercise/equipment catalog, fake members/check-ins/plans for realistic occupancy/demand numbers).
 
 ## Product Principles
 

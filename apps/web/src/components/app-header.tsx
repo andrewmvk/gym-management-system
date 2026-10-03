@@ -9,6 +9,7 @@ import { useMemo, useState } from 'react';
 import { Brand } from '@/components/brand';
 import { KitBar } from '@/components/kit-bar';
 import { ThemeToggle } from '@/components/theme-toggle';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/user-menu';
@@ -67,6 +68,7 @@ export function AppHeader({ area }: { area: AppArea }) {
   const pathname = usePathname();
   const me = useQuery(trpc.auth.me.queryOptions());
   const rules = me.data?.rules;
+  const membership = me.data?.user;
   const ability = useMemo(() => createAppAbility(rules), [rules]);
 
   const items = NAV_ITEMS[area].filter((item) => !item.isVisible || (me.data && item.isVisible(ability)));
@@ -108,6 +110,14 @@ export function AppHeader({ area }: { area: AppArea }) {
         })}
       </nav>
       <div className="ml-auto flex items-center gap-1">
+        {area === 'member' && membership?.membershipPlan && (
+          <Badge
+            variant={membership.membershipStatus === 'active' ? 'live' : 'unavailable'}
+            className="mr-1 hidden sm:inline-flex"
+          >
+            {membership.membershipPlan} · {membership.membershipStatus}
+          </Badge>
+        )}
         <ThemeToggle />
         <UserMenu area={area} />
       </div>

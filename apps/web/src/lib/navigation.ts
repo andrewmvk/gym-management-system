@@ -13,6 +13,7 @@ export const NAV_ITEMS: Record<AppArea, NavItem[]> = {
   member: [
     { href: MEMBER_HOME_PATH, label: 'Home' },
     { href: '/plan', label: 'My plan' },
+    { href: '/metrics', label: 'Metrics' },
     { href: '/onboarding', label: 'Health profile' },
   ],
   staff: [
@@ -24,6 +25,11 @@ export const NAV_ITEMS: Record<AppArea, NavItem[]> = {
       isVisible: (ability) => ability.can('manage', 'MedicalCertificate'),
     },
     { href: '/catalog', label: 'Catalog' },
+    {
+      href: '/members',
+      label: 'Members',
+      isVisible: (ability) => ability.can('read', 'Member'),
+    },
     {
       href: '/policies',
       label: 'Policies',

@@ -1,7 +1,7 @@
 Blocked by: P-14, P-20
 Covers: FR-36, FR-40
 MVP: 4
-Artifacts: apps/api/src/modules/metrics/{router,service,repository}.ts (new domain module), member listing in apps/api/src/modules/auth/, apps/web/src/app/(member)/metrics/, apps/web/src/app/(staff)/members/
+Artifacts: apps/api/src/modules/metrics/{router,service,repository}.ts (new domain module), packages/shared/src/schemas/metrics.ts, member listing in apps/api/src/modules/auth/, apps/web/src/app/(member)/metrics/, apps/web/src/app/(staff)/members/, apps/web/src/components/{date-range-picker,calendar,app-header}.tsx, apps/web/src/lib/navigation.ts
 Evidence: Vitest against Postgres: for a known data set the metrics are exact, days trained ignore days with only completed exercises and no check-in, and a retroactive correction is reflected; manual: both pages render
 
 Task: implement the member's personal metrics and the mocked membership status views.
@@ -14,11 +14,12 @@ Context:
 
 Permitted scope:
 - Only the files in Artifacts and the router registrations. No new dependencies.
+- The seed's demo member (student@example.com, from the P-02 seed) is the account to check the member pages with.
 
 Functional requirements:
 1. metrics.mine({ from, to }), requiring read_own_metrics: trainingFrequency (check-in days per week), daysTrained, exerciseBreakdown (completed exercises per exercise and per muscle group), trainingVolume (sum of sets times reps for completed exercises), and goalProgress (share of planned exercises completed plus the member's goals text). Everything is computed by queries, nothing is stored.
-2. auth.listMembers guarded by read_members: each member with membership_status, membership_plan and aptitude_status, never an embedding or a photo path. auth.me already returns the member's own membership fields (P-03).
-3. Pages: (member)/metrics with a date range, summary cards, a breakdown table, and an empty state; (staff)/members with the membership table. A membership badge appears in the member header.
+2. auth.listMembers guarded by read_members: each activated member (an account with a membership_status, so applicants are left out) with membership_status, membership_plan and aptitude_status, never an embedding or a photo path. auth.me already returns the member's own membership fields (P-03).
+3. Pages: (member)/metrics with a single date range picker (a popover with presets for today, last 7 and 30 days, this month, last 3 and 6 months, this year and last 12 months, plus a calendar for a custom first and last day, built by adding range highlighting to the existing Calendar so no dependency is added), a summary strip, breakdown tables by exercise and by muscle group, the member's goals, and an empty state; (staff)/members with the searchable, filterable membership table. A membership badge appears in the member header bar (and in the account menu).
 
 Acceptance criteria:
 - Metrics match a hand-computed data set exactly.

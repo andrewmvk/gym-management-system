@@ -14,7 +14,7 @@ catalog stay aligned.
 Goal: have something that boots and responds, with real data in the database, with no external
 dependency yet.
 
-- Seed script: full `d_user_policy` set + fixed trainer/admin accounts (FR-41, FR-42, FR-43); the `member`/`trainer`/`admin` policy groups join it with P-23 (FR-47).
+- Seed script: full `d_user_policy` set + fixed trainer/admin accounts and a demo student member (FR-41, FR-42, FR-43); the `member`/`trainer`/`admin` policy groups join it with P-23 (FR-47).
 - Minimal auth: password login, JWT in an httpOnly cookie, basic CASL ability (docs/04-architecture.md §3).
 - Catalog: `d_exercises`, `d_gym_equipment`, `d_exercise_equipment` - schema, admin CRUD, listing (FR-16, FR-17, FR-24).
 

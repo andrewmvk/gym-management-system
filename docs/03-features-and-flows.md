@@ -166,7 +166,8 @@ Onboarding is not a one-time gate - members can add or revise this information l
 
 ```
 1. Shows whether the gym is currently open (server's local timezone
-   against configured hours).
+   against configured hours), with today's hours and when it next
+   closes or opens.
 2. Shows an estimated current occupancy: the count of check-ins within a
    trailing rolling window (e.g. the last 90 minutes). There is no
    checkout event, so this is explicitly an estimate, not an exact
@@ -174,7 +175,11 @@ Onboarding is not a one-time gate - members can add or revise this information l
 3. Shows which muscle groups/equipment are in demand today - computed
    from seeded check-in and plan data, not truly live multi-user traffic,
    and only counting exercises whose equipment is currently available.
+4. Anyone with the check-in read permission also sees today's check-ins
+   per hour.
 ```
+
+The page is public (no sign-in needed) and is linked from the member and staff areas.
 
 ## 9. Admin: Access Policy Management
 

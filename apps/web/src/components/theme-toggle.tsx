@@ -28,7 +28,11 @@ export function ThemeToggle({ className }: { className?: string }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className={cn('text-kit-foreground hover:bg-white/10 aria-expanded:bg-white/10', className)}>
+        <Button
+          variant="ghost"
+          size="icon"
+          className={cn('text-kit-foreground hover:bg-white/10 aria-expanded:bg-white/10', className)}
+        >
           <Icon className="size-5" />
           <span className="sr-only">Change theme</span>
         </Button>

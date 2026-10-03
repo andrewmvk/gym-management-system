@@ -3,6 +3,7 @@ import { aptitudeRouter } from '@api/modules/aptitude/router';
 import { authRouter } from '@api/modules/auth/router';
 import { catalogRouter } from '@api/modules/catalog/router';
 import { chatRouter } from '@api/modules/chat/router';
+import { gymRouter } from '@api/modules/gym/router';
 import { metricsRouter } from '@api/modules/metrics/router';
 import { onboardingRouter } from '@api/modules/onboarding/router';
 import { reviewsRouter } from '@api/modules/plans/reviews-router';
@@ -18,6 +19,7 @@ export const appRouter = router({
   catalog: catalogRouter,
   certificates: certificateRouter,
   chat: chatRouter,
+  gym: gymRouter,
   metrics: metricsRouter,
   onboarding: onboardingRouter,
   plans: plansRouter,

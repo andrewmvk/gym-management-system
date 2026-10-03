@@ -301,7 +301,8 @@ The wall-mounted check-in screen is the one surface with its own layout, because
 
 ### Navigation
 - **Header:** a 64px sticky Locker Ink bar with the brand on the left, then nav links in Control typography at 1rem. Inactive links are Locker Ink Muted; the active one is full white with a 3px Pace Tape underline that grows from the left. Theme menu and user menu sit on the right.
-- **Mobile:** a hamburger opens a left sheet (80% width, max 24rem) in Locker Ink with 2xl uppercase links and a slanted tape marker on the active one.
+- **Grouped pages:** when an area has more pages than fit one line (staff), related pages sit in a group such as "Gym" or "People", shown as a trigger with a chevron. The group opens on hover (and on click or keyboard) as a Locker Ink panel below the trigger, with a hairline kit border and the popover shadow. Each row is Control typography with a slanted marker on the left: Pace Tape on the current page, a muted marker on the others. The trigger carries the tape underline when any page in the group is current. Links never wrap: a page name stays on one line. A group left with one page by permissions is shown as that page's link.
+- **Mobile:** a hamburger opens a left sheet (80% width, max 24rem) in Locker Ink with 2xl uppercase links and a slanted tape marker on the active one. Groups are flattened into the same list under small uppercase group labels.
 - **Tabs:** uppercase Control labels on an inset hairline baseline; the active tab gets a 3px Kit Cobalt underline. Horizontal overflow scrolls without a visible scrollbar.
 - **Pagination:** "1-10 of 34 plans" in numerals on the left, ghost page buttons on the right, the current page filled cobalt.
 

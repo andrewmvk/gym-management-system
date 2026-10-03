@@ -2,10 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { ChartNoAxesColumnIcon, TargetIcon } from 'lucide-react';
-import { type ReactNode, useMemo } from 'react';
+import { useMemo } from 'react';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { PanelSection as Section } from '@/components/panel-section';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -25,18 +26,6 @@ function rangeOfLastDays(days: number) {
 }
 
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
-
-function Section({ title, description, children }: { title: string; description?: string; children: ReactNode }) {
-  return (
-    <section aria-label={title} className="overflow-hidden rounded-lg border bg-card">
-      <div className="border-b px-5 py-4 sm:px-6">
-        <h2 className="font-display text-xl font-bold tracking-wide uppercase">{title}</h2>
-        {description && <p className="text-sm text-muted-foreground">{description}</p>}
-      </div>
-      {children}
-    </section>
-  );
-}
 
 function Figure({ label, value, unit }: { label: string; value: string; unit: string }) {
   return (

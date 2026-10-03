@@ -2,6 +2,7 @@ export * from '@api/db/schema/aptitude';
 export * from '@api/db/schema/catalog';
 export * from '@api/db/schema/checkins';
 export * from '@api/db/schema/consent';
+export * from '@api/db/schema/gym-settings';
 export * from '@api/db/schema/onboarding';
 export * from '@api/db/schema/plans';
 export * from '@api/db/schema/policies';

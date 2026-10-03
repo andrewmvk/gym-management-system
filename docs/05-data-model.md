@@ -255,8 +255,8 @@ Singleton row, editable by whoever holds the turnstile-config permission (FR-35)
 Singleton row for gym-wide info shown on the public/logged-in gym info page.
 | Column | Type | Notes |
 |---|---|---|
-| id | uuid PK | |
-| opening_hours | jsonb | Used to compute "is the gym open," in the server's local timezone (FR-39) |
+| id | uuid PK | Singleton: always the fixed id `00000000-0000-4000-8000-000000000002`, created with the defaults on first read |
+| opening_hours | jsonb | One entry per weekday (`sunday` to `saturday`), each `{ open, close }` in 24-hour `HH:MM` with `open` before `close`, or `null` for a closed day; validated by a zod schema in `packages/shared`. Used to compute "is the gym open" and the next opening or closing time, in the server's local timezone (FR-39). Default: Monday to Friday 06:00-22:00, Saturday 08:00-14:00, Sunday closed. Open is `[open, close)`: the closing minute itself is already closed |
 
 ## 3. Derived / Computed Data (not stored redundantly)
 

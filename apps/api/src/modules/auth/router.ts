@@ -1,6 +1,6 @@
-import { activateMember, loadSession, verifyCredentials } from '@api/modules/auth/service';
+import { activateMember, listMembers, loadSession, verifyCredentials } from '@api/modules/auth/service';
 import { clearSessionCookie, setSessionCookie } from '@api/modules/auth/session';
-import { publicProcedure, router } from '@api/trpc/procedures';
+import { assertCan, authedProcedure, publicProcedure, router } from '@api/trpc/procedures';
 import { LoginInputSchema, SetPasswordInputSchema } from '@cadence/shared/schemas/auth';
 import { TRPCError } from '@trpc/server';
 
@@ -28,6 +28,12 @@ export const authRouter = router({
 
     const session = await loadSession(user.id);
     return session && { user: session.user, rules: session.rules, nextStep: 'onboarding' as const };
+  }),
+
+  // read_members (scope all): the membership table of the staff app, with no biometric field in the result (FR-40).
+  listMembers: authedProcedure.query(({ ctx }) => {
+    assertCan(ctx.ability, 'read', 'Member');
+    return listMembers();
   }),
 
   logout: publicProcedure.mutation(({ ctx }) => {

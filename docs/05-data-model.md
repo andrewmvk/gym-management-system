@@ -274,5 +274,6 @@ A first-boot seed script (see [04-architecture.md](./04-architecture.md) §8) cr
 - The full set of `d_user_policy` rows the app needs (one per operation+resource+scope combination).
 - The three `d_user_policy_group` rows (`member`, `trainer`, `admin`) and their `d_user_policy_group_policy` contents (FR-47).
 - Fixed demo trainer and admin `d_users` rows with known credentials, each given the `trainer` or `admin` group through an `f_user_policy_group_on_user` row (the only way these accounts and their access come into existence - FR-41/FR-42/FR-43).
+- A fixed demo member `d_users` row (`student@example.com`), already activated (`aptitude_status` cleared, `membership_status` active, a mock `membership_plan`) with a stored reference photo and its embedding, in the `member` group.
 - An initial `d_exercises` / `d_gym_equipment` / `d_exercise_equipment` catalog.
 - A batch of fake seeded members (`d_users` rows plus their `member` group membership), `f_check_ins`, and `f_training_plans` so occupancy and equipment-demand queries return meaningful results for a demo.

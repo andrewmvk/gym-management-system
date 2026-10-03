@@ -276,6 +276,37 @@ describe('auth', () => {
     });
   });
 
+  describe('listMembers', () => {
+    it('lists each member with the membership fields and no biometric field, for an admin', async () => {
+      const member = await createMember();
+      await createApplicant('pending');
+      const { caller } = await callerFor(signSessionToken(await adminId()));
+
+      const members = await caller.auth.listMembers();
+
+      expect(members.map((row) => row.email)).toContain(MEMBER_EMAIL);
+      expect(members.map((row) => row.email)).not.toContain(APPLICANT_EMAIL);
+      expect(members.find((row) => row.id === member.id)).toEqual({
+        id: member.id,
+        name: 'Demo Member',
+        email: MEMBER_EMAIL,
+        membershipStatus: 'active',
+        membershipPlan: 'monthly',
+        aptitudeStatus: 'cleared',
+      });
+    });
+
+    it('refuses a member and a signed-out caller', async () => {
+      const member = await createMember();
+
+      const asMember = await callerFor(signSessionToken(member.id));
+      await expect(asMember.caller.auth.listMembers()).rejects.toMatchObject({ code: 'FORBIDDEN' });
+
+      const signedOut = await callerFor();
+      await expect(signedOut.caller.auth.listMembers()).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+  });
+
   it('logout clears the session cookie', async () => {
     const { caller, res } = await callerFor();
 

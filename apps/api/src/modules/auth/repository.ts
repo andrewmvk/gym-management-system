@@ -1,7 +1,7 @@
 import { type DatabaseExecutor, db } from '@api/db/client';
 import { dUserPolicy, dUserPolicyGroupPolicy, dUsers, fUserPolicyGroupOnUser, fUserPolicyOnUser } from '@api/db/schema';
 import type { PolicyGroupId } from '@cadence/shared/auth';
-import { and, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, asc, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
 
 export async function findUserByEmail(email: string, executor: DatabaseExecutor = db) {
   const [user] = await executor.select().from(dUsers).where(eq(dUsers.email, email));
@@ -11,6 +11,23 @@ export async function findUserByEmail(email: string, executor: DatabaseExecutor 
 export async function findUserById(id: string, executor: DatabaseExecutor = db) {
   const [user] = await executor.select().from(dUsers).where(eq(dUsers.id, id));
   return user ?? null;
+}
+
+// FR-40: members are the accounts that went through activation, so they alone carry a membership status. The
+// columns are listed one by one so the embedding and the photo path can never reach a caller.
+export function listMembers(executor: DatabaseExecutor = db) {
+  return executor
+    .select({
+      id: dUsers.id,
+      name: dUsers.name,
+      email: dUsers.email,
+      membershipStatus: dUsers.membershipStatus,
+      membershipPlan: dUsers.membershipPlan,
+      aptitudeStatus: dUsers.aptitudeStatus,
+    })
+    .from(dUsers)
+    .where(isNotNull(dUsers.membershipStatus))
+    .orderBy(asc(dUsers.name), asc(dUsers.email));
 }
 
 // FR-9: turns a cleared applicant into a member. Called inside a transaction alongside assignGroup

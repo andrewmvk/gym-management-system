@@ -7,6 +7,7 @@ import {
   findActiveGrants,
   findUserByEmail,
   findUserById,
+  listMembers as listMemberRows,
 } from '@api/modules/auth/repository';
 import {
   type AbilityRule,
@@ -24,7 +25,7 @@ const DUMMY_PASSWORD_HASH = bcrypt.hashSync('cadence-timing-equalizer', 10);
 const BCRYPT_ROUNDS = 10;
 
 // FR-40 is mocked: there is no real membership catalog, so every activated member gets this one label.
-const DEFAULT_MEMBERSHIP_PLAN = 'Standard';
+export const DEFAULT_MEMBERSHIP_PLAN = 'Standard';
 
 export function toPublicUser(user: User) {
   return {
@@ -44,6 +45,10 @@ export interface Session {
   user: PublicUser;
   ability: AppAbility;
   rules: AbilityRule[];
+}
+
+export function listMembers() {
+  return listMemberRows();
 }
 
 export async function verifyCredentials(email: string, password: string): Promise<User | null> {

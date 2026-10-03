@@ -7,7 +7,9 @@ import {
   fUserPolicyGroupOnUser,
   fUserPolicyOnUser,
 } from '@api/db/schema';
-import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
+import { SEED_ADMIN_EMAIL, SEED_STUDENT_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
+import { FACE_EMBEDDING_LENGTH } from '@api/lib/face-embedding';
+import { DEFAULT_MEMBERSHIP_PLAN } from '@api/modules/auth/service';
 import { resetTestDatabase } from '@api/test/database';
 import {
   ADMIN_GROUP,
@@ -20,7 +22,7 @@ import {
   TRAINER_GROUP,
   TRAINER_POLICY_IDS,
 } from '@cadence/shared/auth';
-import { and, count, eq } from 'drizzle-orm';
+import { and, count, eq, ne } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
 async function rowCounts() {
@@ -71,11 +73,11 @@ describe('seedBase', () => {
     expect(await rowCounts()).toEqual(first);
     expect(first).toEqual({
       policies: POLICY_CATALOG.length,
-      users: 2,
+      users: 3,
       grants: 0,
       groups: POLICY_GROUP_CATALOG.length,
       groupPolicies: MEMBER_POLICY_IDS.length + TRAINER_POLICY_IDS.length + ADMIN_POLICY_IDS.length,
-      memberships: 2,
+      memberships: 3,
     });
   });
 
@@ -114,7 +116,8 @@ describe('seedBase', () => {
   it('leaves member-only fields null on staff accounts', async () => {
     await seedBase();
 
-    const staff = await db.select().from(dUsers);
+    const staff = await db.select().from(dUsers).where(ne(dUsers.email, SEED_STUDENT_EMAIL));
+    expect(staff).toHaveLength(2);
     for (const user of staff) {
       expect(user.passwordHash).toBeTruthy();
       expect(user).toMatchObject({
@@ -126,6 +129,30 @@ describe('seedBase', () => {
         membershipPlan: null,
       });
     }
+  });
+
+  it('seeds an activated demo member with a photo and an embedding, in the member group only', async () => {
+    await seedBase();
+
+    const [student] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_STUDENT_EMAIL));
+    expect(student).toMatchObject({
+      aptitudeStatus: 'cleared',
+      membershipStatus: 'active',
+      membershipPlan: DEFAULT_MEMBERSHIP_PLAN,
+    });
+    expect(student?.passwordHash).toBeTruthy();
+    expect(student?.referenceFaceEmbedding).toHaveLength(FACE_EMBEDDING_LENGTH);
+    expect(student?.referencePhotoPath).toMatch(new RegExp(`^${student?.id}/reference_photo/.+\\.jpg$`));
+    expect(await groupIdsOf(SEED_STUDENT_EMAIL)).toEqual([MEMBER_GROUP]);
+  });
+
+  it('keeps the demo member photo as it was when re-run', async () => {
+    await seedBase();
+    const [first] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_STUDENT_EMAIL));
+    await seedBase();
+    const [second] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_STUDENT_EMAIL));
+
+    expect(second?.referencePhotoPath).toBe(first?.referencePhotoPath);
   });
 
   it('keeps later changes to a staff membership when re-run', async () => {

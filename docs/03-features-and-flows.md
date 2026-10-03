@@ -115,8 +115,10 @@ Onboarding is not a one-time gate - members can add or revise this information l
 ## 5. Member: Metrics
 
 ```
-1. Member opens their metrics view.
-2. System computes (from check-ins + plan/exercise history, not stored
+1. Member opens their metrics view and picks a date range, either a
+   preset (today, last 7 days, this month, this year, ...) or a custom
+   first and last day.
+2. System computes, for that range, (from check-ins + plan/exercise history, not stored
    redundantly): training frequency, total days trained, exercise
    breakdown, training volume, progress toward stated goals.
 ```

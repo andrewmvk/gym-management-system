@@ -10,6 +10,7 @@ Context:
 - Schema: docs/05-data-model.md (d_users, d_user_policy, f_user_policy_on_user). Conventions: rules/database.md and rules/naming-conventions.md. Migrations always come from drizzle-kit generate.
 - Tests use a real Postgres through TEST_DATABASE_URL, never a mock (rules/testing.md). It points to the separate test database the backend entrypoint creates in the developer's local container (P-01).
 - The seed is the only code path that creates staff accounts and their policies (FR-41) and must be safe to re-run.
+- Amended later: the seed also creates the demo member student@example.com (password from SEED_STUDENT_PASSWORD, required like the other two), already activated and in the member group, with src/test/fixtures/faces/valid/reference.jpg stored as its reference photo and its embedding computed through the face-embedding module. Like the staff rows it is insert-if-missing, and the photo is only stored when the row is first created. The seed tests cover it, and the staff-only checks exclude it.
 
 Permitted scope:
 - Only the files in Artifacts and the env additions (TEST_DATABASE_URL, optional; SEED_TRAINER_PASSWORD and SEED_ADMIN_PASSWORD, required, at least 8 characters) in the env loader and .env.example.

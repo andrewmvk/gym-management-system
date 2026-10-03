@@ -4,7 +4,7 @@ Node.js + Express hosting the tRPC HTTP adapter. Express itself stays a thin hos
 
 ## Module structure
 
-Organize by domain, not by technical layer: `src/modules/<domain>/` for each of `aptitude`, `onboarding`, `plans`, `catalog`, `chat`, `checkins`, `turnstile`, `ai`, `auth`, `policies` (FR-42/43/47/48: viewing, granting and revoking `d_user_policy`/`f_user_policy_on_user` and assigning policy groups through `f_user_policy_group_on_user`). Each domain module has:
+Organize by domain, not by technical layer: `src/modules/<domain>/` for each of `aptitude`, `onboarding`, `plans`, `catalog`, `chat`, `checkins`, `turnstile`, `ai`, `auth`, `policies` (FR-42/43/47/48: viewing, granting and revoking `d_user_policy`/`f_user_policy_on_user` and assigning policy groups through `f_user_policy_group_on_user`), `metrics` (FR-36: a member's personal metrics, computed by queries on each call and never stored). Each domain module has:
 
 - `router.ts` - tRPC procedures + zod input schemas. Thin: no direct DB queries here.
 - `service.ts` - business logic, orchestrates repository calls and the AI module.

@@ -1,9 +1,15 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { env } from '@api/config/env';
 import { type Database, db as defaultDb, type Transaction } from '@api/db/client';
 import { dUserPolicy, dUserPolicyGroup, dUserPolicyGroupPolicy, dUsers, fUserPolicyGroupOnUser } from '@api/db/schema';
 import { seedCatalog } from '@api/db/seed-data/catalog';
+import { computeFaceEmbedding } from '@api/lib/face-embedding';
+import { saveUpload } from '@api/lib/uploads';
+import { DEFAULT_MEMBERSHIP_PLAN } from '@api/modules/auth/service';
 import {
   ADMIN_GROUP,
+  MEMBER_GROUP,
   POLICY_CATALOG,
   POLICY_GROUP_CATALOG,
   type PolicyGroupId,
@@ -14,6 +20,9 @@ import { and, eq, notInArray, sql } from 'drizzle-orm';
 
 export const SEED_TRAINER_EMAIL = 'trainer@example.com';
 export const SEED_ADMIN_EMAIL = 'admin@example.com';
+export const SEED_STUDENT_EMAIL = 'student@example.com';
+
+const STUDENT_PHOTO_PATH = fileURLToPath(new URL('../test/fixtures/faces/valid/reference.jpg', import.meta.url));
 
 const BCRYPT_ROUNDS = 10;
 
@@ -66,6 +75,48 @@ async function ensureStaffAccount(tx: Transaction, account: StaffAccount) {
   await tx.insert(fUserPolicyGroupOnUser).values({ userId: user.id, groupId: account.groupId }).onConflictDoNothing();
 }
 
+// The demo member is created already activated (cleared, active, in the member group) so the member screens can be
+// used without going through signup. Like the staff rows it is insert-if-missing, and the photo is only stored and
+// embedded when the row is first created, so a re-run never piles up copies of the file.
+async function ensureStudentAccount(tx: Transaction) {
+  const [created] = await tx
+    .insert(dUsers)
+    .values({
+      email: SEED_STUDENT_EMAIL,
+      name: 'Demo Student',
+      passwordHash: await bcrypt.hash(env.SEED_STUDENT_PASSWORD, BCRYPT_ROUNDS),
+      aptitudeStatus: 'cleared',
+      membershipStatus: 'active',
+      membershipPlan: DEFAULT_MEMBERSHIP_PLAN,
+    })
+    .onConflictDoNothing({ target: dUsers.email })
+    .returning({ id: dUsers.id });
+
+  if (created) {
+    const photo = await readFile(STUDENT_PHOTO_PATH);
+    const embedding = await computeFaceEmbedding(photo);
+    if (!embedding.ok) {
+      throw new Error(`Seed could not compute the face embedding of the demo student (${embedding.reason})`);
+    }
+    const saved = await saveUpload({
+      ownerId: created.id,
+      kind: 'reference_photo',
+      filename: 'reference.jpg',
+      mimeType: 'image/jpeg',
+      base64: photo.toString('base64'),
+    });
+    await tx
+      .update(dUsers)
+      .set({ referencePhotoPath: saved.path, referenceFaceEmbedding: embedding.embedding })
+      .where(eq(dUsers.id, created.id));
+  }
+
+  const [user] = await tx.select({ id: dUsers.id }).from(dUsers).where(eq(dUsers.email, SEED_STUDENT_EMAIL));
+  if (!user) throw new Error(`Seed could not load the student account ${SEED_STUDENT_EMAIL}`);
+
+  await tx.insert(fUserPolicyGroupOnUser).values({ userId: user.id, groupId: MEMBER_GROUP }).onConflictDoNothing();
+}
+
 export async function seedBase(database: Database = defaultDb) {
   await database.transaction(async (tx) => {
     await tx
@@ -95,6 +146,7 @@ export async function seedBase(database: Database = defaultDb) {
       password: env.SEED_ADMIN_PASSWORD,
       groupId: ADMIN_GROUP,
     });
+    await ensureStudentAccount(tx);
 
     await seedCatalog(tx);
   });

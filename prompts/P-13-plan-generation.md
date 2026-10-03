@@ -18,7 +18,7 @@ Permitted scope:
 Functional requirements:
 1. Plan tables as in docs/05-data-model.md, with a unique constraint on (user_id, plan_date), and f_profile_events with its event_type enum.
 2. plansService.generateForDate(userId, date): assemble the context, call the AI module with the plan purpose and a zod schema of { exercises: [{ exerciseId, sets, reps, load?, notes? }] }, validate that every exerciseId exists and passes the predicate (discard others; if none remain use the placeholder), and persist the plan as status ai_published with ordered exercises. An existing ai_published plan for that date is replaced; a trainer_edited plan is refused unless confirmOverwrite is true (the guard is completed in P-15).
-3. PLAN_GENERATOR=placeholder (default when AI_MODE=mock) picks 3 to 5 available exercises across different muscle groups deterministically, so the flow works end to end without AI.
+3. PLAN_GENERATOR=placeholder (default when AI_MODE=mock) picks 3 to 5 available exercises across different muscles deterministically, so the flow works end to end without AI (grouped by lead muscle and ordered by the member's muscle focus since P-29).
 4. Procedure plans.generateToday for the signed-in member. When the AI is unavailable throw TRPCError INTERNAL_SERVER_ERROR with the message "AI is temporarily unavailable" (rules/error-handling.md).
 5. After a successful onboarding submission, call generateForDate for today, best effort: a failure is logged and the member can retry with plans.generateToday.
 

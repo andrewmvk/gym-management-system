@@ -1,5 +1,5 @@
 import { db, pool } from '@api/db/client';
-import { dExerciseEquipment, dExercises, dGymEquipment } from '@api/db/schema';
+import { dExerciseEquipment, dExerciseMuscles, dExercises, dGymEquipment } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
 import { resetTestDatabase } from '@api/test/database';
 import { count, eq } from 'drizzle-orm';
@@ -38,6 +38,32 @@ describe('seedCatalog', () => {
 
     expect(withoutEquipment.length).toBeGreaterThan(0);
     expect(withoutEquipment.length).toBeLessThan(exercises.length);
+  });
+
+  it('gives every exercise at least one primary muscle', async () => {
+    await seedBase();
+
+    const exercises = await db.select({ id: dExercises.id }).from(dExercises);
+    const primaries = await db
+      .select({ exerciseId: dExerciseMuscles.exerciseId })
+      .from(dExerciseMuscles)
+      .where(eq(dExerciseMuscles.role, 'primary'));
+    const withPrimary = new Set(primaries.map((row) => row.exerciseId));
+
+    expect(exercises.filter((exercise) => !withPrimary.has(exercise.id))).toEqual([]);
+  });
+
+  it('fills in the muscle map of an exercise that has none, without touching other rows', async () => {
+    await seedBase();
+    const [squat] = await db.select().from(dExercises).where(eq(dExercises.name, 'Bodyweight Squat'));
+    await db.delete(dExerciseMuscles).where(eq(dExerciseMuscles.exerciseId, squat!.id));
+    const before = await db.select().from(dExerciseMuscles);
+
+    await seedBase();
+
+    const after = await db.select().from(dExerciseMuscles);
+    expect(after.length).toBeGreaterThan(before.length);
+    expect(after.some((row) => row.exerciseId === squat!.id && row.role === 'primary')).toBe(true);
   });
 
   it('does not undo a later toggle of an equipment item when re-run', async () => {

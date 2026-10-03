@@ -1,12 +1,13 @@
 import * as service from '@api/modules/catalog/service';
 import { assertCan, authedProcedure, publicProcedure, router } from '@api/trpc/procedures';
+import { ExerciseMusclesSchema } from '@cadence/shared/schemas/muscles';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 const CreateExerciseInputSchema = z.object({
   name: z.string().trim().min(1, 'Name is required'),
-  muscleGroup: z.string().trim().min(1, 'Muscle group is required'),
   instructions: z.string().trim().min(1, 'Instructions are required'),
+  muscles: ExerciseMusclesSchema,
   equipmentIds: z.array(z.uuid()).default([]),
 });
 

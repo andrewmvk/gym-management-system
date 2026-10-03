@@ -1,8 +1,18 @@
 import { db, pool } from '@api/db/client';
-import { dUsers, fPlanReviews, fTrainingPlans, fUserPolicyOnUser } from '@api/db/schema';
+import {
+  dExercises,
+  dGymEquipment,
+  dUsers,
+  fPlanReviews,
+  fTrainingPlanExercises,
+  fTrainingPlans,
+  fUserPolicyOnUser,
+} from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
+import { todayLocal } from '@api/lib/dates';
 import { logger } from '@api/lib/logger';
 import { signSessionToken } from '@api/modules/auth/session';
+import { setFocus } from '@api/modules/focus/service';
 import { generateForDate } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
@@ -97,6 +107,136 @@ describe('reviews router', () => {
       expect(result.exercises.length).toBeGreaterThan(0);
       expect(result.reviews).toEqual([]);
       expect(result.catalog.length).toBeGreaterThan(0);
+    });
+
+    it('adds the muscle work the member completed in the 14 days before the plan, and their focus', async () => {
+      const { member, plan } = await createMemberWithPlan();
+      const [bench] = await db.select().from(dExercises).where(eq(dExercises.name, 'Barbell Bench Press'));
+      const addPlan = async (planDate: string, completed: boolean) => {
+        const [row] = await db
+          .insert(fTrainingPlans)
+          .values({ userId: member.id, planDate, status: 'ai_published' })
+          .returning();
+        await db
+          .insert(fTrainingPlanExercises)
+          .values({ trainingPlanId: row!.id, exerciseId: bench!.id, sets: 3, reps: 10, orderIndex: 0, completed });
+      };
+      await addPlan('2026-09-28', true);
+      await addPlan('2026-09-29', false);
+      await addPlan('2026-09-10', true);
+      await setFocus(member.id, { muscle: 'glutes', bias: 2 });
+      const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
+
+      const result = await caller.reviews.getPlan({ planId: plan.id });
+
+      expect(result.recentMuscleLoad).toEqual({ chest: 3, triceps: 1.5, 'front-deltoid': 1.5 });
+      expect(result.muscleFocus).toEqual([{ muscle: 'glutes', bias: 2 }]);
+    });
+  });
+
+  describe('must-review plans', () => {
+    async function addPlanWith(memberId: string, planDate: string, exerciseName: string) {
+      const [exercise] = await db.select().from(dExercises).where(eq(dExercises.name, exerciseName));
+      const [plan] = await db
+        .insert(fTrainingPlans)
+        .values({ userId: memberId, planDate, status: 'ai_published' })
+        .returning();
+      await db
+        .insert(fTrainingPlanExercises)
+        .values({ trainingPlanId: plan!.id, exerciseId: exercise!.id, sets: 3, reps: 10, orderIndex: 0 });
+      return plan!;
+    }
+    const setPullUpBar = (isAvailable: boolean) =>
+      db.update(dGymEquipment).set({ isAvailable }).where(eq(dGymEquipment.name, 'Pull-up Bar'));
+
+    it('flags a plan from today on that holds an exercise that cannot be done, and clears when it can', async () => {
+      const member = await createMember('broken-queue@example.com');
+      const today = await addPlanWith(member.id, todayLocal(), 'Pull-Up');
+      const past = await addPlanWith(member.id, '2020-01-01', 'Pull-Up');
+      await setPullUpBar(false);
+      const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
+
+      const queue = await caller.reviews.queue();
+
+      expect(queue.find((entry) => entry.id === today.id)).toMatchObject({ needsReview: true, unavailableCount: 1 });
+      expect(queue.find((entry) => entry.id === past.id)).toMatchObject({ needsReview: false, unavailableCount: 0 });
+
+      await setPullUpBar(true);
+      expect((await caller.reviews.queue()).find((entry) => entry.id === today.id)?.needsReview).toBe(false);
+    });
+
+    it('shows the member the same flag and which equipment is down', async () => {
+      const member = await createMember('broken-member@example.com');
+      await addPlanWith(member.id, todayLocal(), 'Pull-Up');
+      await setPullUpBar(false);
+      const caller = await callerFor(signSessionToken(member.id));
+
+      const plan = await caller.plans.getToday();
+
+      expect(plan?.needsReview).toBe(true);
+      expect(plan?.exercises[0]).toMatchObject({ isPerformable: false, equipmentDown: ['Pull-up Bar'] });
+    });
+
+    it('lists them first on the overview, with the pool map counting only what can be done', async () => {
+      const broken = await createMember('broken-overview@example.com');
+      const fine = await createMember('fine-overview@example.com');
+      const brokenPlan = await addPlanWith(broken.id, todayLocal(), 'Pull-Up');
+      await addPlanWith(fine.id, todayLocal(), 'Push-Up');
+      await setPullUpBar(false);
+      const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
+
+      const overview = await caller.reviews.overview();
+
+      expect(overview.needsReview).toEqual([
+        expect.objectContaining({
+          planId: brokenPlan.id,
+          memberName: 'Review Test Member',
+          blocked: [expect.objectContaining({ name: 'Pull-Up', equipmentDown: ['Pull-up Bar'] })],
+        }),
+      ]);
+      expect(overview.planCount).toBe(2);
+      expect(overview.musclePlans.chest).toBe(1);
+      expect(overview.musclePlans.lats).toBeUndefined();
+      // Out-of-service pieces come first, and each piece counts today's plans that use it.
+      expect(overview.equipment[0]).toMatchObject({ name: 'Pull-up Bar', isAvailable: false, planCount: 1 });
+      expect(overview.equipment.filter((piece) => !piece.isAvailable).length).toBeGreaterThanOrEqual(1);
+      const unusedPiece = overview.equipment.find((piece) => piece.name === 'Treadmill');
+      expect(unusedPiece).toMatchObject({ isAvailable: true, planCount: 0 });
+    });
+
+    it('counts plans a trainer edited or noted, and keeps notes apart from edits in the queue', async () => {
+      const edited = await createMember('edited-member@example.com');
+      const noted = await createMember('noted-member@example.com');
+      const untouched = await createMember('untouched-member@example.com');
+      const editedPlan = await addPlanWith(edited.id, todayLocal(), 'Push-Up');
+      const notedPlan = await addPlanWith(noted.id, todayLocal(), 'Push-Up');
+      const untouchedPlan = await addPlanWith(untouched.id, todayLocal(), 'Push-Up');
+      const trainer = await createTrainer('overview-trainer@example.com');
+      const caller = await callerFor(signSessionToken(trainer.id));
+      await caller.reviews.editPlan({
+        planId: editedPlan.id,
+        exercises: [{ exerciseId: (await db.select().from(dExercises))[0]!.id, sets: 3, reps: 10 }],
+      });
+      await caller.reviews.addNote({ planId: notedPlan.id, note: 'Add a pulling exercise' });
+
+      const queue = await caller.reviews.queue();
+      const overview = await caller.reviews.overview();
+
+      expect(queue.find((entry) => entry.id === editedPlan.id)).toMatchObject({
+        status: 'trainer_edited',
+        noteCount: 0,
+      });
+      expect(queue.find((entry) => entry.id === notedPlan.id)).toMatchObject({ status: 'ai_published', noteCount: 1 });
+      expect(queue.find((entry) => entry.id === untouchedPlan.id)).toMatchObject({ noteCount: 0 });
+      expect(overview.trainerActivity.planCount).toBe(2);
+      expect(overview.trainerActivity.latest).toMatchObject({ trainingPlanId: notedPlan.id, isEdit: false });
+    });
+
+    it('refuses a member the overview', async () => {
+      const member = await createMember('overview-member@example.com');
+      const caller = await callerFor(signSessionToken(member.id));
+
+      await expect(caller.reviews.overview()).rejects.toMatchObject({ code: 'FORBIDDEN' });
     });
   });
 

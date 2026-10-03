@@ -9,6 +9,7 @@ import {
   WEEKDAYS,
   type Weekday,
 } from '@cadence/shared/schemas/gym';
+import { computeMuscleLoad } from '@cadence/shared/schemas/muscle-heat';
 
 const MS_PER_MINUTE = 60 * 1000;
 const HOURS_PER_DAY = 24;
@@ -76,15 +77,15 @@ async function getDemandToday(now: Date) {
     equipmentByExercise.set(row.exerciseId, [...(equipmentByExercise.get(row.exerciseId) ?? []), row]);
   }
 
-  const muscleGroups: string[] = [];
+  const available: typeof planned = [];
   const equipment: string[] = [];
   for (const row of planned) {
     const linked = equipmentByExercise.get(row.exerciseId) ?? [];
     if (!isExerciseAvailable(linked)) continue;
-    muscleGroups.push(row.muscleGroup);
+    available.push(row);
     for (const item of linked) if (item.isAvailable) equipment.push(item.name);
   }
-  return { muscleGroups: tally(muscleGroups), equipment: tally(equipment) };
+  return { muscleLoad: computeMuscleLoad(available), equipment: tally(equipment) };
 }
 
 // The clock is injectable so the window and the opening edges are testable without waiting.

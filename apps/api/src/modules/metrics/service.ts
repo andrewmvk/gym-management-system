@@ -1,5 +1,6 @@
 import { endOfLocalDay, localDateString, startOfLocalDay } from '@api/lib/dates';
 import { findCheckInTimes, findLatestGoals, findPlanExercisesInRange } from '@api/modules/metrics/repository';
+import { computeMuscleLoad, type MuscleLoad } from '@cadence/shared/schemas/muscle-heat';
 
 const DAYS_PER_WEEK = 7;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -16,7 +17,7 @@ export interface MemberMetrics {
   trainingFrequency: number;
   exerciseBreakdown: {
     byExercise: BreakdownEntry[];
-    byMuscleGroup: BreakdownEntry[];
+    muscleLoad: MuscleLoad;
   };
   trainingVolume: number;
   goalProgress: {
@@ -25,6 +26,19 @@ export interface MemberMetrics {
     completionRate: number;
     goals: string | null;
   };
+}
+
+export interface MemberWeek {
+  trainedDates: string[];
+  lastCheckInAt: Date | null;
+}
+
+// The days of a range with at least one check-in, plus the latest check-in instant: what the member's
+// Now screen needs to say "you're in" and to draw the week. Same rule as days trained (FR-36).
+export async function getMemberWeek(userId: string, from: string, to: string): Promise<MemberWeek> {
+  const times = await findCheckInTimes(userId, startOfLocalDay(from), endOfLocalDay(to));
+  const latest = times.reduce<Date | null>((current, time) => (!current || time > current ? time : current), null);
+  return { trainedDates: [...new Set(times.map(localDateString))].sort(), lastCheckInAt: latest };
 }
 
 function round(value: number, digits: number) {
@@ -67,7 +81,7 @@ export async function getMemberMetrics(userId: string, from: string, to: string)
     trainingFrequency,
     exerciseBreakdown: {
       byExercise: countBy(completed.map((exercise) => exercise.exerciseName)),
-      byMuscleGroup: countBy(completed.map((exercise) => exercise.muscleGroup)),
+      muscleLoad: computeMuscleLoad(completed),
     },
     trainingVolume,
     goalProgress: {

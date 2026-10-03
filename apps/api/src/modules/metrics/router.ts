@@ -1,4 +1,4 @@
-import { getMemberMetrics } from '@api/modules/metrics/service';
+import { getMemberMetrics, getMemberWeek } from '@api/modules/metrics/service';
 import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 import { subject } from '@cadence/shared/auth';
 import { MetricsRangeInputSchema } from '@cadence/shared/schemas/metrics';
@@ -8,5 +8,10 @@ export const metricsRouter = router({
   mine: authedProcedure.input(MetricsRangeInputSchema).query(({ ctx, input }) => {
     assertCan(ctx.ability, 'read', subject('Metrics', { userId: ctx.user.id }));
     return getMemberMetrics(ctx.user.id, input.from, input.to);
+  }),
+
+  week: authedProcedure.input(MetricsRangeInputSchema).query(({ ctx, input }) => {
+    assertCan(ctx.ability, 'read', subject('Metrics', { userId: ctx.user.id }));
+    return getMemberWeek(ctx.user.id, input.from, input.to);
   }),
 });

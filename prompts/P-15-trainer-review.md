@@ -14,7 +14,7 @@ Permitted scope:
 - Only the files in Artifacts and the router registration. No new dependencies.
 
 Functional requirements:
-1. Procedures guarded by the plan review abilities: reviews.queue (recent plans across members with member name, status, and last note), reviews.getPlan, reviews.addNote({ planId, note }) inserting a comment row, and reviews.editPlan({ planId, exercises, note? }) replacing the exercise list, setting status trainer_edited with last_edited_by_user_id and last_edited_at, and inserting a row with is_edit true.
+1. Procedures guarded by the plan review abilities: reviews.queue (recent plans across members with member name, status, and last note; P-30 adds needsReview, unavailableCount and noteCount to each entry, and a reviews.overview procedure for the staff Overview), reviews.getPlan, reviews.addNote({ planId, note }) inserting a comment row, and reviews.editPlan({ planId, exercises, note? }) replacing the exercise list, setting status trainer_edited with last_edited_by_user_id and last_edited_at, and inserting a row with is_edit true.
 2. Complete the guard started in P-13: plansService.regenerate({ userId, date, confirmOverwrite }) returns { status: "needs_confirmation", editedBy, editedAt } when the plan is trainer_edited and confirmOverwrite is not true, as data and not an exception. With confirmation it regenerates and the review history stays.
 3. Staff pages: (staff)/reviews queue and a plan detail page with the exercise table, the notes history (author, time, comment or edit badge), an add-note form, and an edit form to change sets, reps and load and to add or remove catalog exercises.
 

@@ -13,8 +13,8 @@ Whole `apps/web` app: member (home, plan, onboarding, chat), staff (home, review
 
 THESIS: Cadence is the club and every screen wears its kit; refuses the neon-on-black fitness app and the white SaaS card grid.
 OWN-WORLD: cobalt kit color, ink and chalk panels, pace-yellow tape for attention; condensed athletic numerals (Barlow Condensed) over a workhorse sans (Barlow); angled sleeve stripes in the top-right corner of ink panels (no full-width tape); status by form: solid live, dashed pending, struck unavailable.
-STORY: member knows today's work at a glance; staff clear queues fast; applicants see numbered stations and the irreversible point.
-FIRST VIEWPORT: member home: kit header, big date numerals, today's roster with sets x reps x load in display numerals, one cobalt primary action.
+STORY: member knows what to do right now; staff see what needs a look; applicants see numbered stations and the irreversible point.
+FIRST VIEWPORT: member home (Now): kit header with the date and the tally, check-in and gym status, the next exercise in display numerals (sets x reps x load) with one cobalt Done action.
 FORM: Club Kit, candidate 5 of 7, seed e8c870ff.
 FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
 

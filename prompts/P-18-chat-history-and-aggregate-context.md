@@ -15,7 +15,7 @@ Permitted scope:
 
 Functional requirements:
 1. Extend the chat system prompt and context so the AI receives the member's active injuries and medication changes next to today's exercises and is instructed to warn about conflicts and to propose a safer alternative from the available catalog.
-2. plansService.getTodayAggregate() returns an anonymized summary of today's published plans: the top 10 exercises and top 5 muscle groups with counts, and never a member id or name.
+2. plansService.getTodayAggregate() returns an anonymized summary of today's published plans: the top 10 exercises and top 5 muscles (weighted sets, since P-29) with counts, and never a member id or name.
 3. Always include that compact aggregate in the chat and adjustment context, so a question such as "what is everyone doing today" can be answered without a second AI call.
 
 Acceptance criteria:

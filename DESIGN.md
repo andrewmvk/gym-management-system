@@ -20,6 +20,12 @@ colors:
   field-stroke: "oklch(0.83 0.008 265)"
   cleared-green: "oklch(0.5 0.13 155)"
   stop-red: "oklch(0.54 0.21 27)"
+  heat-0: "oklch(0.915 0.006 265)"
+  heat-1: "oklch(0.82 0.01 265)"
+  heat-2: "oklch(0.7 0.012 265)"
+  heat-3: "oklch(0.55 0.014 265)"
+  heat-4: "oklch(0.38 0.014 265)"
+  heat-5: "oklch(0.22 0.014 265)"
 typography:
   display:
     fontFamily: "Barlow Condensed, sans-serif"
@@ -181,13 +187,16 @@ A restrained team palette: one saturated cobalt, one ink, one yellow, on cool ne
 - **Cobalt Wash** / **Cobalt Wash Text**: tinted info surfaces (notes, "remembered from chat", icon tiles, checked option cards).
 - **Hairline** / **Field Stroke**: dividers and card borders / input outlines.
 - **Locker Ink Muted**: secondary text on ink panels.
+- **Heat 0 to Heat 5**: the muscle map ramp (`--heat-0` to `--heat-5`), six achromatic steps from "no work" up to the busiest muscle. Light theme runs from a pale gray to near Locker Ink (above); dark theme reverses direction so more work is lighter: oklch(0.29 0.013 265), oklch(0.4 0.014 265), oklch(0.52 0.014 265), oklch(0.67 0.012 265), oklch(0.82 0.01 265), oklch(0.96 0.006 265).
 
 ### Named Rules
 **The Team Color Rule.** Kit Cobalt marks what you can do or what is live. If an element is neither an action nor live state, it doesn't get cobalt.
 
-**The Tape Means Look Rule.** Pace Tape is reserved for "notice this": edits by someone else, where you are in a sequence, who you are. Never use it for a primary action inside the app.
+**The Tape Means Look Rule.** Pace Tape is reserved for "notice this": edits by someone else, where you are in a sequence, who you are, and a plan that must be reviewed because an exercise in it cannot be done (the Must Review badge, the plan notice and the review banner). Never use it for a primary action inside the app.
 
 **The Achromatic Reading Field Rule.** Paragraphs, tables and forms sit on Chalk or Card White with ink and gray text. Color lives at the edges: badges, buttons, kit panels.
+
+**The Quiet Heat Rule.** Data heat is never colored. The muscle map ramp is ink on gray in both themes, so Kit Cobalt stays reserved for what you can do (hover, select, set a focus) and a heat step is never mistaken for an action.
 
 ## Typography
 
@@ -214,7 +223,7 @@ A restrained team palette: one saturated cobalt, one ink, one yellow, on cool ne
 
 One frame for every page: the header and page content share the same centered container (max width 72rem, `max-w-6xl`) with a 16px gutter on phones and 24px from sm. Pages stack sections with a 32px gap and leave 96px at the bottom so the floating coach button never covers content.
 
-Two-column pages (member home, catalog, review detail) use a 3-column grid on large screens: the main content spans two columns, the side panel one. Onboarding uses five columns split 2/3. Everything collapses to a single column below lg.
+Two-column pages (the member plan page, catalog, review detail) use a 3-column grid on large screens: the main content spans two columns, the side panel one. A side panel never sits inside a column that is already a third of the page, so a map is never squeezed. The member home (the Now screen) and the staff Overview are single-column pages: the Now screen is one stack read from top to bottom with the next exercise as its focus, and the Overview puts three equal summary lines first (each a number, a title and one sentence, opening the page that owns the detail) and one full-width pool card below them. Onboarding uses five columns split 2/3. Everything collapses to a single column below lg.
 
 Sign-in and sign-up have no app header: a single centered card (max width 32rem) on the page ground, brand inside the card's ink top, the switch-page link under the card.
 
@@ -243,7 +252,7 @@ Tight, confident corners. Cards, panels and dialogs use 8px; buttons, inputs, se
 
 The recurring silhouette is the **slant**: the brand mark is two parallelograms leaning right, and the same 107° lean repeats in the sleeve stripes, the stepper and progress segments (`-skew-x-12`), and the active marker in the mobile nav.
 
-Dashed strokes are semantic, not decorative: they mean pending, empty, or failed-to-load (see the Form-Not-Hue Rule).
+Dashed strokes are semantic, not decorative: they mean pending, empty, or failed-to-load (see the Form-Not-Hue Rule). On the muscle map a dashed outline means no exercise trains that muscle, and a dashed cobalt outline means the member asked for less of it; a diagonal hatch means lost to unavailable equipment, the same grammar as struck.
 
 ## Components
 
@@ -266,7 +275,7 @@ Confident and kit-sharp: uppercase condensed labels, solid fills, no gloss.
 - **Pending:** transparent with a dashed ink border.
 - **Retry:** transparent with a dashed Stop Red border and red text ("AI: couldn't evaluate"). This is for technical failure, never a real determination.
 - **Unavailable:** outlined, gray, struck through.
-- **Tape:** solid Pace Tape ("Trainer edited", "Sample plan").
+- **Tape:** solid Pace Tape ("Trainer edited", "Sample plan"). A plan with a trainer's note but no edit uses the quieter Secondary badge ("Trainer note"), because a note changes nothing in the plan.
 
 ### Cards / Containers
 - **Corner Style:** 8px.
@@ -310,7 +319,7 @@ The wall-mounted check-in screen is the one surface with its own layout, because
 "Step 3 of 5 · Photo" in label type, over a row of slanted segments: done segments solid cobalt, the current one Pace Tape, upcoming ones dashed. The point after which answers can't be changed is marked with a lock line above the submit button.
 
 ### Exercise Row (signature interaction)
-The checkbox, the order number, the name and muscle-group label, and sets × reps (with load under it) as right-aligned numerals. Completing it fills the checkbox cobalt, draws a line through the name from left to right (420ms, expo-out), dims the numerals, and ticks the panel's tally and progress segments. Exercises that can't be done strike their numerals and show an "Equipment unavailable" badge.
+The checkbox, the order number, the name and its muscles (the primary muscles in the label type, the supporting ones after a plus in the body face), and sets × reps (with load under it) as right-aligned numerals. Completing it fills the checkbox cobalt, draws a line through the name from left to right (420ms, expo-out), dims the numerals, and ticks the panel's tally and progress segments. Exercises that can't be done strike their numerals and show an "Equipment unavailable" badge. While a muscle is selected on the muscle map, the rows that do not train it dim to 45%.
 
 ### Tooltip
 Explains a label without a visible second line. Opens on hover and keyboard focus after 150ms from a small icon-only trigger: a help (`?`) icon, 28px square, muted until hovered, with the same text as its accessible name. The bubble is a Card-colored popover with a Hairline border, the Popover shadow, 6px corners, caption-sized text and a 15rem maximum width. Use `?` to explain what something is; reserve `!` for a warning, which belongs in a badge or message instead. Never put information users need to act on only in a tooltip, because a tap on a phone may not open it.
@@ -319,7 +328,27 @@ Explains a label without a visible second line. Opens on hover and keyboard focu
 The policies-by-groups comparison on the policy screen's second tab: one row per policy, one column per group, a Kit Cobalt tick where the group includes it and a faint dash where it doesn't. Group headers are Title typography with a help tooltip for the description and the group's tally in numerals ("8 of 18") underneath; the first header, "Policy", is the same size and vertically centered with them. Rows holding the same set of groups sit together, widest first, and a 4px Bench Gray rule marks each new cluster, so every group reads as a block of ticks down its column. Each row leads with the policy's description and, under it, its permission in caption type. Each cell has an off-screen label for screen readers. It scrolls horizontally inside its card on a phone.
 
 ### Chart
-Data is drawn with shadcn's Chart component (`components/ui/chart.tsx`, Recharts underneath), never hand-built bars. The check-ins-per-hour bar chart on the gym page is the pattern: a `ChartContainer` 12rem tall inside a card section, horizontal Hairline grid lines only, no axis lines or tick marks, count labels on the left and hour labels every six hours at the bottom, in the muted gray and numerals. Bars have 2px top corners and are Locker Ink at 60% for past hours; the current hour is Kit Cobalt, because it is live state. The tooltip is the Popover pattern (Card-colored, Hairline border, Popover shadow) and gives "07:00 to 07:59" with the count, on hover, tap and keyboard focus (`accessibilityLayer`). A one-line summary in body type above the chart (peak hour and total) carries the reading for anyone who skips the graphic. Demand lists on the same page stay as simple CSS bars: they rank names, not a time series.
+Data is drawn with shadcn's Chart component (`components/ui/chart.tsx`, Recharts underneath), never hand-built bars. The check-ins-per-hour bar chart on the gym page is the pattern: a `ChartContainer` 12rem tall inside a card section, horizontal Hairline grid lines only, no axis lines or tick marks, count labels on the left and hour labels every six hours at the bottom, in the muted gray and numerals. Bars have 2px top corners and are Locker Ink at 60% for past hours; the current hour is Kit Cobalt, because it is live state. The tooltip is the Popover pattern (Card-colored, Hairline border, Popover shadow) and gives "07:00 to 07:59" with the count, on hover, tap and keyboard focus (`accessibilityLayer`). A one-line summary in body type above the chart (peak hour and total) carries the reading for anyone who skips the graphic. Equipment demand lists on the same page stay as simple CSS bars: they rank names, not a time series. A heat map of muscles is not a chart: it is the Muscle Map below.
+
+### Muscle Map (signature visualization)
+A front and a back body drawn from inline SVG, one shape group per muscle (22 muscles; left and right are never told apart, so both sides are painted, hovered and selected as one, and a muscle seen from both sides looks the same on both). Each muscle is filled with one of six achromatic steps, `--heat-0` for no work up to `--heat-5` for the busiest muscle in that view, with a 1.5px Card-colored stroke so neighbors separate. The fill eases for 300ms (expo-out) when the data changes, the one authored motion. The ramp is Locker Ink on gray, never colored (The Quiet Heat Rule).
+- **Cobalt is interaction only:** hovering a muscle, on the body or in the list, draws a 2px Kit Cobalt outline, the selected muscle a 3px one, and a muscle the member has a focus for keeps a 2px solid cobalt outline, dashed when the focus is less. The outlined muscle is drawn last so no neighbor covers it.
+- **Form carries status:** a diagonal hatch over the fill means lost to unavailable equipment, and a dashed Locker Ink outline means no exercise trains that muscle. The legend explains the ramp and shows the hatch and the dashed swatch only when the view uses them.
+- **Layout:** the two bodies sit side by side from `sm` inside their card; on a phone one body shows behind a Front/Back segmented control. A narrow form column asks for the single view at every size. The map sits next to a ranked list of the same muscles (a swatch, the name, the value in numerals): the list is the text summary, the keyboard and screen-reader path (every muscle is a button), and where a selected muscle's detail opens, a hairline-bordered block with its exercises, never a nested card. The shapes themselves are hidden from assistive technology and carry a hover title.
+- **Loading:** a skeleton is the real silhouette in 7% ink, pulsing, behind the usual 200ms delay.
+- **Variants:** the plan page (heat is weighted sets of the plan, plus the focus control), plan history and metrics (read-only), gym demand, the catalog Coverage tab (catalog, available now, lost; selecting out-of-service equipment redraws only the muscles it hurts, hatched), and the add-exercise body selector (a tap steps a muscle through primary at the top step, supporting at a lower one, and off).
+
+### Must-Review Notice
+A plan that holds an exercise that cannot be done (equipment out of service) says so with Pace Tape, because it means "look at this". On the member's plan page and Now screen it is a tape-tinted strip that names the exercises and the equipment that is down and offers "Rebuild without them" (a confirmation first). For staff it is the same tape badge, "Must review", in the queue (filterable, flagged plans first), a banner on the plan review page, and the first summary line of the Overview, a count with one sentence naming the next plan and linking to the queue filtered to must-review plans. It is a notice, never a block: it uses no red and no strikethrough (those mean a settled negative or an unavailable exercise), and it disappears when the plan no longer needs it. When nothing needs review the Overview line says so in one calm sentence.
+
+### Week Strip
+Seven slanted segments, Monday to Sunday, in the stepper's lean (`-skew-x-12`, 2px corners): a day with a check-in is solid Kit Cobalt, a day without one is Bench Gray, and a day yet to come is dashed. The weekday initial sits under each segment in label type and today's segment keeps a 2px ink outline. It is a row of facts about the member's own visits, so each segment has the date and "checked in" or "no check-in" as its accessible name.
+
+### Pool Map
+The Overview's card, in two columns from md. On the left, the Muscle Map with its value being how many of today's plans train each muscle (not weighted sets), counting only exercises that can be done now, with its legend and a one-line text summary. It states facts only: no judgement is drawn on it, and a muscle no plan trains gets the dashed outline ("No plan trains it"). It has no ranked list and is not interactive. On the right, a scrollable list of every piece of equipment: pieces out of service come first, struck through with an "Out of service" badge, each row ending in the count of today's plans that use it as X/N in numerals, and a link to the catalog Coverage tab. The list is positioned to fill the height of the map column, so a long list scrolls inside the card and never makes it taller than the body and legend; below md it stacks under the map with a capped height.
+
+### Focus Stepper
+How much of a muscle the member wants: five slanted segments (`-skew-x-12`, 2px corners, the stepper's lean) centered on "Normal", labeled Much less, Normal and Much more in label type. The segments between Normal and the chosen level fill Kit Cobalt; at Normal only the center segment shows, in ink at 60%. Each segment is a toggle button with its level as its accessible name, and focus shows the usual 3px cobalt ring.
 
 ### Certificate Preview
 The 7rem square thumbnail of an uploaded certificate in the review queue: a 6px-cornered, hairline-bordered tile that opens the file full size, with an ink veil and an open icon on hover and focus. If the file is missing from storage, the tile becomes a dashed Bench Gray square with a "File not found" label, since a dashed stroke already means failed-to-load. Each row also shows when it was uploaded, in numerals.
@@ -337,6 +366,7 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 - **Do** keep every page in the same 72rem container as the header.
 - **Do** design both themes at once; every color is a role token that `.dark` redefines.
 - **Do** build charts with the shadcn Chart component and the role tokens (`var(--primary)`, ink at 60%), and give each one a text summary.
+- **Do** draw any muscle visual with the shared Muscle Map and the `--heat-*` tokens, and pair it with the ranked list so it works without pointing at a shape.
 
 ### Don't:
 - **Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.
@@ -348,3 +378,4 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 - **Don't** show the app header on sign-in or sign-up, or a theme toggle there; those pages follow the system theme.
 - **Don't** use spinners or "Loading..." text for data; use matching skeletons behind the 200ms delay.
 - **Don't** leave a broken image icon where an uploaded file is missing; show the dashed "File not found" tile.
+- **Don't** color data heat (no red-to-green or cobalt ramp) or tell left from right on the muscle map; cobalt outlines are for hover, selection and the member's own focus only.

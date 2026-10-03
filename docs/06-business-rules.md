@@ -2,9 +2,9 @@
 
 Unit 2 asks that we distinguish **functional requirement** ("what the system does"), **non-functional
 requirement** ("with what quality"), and **business rule** ("what domain condition must be honored").
-`docs/02-requirements.md` already numbers FR-1..FR-48 (functional) and NFR-1..NFR-6 (non-functional),
+`docs/02-requirements.md` already numbers FR-1..FR-56 (functional) and NFR-1..NFR-6 (non-functional),
 but several business rules are **embedded as prose inside the FRs**, without their own code. This
-document extracts the most important ones as RN-01..RN-13, in the format Unit 2 recommends (code,
+document extracts the most important ones as RN-01..RN-14, in the format Unit 2 recommends (code,
 description, source requirement, verification criterion) - so each one becomes an isolated, testable
 prompt, like the `AssessmentService.complete()` example in the course booklet.
 
@@ -27,6 +27,7 @@ exercise.
 | RN-11 | Trainer/admin accounts only ever exist via the seed script; no application code path can create one. | FR-41, FR-43 | There is no public "signup" mutation that writes a staff policy. |
 | RN-12 | A face embedding is never computed for a member without a prior recorded consent event. The consent event is recorded in the same transaction as the signup, before the embedding is computed, and a rejected photo rolls both back. | FR-46, docs/05-data-model.md `f_consent_events` | A signup submitted without consent must be refused; a signup whose photo is rejected must leave no `d_users` row and no `f_consent_events` row behind. |
 | RN-13 | Policy groups are read-only in the application, and an admin can never remove their own access to the staff area or to policy management, whether directly or by leaving the group that supplies it. | FR-43, FR-47 | No procedure creates, edits or deletes a `d_user_policy_group` or `d_user_policy_group_policy` row. Revoking or denying `read_staff_app` or `manage_policy_assignments` on yourself, or ending your only active group that supplies either, is refused. |
+| RN-14 | A plan dated today or later that holds an exercise that cannot be done (RN-04 fails for it) is a must-review plan. The flag is derived on every read, never stored, never blocks publication or access, and a plan dated before today is never flagged. | FR-53, FR-18, PRODUCT.md principle 1 | With a plan for today holding an exercise whose only equipment is switched off, `reviews.queue` and the member's plan view report it as must-review; switching the equipment back on, or editing the exercise out, clears it with no write to the plan; the same plan dated yesterday is not flagged; the plan stays published throughout. |
 
 ## How to use this in prompts
 

@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
 import { PanelSection as Section } from '@/components/panel-section';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -117,8 +118,8 @@ function MemberMetricsSkeleton() {
         <Section title="By exercise">
           <BreakdownSkeleton />
         </Section>
-        <Section title="By muscle group">
-          <BreakdownSkeleton />
+        <Section title="Muscles worked">
+          <MuscleLoadView.Skeleton className="px-5 py-5 sm:px-6" />
         </Section>
       </div>
     </div>
@@ -232,15 +233,19 @@ function MemberMetricsRoot() {
                 <BreakdownTable heading="Exercise" rows={exerciseBreakdown.byExercise} />
               )}
             </Section>
-            <Section title="By muscle group" description="The same exercises, grouped.">
-              {exerciseBreakdown.byMuscleGroup.length === 0 ? (
+            <Section title="Muscles worked" description="Weighted sets from the exercises you completed.">
+              {Object.keys(exerciseBreakdown.muscleLoad).length === 0 ? (
                 <EmptyState
                   icon={ChartNoAxesColumnIcon}
                   title="No exercises completed"
                   description="Mark exercises as done in your plan to see them here."
                 />
               ) : (
-                <BreakdownTable heading="Muscle group" rows={exerciseBreakdown.byMuscleGroup} />
+                <MuscleLoadView
+                  load={exerciseBreakdown.muscleLoad}
+                  label="Muscles worked in this range"
+                  className="px-5 py-5 sm:px-6"
+                />
               )}
             </Section>
           </div>

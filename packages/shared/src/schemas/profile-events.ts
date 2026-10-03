@@ -7,6 +7,7 @@ export const PROFILE_EVENT_TYPES = [
   'life_event',
   'state_update',
   'plan_adjustment_request',
+  'muscle_focus_changed',
 ] as const;
 export type ProfileEventType = (typeof PROFILE_EVENT_TYPES)[number];
 

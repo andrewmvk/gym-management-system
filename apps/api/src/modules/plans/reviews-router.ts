@@ -38,6 +38,11 @@ export const reviewsRouter = router({
     return service.listQueue();
   }),
 
+  overview: authedProcedure.query(({ ctx }) => {
+    assertCan(ctx.ability, 'read', ANY_TRAINING_PLAN);
+    return service.getOverview();
+  }),
+
   getPlan: authedProcedure.input(GetPlanInputSchema).query(async ({ ctx, input }) => {
     assertCan(ctx.ability, 'read', ANY_TRAINING_PLAN);
     const result = await service.getPlan(input.planId);

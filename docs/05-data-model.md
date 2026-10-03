@@ -21,6 +21,8 @@ erDiagram
     D_USERS ||--o{ F_PLAN_REVIEWS : writes
     D_EXERCISES ||--o{ F_TRAINING_PLAN_EXERCISES : "referenced by"
     D_EXERCISES ||--o{ D_EXERCISE_EQUIPMENT : requires
+    D_EXERCISES ||--o{ D_EXERCISE_MUSCLES : trains
+    D_USERS ||--o{ F_MEMBER_MUSCLE_FOCUS : sets
     D_GYM_EQUIPMENT ||--o{ D_EXERCISE_EQUIPMENT : "used by"
     D_USERS ||--o| D_TURNSTILE_CONFIG : configures
     D_USERS ||--o{ F_USER_POLICY_ON_USER : holds
@@ -157,9 +159,20 @@ Curated library (FR-16) - the AI selects from this, does not invent free-text ex
 |---|---|---|
 | id | uuid PK | |
 | name | text | |
-| muscle_group | text | e.g. "legs", "chest" |
 | instructions | text | |
 | created_at | timestamp | |
+
+The muscles an exercise trains live in `d_exercise_muscles` below; there is no free-text muscle group column. Migration `0010` drops the old `muscle_group` column and creates the muscle tables, so an existing local database should run `pnpm db:reset`. Re-running the seed also works for the seeded exercises: it fills in the muscle map of any seeded exercise that has none, while an exercise added by hand needs its muscles tagged again.
+
+### `d_exercise_muscles`
+The muscle map of an exercise (FR-16, FR-49): which of the 22 fixed muscles it trains, and how. Part of the add-only catalog: rows are written when the exercise is created and never edited afterward (FR-24).
+| Column | Type | Notes |
+|---|---|---|
+| exercise_id | uuid FK → d_exercises.id | Composite PK with `muscle` |
+| muscle | enum `muscle` | `neck`, `chest`, `front-deltoid`, `lateral-deltoid`, `rear-deltoid`, `biceps`, `triceps`, `forearm-flexors`, `forearm-extensors`, `abs`, `abs-lower`, `obliques`, `trapezius`, `rotator-cuff`, `lats`, `lower-back`, `glutes`, `abductors`, `quads`, `quads-outer`, `hamstrings`, `calves`. The vocabulary is owned by `packages/shared/src/schemas/muscles.ts`, which also holds each muscle's label and the body view or views it is drawn on. Left and right are never stored: a muscle is one value |
+| role | enum `muscle_role` | `primary` or `secondary`. A primary muscle weighs 1 and a secondary one 0.5 when work is summed |
+
+Every exercise has at least one `primary` row, enforced by the shared zod schema on creation. A muscle appears at most once per exercise (the composite key).
 
 ### `d_gym_equipment`
 | Column | Type | Notes |
@@ -232,12 +245,23 @@ The durable "AI memory" extracted from chat (FR-27) - **not** a chat transcript 
 |---|---|---|
 | id | uuid PK | |
 | user_id | uuid FK → d_users.id | |
-| event_type | enum(`injury`,`skipped_exercise`,`medication_change`,`life_event`,`state_update`,`plan_adjustment_request`) | |
-| payload | jsonb | Structured extracted data, shape depends on `event_type` |
+| event_type | enum(`injury`,`skipped_exercise`,`medication_change`,`life_event`,`state_update`,`plan_adjustment_request`,`muscle_focus_changed`) | `muscle_focus_changed` is written by the focus module (FR-51), never extracted from chat |
+| payload | jsonb | Structured extracted data, shape depends on `event_type`. For `muscle_focus_changed`: `{ description, muscle, from, to }`, the levels before and after |
 | source_message | text, nullable | Optional raw excerpt kept for traceability/debugging, not for UI replay |
 | created_at | timestamp | |
 
-This table is what the AI reads (alongside `f_onboarding_submissions` and recent `f_training_plans`) to build context for every new plan generation or chat response - it's the mechanism behind "the AI always knows about the user's current and historical state."
+This table is what the AI reads (alongside `f_onboarding_submissions` and recent `f_training_plans`) to build context for every new plan generation or chat response - it's the mechanism behind "the AI always knows about the user's current and historical state." The `muscle_focus_changed` rows are kept as history but left out of those prompts: the current levels in `f_member_muscle_focus` are read instead.
+
+### `f_member_muscle_focus`
+A member's current emphasis per muscle (FR-51). A fact table in the sense of `rules/naming-conventions.md`: it records what the member chose, and a row is updated in place rather than versioned (the history is the `muscle_focus_changed` events above).
+| Column | Type | Notes |
+|---|---|---|
+| user_id | uuid FK → d_users.id | Composite PK with `muscle` |
+| muscle | enum `muscle` | The same 22 values as `d_exercise_muscles.muscle` |
+| bias | smallint | -2 (much less), -1, 1, or 2 (much more); validated to the range -2 to 2 by the shared zod schema |
+| updated_at | timestamp | |
+
+A missing row means normal (0): setting a muscle back to normal deletes its row, so the table only ever holds the muscles the member has an opinion about.
 
 ### `d_turnstile_config`
 Singleton row, editable by whoever holds the turnstile-config permission (FR-35).
@@ -262,9 +286,15 @@ Singleton row for gym-wide info shown on the public/logged-in gym info page.
 
 These are queries, not tables:
 
-- **Personal metrics** (FR-36): training frequency/days trained counts distinct calendar days with a row in `f_check_ins` for that member - physical check-in only, not exercise completion. Exercise breakdown and training volume come from `f_training_plan_exercises`/`f_training_plans` instead. Reflects the corrected record where retroactive edits were made (FR-23).
+- **Personal metrics** (FR-36): training frequency/days trained counts distinct calendar days with a row in `f_check_ins` for that member - physical check-in only, not exercise completion. Exercise breakdown and training volume come from `f_training_plan_exercises`/`f_training_plans` instead, and the muscle heat map is the weighted load of the completed exercises in the range (sets times the muscle's role weight, from `d_exercise_muscles`). Reflects the corrected record where retroactive edits were made (FR-23).
+- **Plan muscle load** (FR-50): for one plan, the sum over its exercises of `sets` times the role weight (primary 1, secondary 0.5) for each muscle the exercise trains. Only exercises that are performable right now (the FR-17 rule) count. The same weighting feeds the AI's "top muscles today" aggregate and the heat steps, which scale each muscle against the busiest one in the view.
+- **Catalog coverage** (FR-52): per muscle, the exercises in `d_exercise_muscles` that train it, how many of them are available now, and how many are lost, plus for each unavailable equipment item the exercises it takes out (unavailable, with that item unavailable) and the muscles they train. Computed in the browser from the catalog list with the shared functions.
+- **Must-review plan** (FR-53, RN-14): a row of `f_training_plans` whose `plan_date` is today or later and that has at least one `f_training_plan_exercises` row whose exercise fails the FR-17 rule (it has linked equipment and none of it is available). Evaluated on every read, never stored: there is no flag column and no acknowledged state, so it clears when the plan's exercises change or the equipment's `is_available` is switched back on. A plan dated before today is never flagged.
+- **Plan review comparison** (FR-54): the member's weighted muscle load from the `completed` exercises of their plans in the 14 days before the plan's `plan_date` (the plan's own day excluded), and their current rows of `f_member_muscle_focus`. The load of the plan itself is computed in the browser from the exercises being edited.
+- **Today's pool** (FR-56): for today's `f_training_plans` (every member, not only those checked in), how many plans train each muscle through an exercise that can be done now, the equipment currently unavailable, the must-review plans above, and the most recent `f_plan_reviews` rows with their author, member and plan date.
+- **Member week** (FR-55): the local calendar days of a range with a row in `f_check_ins` for the member, and the latest `checked_in_at` in the range; the same rule as days trained (FR-36).
 - **Current occupancy** (FR-37): `COUNT(*) FROM f_check_ins WHERE checked_in_at >= now() - interval '90 minutes'` (window is a tunable constant, not user-configurable) - an estimate, since there is no checkout event.
-- **Gym-wide equipment/muscle-group demand** (FR-38): aggregating today's `f_check_ins` joined to `f_training_plans`/`f_training_plan_exercises`/`d_exercises`, filtered to exercises currently available per the `d_exercise_equipment` → `d_gym_equipment.is_available` rule.
+- **Gym-wide equipment/muscle demand** (FR-38): aggregating today's `f_check_ins` joined to `f_training_plans`/`f_training_plan_exercises`/`d_exercises`/`d_exercise_muscles`, filtered to exercises currently available per the `d_exercise_equipment` → `d_gym_equipment.is_available` rule. Equipment demand is a count per piece; muscle demand is the weighted load of the planned sets per muscle.
 - **A user's effective permissions** (FR-42): every non-expired `f_user_policy_on_user` row for that user plus every policy of each non-expired group membership (`f_user_policy_group_on_user` → `d_user_policy_group_policy`), joined to `d_user_policy`, translated into CASL rules (see `f_user_policy_on_user`/`f_user_policy_group_on_user` above).
 - **Where a user's policy comes from** (FR-48): for each effective policy, the groups that supply it and whether a direct row also exists; this is what the Admin policy screen labels "via Admin group" or "direct".
 
@@ -275,5 +305,5 @@ A first-boot seed script (see [04-architecture.md](./04-architecture.md) §8) cr
 - The three `d_user_policy_group` rows (`member`, `trainer`, `admin`) and their `d_user_policy_group_policy` contents (FR-47).
 - Fixed demo trainer and admin `d_users` rows with known credentials, each given the `trainer` or `admin` group through an `f_user_policy_group_on_user` row (the only way these accounts and their access come into existence - FR-41/FR-42/FR-43).
 - A fixed demo member `d_users` row (`student@example.com`), already activated (`aptitude_status` cleared, `membership_status` active, a mock `membership_plan`) with a stored reference photo and its embedding, in the `member` group.
-- An initial `d_exercises` / `d_gym_equipment` / `d_exercise_equipment` catalog.
+- An initial `d_exercises` / `d_gym_equipment` / `d_exercise_equipment` / `d_exercise_muscles` catalog, with a muscle map for every exercise. Neck, rotator cuff and forearm extensors are left untrained on purpose, so the staff coverage map has real gaps to show.
 - A batch of fake seeded members (`d_users` rows plus their `member` group membership), `f_check_ins`, and `f_training_plans` so occupancy and equipment-demand queries return meaningful results for a demo.

@@ -53,7 +53,9 @@ message (this is literally the course booklet's definition of MVP 3).
 Goal: nothing here changes a business rule, it only exposes data that already exists.
 
 - Member metrics (FR-36).
-- Gym info page: occupancy, equipment demand (FR-37, FR-38, FR-39).
+- Gym info page: occupancy, equipment and muscle demand (FR-37, FR-38, FR-39).
+- Muscle map: the muscle registry on every exercise, the plan, history, metrics and gym heat maps, the member's muscle focus and the staff coverage view (FR-49 to FR-52).
+- Must-review plans (an exercise that cannot be done flags the plan for the member and for staff), the muscle balance preview on the plan review page, the member Now screen and the staff exceptions Overview (FR-53 to FR-56, RN-14).
 - Admin policy management screen with policy groups (FR-43, FR-47, FR-48, RN-10, RN-13).
 
 **MVP 4 validation**: the numbers match what's in the database (verify manually against a direct SQL

@@ -19,6 +19,12 @@
   --color-success-foreground: var(--success-foreground);
   --color-tape: var(--tape);
   --color-tape-foreground: var(--tape-foreground);
+  --color-heat-0: var(--heat-0);
+  --color-heat-1: var(--heat-1);
+  --color-heat-2: var(--heat-2);
+  --color-heat-3: var(--heat-3);
+  --color-heat-4: var(--heat-4);
+  --color-heat-5: var(--heat-5);
   --color-kit: var(--kit);
   --color-kit-foreground: var(--kit-foreground);
   --color-kit-muted: var(--kit-muted);
@@ -82,6 +88,13 @@
   --success-foreground: oklch(0.99 0.003 95);
   --tape: oklch(0.87 0.165 92);
   --tape-foreground: oklch(0.2 0.03 80);
+  /* Muscle map heat ramp: achromatic, from no work (0) up to the busiest muscle (5). */
+  --heat-0: oklch(0.915 0.006 265);
+  --heat-1: oklch(0.82 0.01 265);
+  --heat-2: oklch(0.7 0.012 265);
+  --heat-3: oklch(0.55 0.014 265);
+  --heat-4: oklch(0.38 0.014 265);
+  --heat-5: oklch(0.22 0.014 265);
   --kit: oklch(0.18 0.014 265);
   --kit-foreground: oklch(0.974 0.003 95);
   --kit-muted: oklch(0.74 0.012 265);
@@ -117,6 +130,12 @@
   --success-foreground: oklch(0.17 0.03 155);
   --tape: oklch(0.86 0.16 92);
   --tape-foreground: oklch(0.2 0.03 80);
+  --heat-0: oklch(0.29 0.013 265);
+  --heat-1: oklch(0.4 0.014 265);
+  --heat-2: oklch(0.52 0.014 265);
+  --heat-3: oklch(0.67 0.012 265);
+  --heat-4: oklch(0.82 0.01 265);
+  --heat-5: oklch(0.96 0.006 265);
   --kit: oklch(0.12 0.01 265);
   --kit-foreground: oklch(0.955 0.004 95);
   --kit-muted: oklch(0.72 0.012 265);

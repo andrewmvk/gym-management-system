@@ -1,67 +1,71 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { ArrowRightIcon, HeartPulseIcon, MessageCircleIcon } from 'lucide-react';
-import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { TodayPlan } from '@/app/(member)/plan/today-plan';
+import { HomeNotice } from '@/app/(member)/home/home-notice';
+import { NextUpCard } from '@/app/(member)/home/next-up-card';
+import { NowHero } from '@/app/(member)/home/now-hero';
+import { RemainingList } from '@/app/(member)/home/remaining-list';
+import { SinceLastVisit } from '@/app/(member)/home/since-last-visit';
+import { WeekStrip } from '@/app/(member)/home/week-strip';
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
-import { PageHeading } from '@/components/page-heading';
-import { Button } from '@/components/ui/button';
-import { useTRPC } from '@/lib/trpc';
 
-function HomeLayout({ heading, plan }: { heading: ReactNode; plan: ReactNode }) {
+// One grid level: the next exercise and the rest of the list on the left, the week and what changed on the right.
+function HomeLayout({
+  hero,
+  notice,
+  main,
+  side,
+}: {
+  hero: ReactNode;
+  notice?: ReactNode;
+  main: ReactNode;
+  side: ReactNode;
+}) {
   return (
     <PageContainer>
-      {heading}
+      {hero}
+      {notice}
       <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="min-w-0 lg:col-span-2">{plan}</div>
-        <aside className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 rounded-lg border bg-card p-5">
-            <MessageCircleIcon className="size-5 text-primary" />
-            <p className="font-display text-xl font-bold tracking-wide uppercase">Talk to your coach</p>
-            <p className="text-sm text-pretty text-muted-foreground">
-              Sore knee, new medication, short on time? Tell the AI coach with the button at the bottom right. What you
-              share shapes your future plans.
-            </p>
-          </div>
-          <div className="flex flex-col gap-3 rounded-lg border bg-card p-5">
-            <HeartPulseIcon className="size-5 text-primary" />
-            <p className="font-display text-xl font-bold tracking-wide uppercase">Health profile</p>
-            <p className="text-sm text-pretty text-muted-foreground">
-              Your medications, conditions and goals are what every plan starts from.
-            </p>
-            <Button asChild variant="outline" className="self-start">
-              <Link href="/onboarding">
-                Review profile
-                <ArrowRightIcon data-icon="inline-end" />
-              </Link>
-            </Button>
-          </div>
-        </aside>
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-2">{main}</div>
+        <div className="flex min-w-0 flex-col gap-6">{side}</div>
       </div>
     </PageContainer>
   );
 }
 
-function todayLabel() {
-  return new Date().toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
-}
-
 function MemberHomeSkeleton() {
-  return <HomeLayout heading={<PageHeading.Skeleton />} plan={<TodayPlan.Skeleton />} />;
+  return (
+    <HomeLayout
+      hero={<NowHero.Skeleton />}
+      main={
+        <>
+          <NextUpCard.Skeleton />
+          <RemainingList.Skeleton />
+        </>
+      }
+      side={<WeekStrip.Skeleton />}
+    />
+  );
 }
 
 function MemberHomeContent() {
-  const trpc = useTRPC();
-  const me = useQuery(trpc.auth.me.queryOptions());
-  const firstName = me.data?.user.name.split(' ')[0];
-
   return (
     <HomeLayout
-      heading={<PageHeading title={firstName ? `Let's go, ${firstName}` : "Let's go"} description={todayLabel()} />}
-      plan={<TodayPlan />}
+      hero={<NowHero />}
+      notice={<HomeNotice />}
+      main={
+        <>
+          <NextUpCard />
+          <RemainingList />
+        </>
+      }
+      side={
+        <>
+          <WeekStrip />
+          <SinceLastVisit />
+        </>
+      }
     />
   );
 }

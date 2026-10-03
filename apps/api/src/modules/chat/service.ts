@@ -4,9 +4,19 @@ import { type AiResult, runStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
 import * as repository from '@api/modules/chat/repository';
+import { findFocusByUserId } from '@api/modules/focus/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import * as plansRepository from '@api/modules/plans/repository';
-import { generateForDate, getToday, getTodayAggregate, type PlanAggregate } from '@api/modules/plans/service';
+import {
+  type AvailableExercise,
+  buildMuscleFocusLines,
+  formatCatalogLine,
+  generateForDate,
+  getToday,
+  getTodayAggregate,
+  type PlanAggregate,
+} from '@api/modules/plans/service';
+import type { MemberMuscleFocus } from '@cadence/shared/schemas/muscles';
 import { type ChatResponse, ChatResponseSchema } from '@cadence/shared/schemas/profile-events';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
@@ -46,19 +56,23 @@ export interface ChatContext {
   activeHealthEvents: ProfileEvent[];
   olderEventsSummary: string | null;
   todayPlan: Awaited<ReturnType<typeof getToday>>;
-  availableExercises: { id: string; name: string; muscleGroup: string }[];
+  availableExercises: AvailableExercise[];
+  muscleFocus: MemberMuscleFocus[];
   aggregate: PlanAggregate;
 }
 
 async function assembleChatContext(userId: string): Promise<ChatContext> {
-  const [user, onboardingSubmissions, allEvents, todayPlan, catalog, aggregate] = await Promise.all([
+  const [user, onboardingSubmissions, profileEvents, todayPlan, catalog, aggregate, muscleFocus] = await Promise.all([
     findUserById(userId),
     findSubmissionsByUserId(userId),
     plansRepository.findProfileEventsByUserId(userId),
     getToday(userId),
     listExercises(),
     getTodayAggregate(),
+    findFocusByUserId(userId),
   ]);
+  // The focus block is the current truth; its change events would only repeat stale levels.
+  const allEvents = profileEvents.filter((event) => event.eventType !== 'muscle_focus_changed');
   const recentEvents = allEvents.slice(0, RECENT_EVENTS_LIMIT);
 
   return {
@@ -70,6 +84,7 @@ async function assembleChatContext(userId: string): Promise<ChatContext> {
     olderEventsSummary: summarizeOlderEvents(allEvents.slice(RECENT_EVENTS_LIMIT)),
     todayPlan,
     availableExercises: catalog.filter((exercise) => exercise.isAvailable),
+    muscleFocus,
     aggregate,
   };
 }
@@ -85,9 +100,9 @@ function buildAggregateLines(aggregate: PlanAggregate): string[] {
       : '- Top exercises: none yet',
   );
   lines.push(
-    aggregate.topMuscleGroups.length > 0
-      ? `- Top muscle groups: ${aggregate.topMuscleGroups.map((g) => `${g.name} (${g.count})`).join(', ')}`
-      : '- Top muscle groups: none yet',
+    aggregate.topMuscles.length > 0
+      ? `- Top muscles: ${aggregate.topMuscles.map((muscle) => `${muscle.name} (${muscle.count})`).join(', ')}`
+      : '- Top muscles: none yet',
   );
   return lines;
 }
@@ -125,9 +140,10 @@ export function buildChatUserPrompt(context: ChatContext, message: string): stri
   if (context.activeHealthEvents.length === 0) lines.push('- none reported');
   for (const event of context.activeHealthEvents) lines.push(`- ${event.eventType}: ${JSON.stringify(event.payload)}`);
 
+  lines.push(...buildMuscleFocusLines(context.muscleFocus));
+
   lines.push('Available exercise catalog - propose alternatives only from this list:');
-  for (const exercise of context.availableExercises)
-    lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
+  for (const exercise of context.availableExercises) lines.push(formatCatalogLine(exercise));
 
   lines.push('Profile history, most recent first:');
   if (context.recentEvents.length === 0) lines.push('- none yet');
@@ -152,7 +168,10 @@ const CHAT_SYSTEM_PROMPT =
   'physical state, or a request to adjust their plan) as structured facts - never invent facts the ' +
   "message does not support. Weigh the member's active injuries and medication changes against today's " +
   'exercises: if one conflicts, warn about it and propose a safer alternative from the available ' +
-  'catalog. Only mention the cross-member aggregate if the member asks about what others are doing.';
+  'catalog. Catalog exercises list the muscles they train as primary or secondary, and the member muscle ' +
+  'focus (-2 much less to +2 much more) says which muscles they want emphasized; respect it when proposing ' +
+  'alternatives, but never above safety. Only mention the cross-member aggregate if the member asks about ' +
+  'what others are doing.';
 
 export type EvaluateChat = (contextPrompt: string) => Promise<AiResult<ChatResponse>>;
 
@@ -214,7 +233,7 @@ const PLAN_CORRECTION_SYSTEM_PROMPT =
 
 function buildCorrectionUserPrompt(
   currentExercises: readonly plansRepository.PlanExerciseDetail[],
-  availableExercises: readonly { id: string; name: string; muscleGroup: string }[],
+  availableExercises: readonly AvailableExercise[],
   aggregate: PlanAggregate,
   instruction: string,
 ): string {
@@ -228,8 +247,7 @@ function buildCorrectionUserPrompt(
   }
 
   lines.push('Available exercise catalog - choose exerciseId only from this list:');
-  for (const exercise of availableExercises)
-    lines.push(`- ${exercise.id} | ${exercise.name} | ${exercise.muscleGroup}`);
+  for (const exercise of availableExercises) lines.push(formatCatalogLine(exercise));
 
   lines.push(...buildAggregateLines(aggregate));
 

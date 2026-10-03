@@ -50,6 +50,7 @@ Filters, search terms, and tabs live in the URL's search params through `useUrlS
 - `cn()` helper for conditional class merging.
 - `class-variance-authority` (`cva`) for component variants - don't build variant logic with template-string concatenation.
 - Use Tailwind's defined scale, never arbitrary values: `text-xs` not `text-[10px]`, `tracking-wider` not `tracking-[0.04em]`, `rounded-sm` not `rounded-[5px]`, `border-2` not `border-[1.5px]`, `lg:grid-cols-3` + `lg:col-span-2` not `lg:grid-cols-[minmax(0,1fr)_20rem]`. One-off sizes compose into components that don't match the rest of the app. If the scale truly lacks a value the design system needs everywhere (a shadow, a hover color, an inset baseline), add it once as a token in `apps/web/src/app/globals.css` (`@theme`) and use the named utility (`shadow-popover`, `bg-primary-hover`). An arbitrary value is acceptable only when no token can express it, such as viewport math (`max-h-[calc(100dvh-8rem)]`) or a browser-only property (`[scrollbar-width:none]`).
+- Muscle visuals (heat maps, selectors, coverage) use the shared components in `components/muscle-map/` and the `--heat-*` tokens, never a hand-built body or a new ramp. The muscle list and weights come from `packages/shared/src/schemas/muscles.ts`.
 - Interactive elements get a pointer cursor from the base layer in `globals.css` (buttons, links, menu items, options, tabs, labels). Don't add `cursor-pointer` per element, and don't remove that base rule.
 
 ## Routing / access structure

@@ -3,7 +3,7 @@ import { dExercises, dUsers, fTrainingPlanExercises, fTrainingPlans } from '@api
 import { seedBase } from '@api/db/seed';
 import { todayLocal } from '@api/lib/dates';
 import type { EvaluatePlan, GenerateForDateResult } from '@api/modules/plans/service';
-import { generateForDate, getTodayAggregate } from '@api/modules/plans/service';
+import { generateForDate, generatePlaceholderExercises, getTodayAggregate } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -89,6 +89,45 @@ describe('plans', () => {
     });
   });
 
+  describe('generatePlaceholderExercises', () => {
+    const chestPress = {
+      id: 'chest-press',
+      name: 'Chest Press',
+      muscles: [{ muscle: 'chest', role: 'primary' }],
+    } as const;
+    const row = { id: 'row', name: 'Row', muscles: [{ muscle: 'lats', role: 'primary' }] } as const;
+    const squat = { id: 'squat', name: 'Squat', muscles: [{ muscle: 'quads', role: 'primary' }] } as const;
+    const curl = { id: 'curl', name: 'Curl', muscles: [{ muscle: 'biceps', role: 'primary' }] } as const;
+    const exercises = [chestPress, row, squat, curl];
+
+    it('orders groups by muscle focus and adds a set to emphasized muscles', () => {
+      const picked = generatePlaceholderExercises(exercises, [{ muscle: 'quads', bias: 2 }]);
+
+      expect(picked[0]).toMatchObject({ exerciseId: 'squat', sets: 4 });
+    });
+
+    it('takes a set off a muscle set to less', () => {
+      const picked = generatePlaceholderExercises(exercises, [{ muscle: 'chest', bias: -1 }]);
+
+      expect(picked.find((entry) => entry.exerciseId === 'chest-press')?.sets).toBe(2);
+    });
+
+    it('leaves out an exercise whose primary muscle is set to much less', () => {
+      const picked = generatePlaceholderExercises(exercises, [{ muscle: 'biceps', bias: -2 }]);
+
+      expect(picked.map((entry) => entry.exerciseId)).not.toContain('curl');
+    });
+
+    it('still builds a plan when every exercise is set to much less', () => {
+      const picked = generatePlaceholderExercises(
+        exercises,
+        exercises.map((exercise) => ({ muscle: exercise.muscles[0].muscle, bias: -2 })),
+      );
+
+      expect(picked.length).toBeGreaterThan(0);
+    });
+  });
+
   describe('generateForDate (ai)', () => {
     it('persists exactly the AI-chosen exercises when they are all valid and available', async () => {
       const member = await createMember();
@@ -168,20 +207,19 @@ describe('plans', () => {
         { name: 'Barbell Back Squat', count: 2 },
         { name: 'Plank', count: 1 },
       ]);
-      expect(aggregate.topMuscleGroups).toEqual([
-        { name: 'chest', count: 3 },
-        { name: 'legs', count: 2 },
-        { name: 'core', count: 1 },
+      expect(aggregate.topMuscles.slice(0, 3)).toEqual([
+        { name: 'Chest', count: 9 },
+        { name: 'Abs', count: 7.5 },
+        { name: 'Front delts', count: 6 },
       ]);
       expect(JSON.stringify(aggregate)).not.toContain(memberA.id);
       expect(JSON.stringify(aggregate)).not.toContain('aggregate-a@example.com');
     });
 
-    it('caps at the top 10 exercises and top 5 muscle groups', async () => {
+    it('caps at the top 10 exercises and top 5 muscles', async () => {
       const today = todayLocal();
       const member = await createMember();
-      // 12 distinct exercises (caps topExercises at 10) spanning 7 distinct muscle groups (caps
-      // topMuscleGroups at 5), with legs given a clear lead so the top slot is deterministic.
+      // 12 distinct exercises (caps topExercises at 10) that together train far more than 5 muscles.
       const allExerciseNames = [
         'Bodyweight Squat',
         'Barbell Back Squat',
@@ -201,14 +239,15 @@ describe('plans', () => {
       const aggregate = await getTodayAggregate();
 
       expect(aggregate.topExercises).toHaveLength(10);
-      expect(aggregate.topMuscleGroups).toHaveLength(5);
-      expect(aggregate.topMuscleGroups[0]).toEqual({ name: 'legs', count: 3 });
+      expect(aggregate.topMuscles).toHaveLength(5);
+      const counts = aggregate.topMuscles.map((muscle) => muscle.count);
+      expect(counts).toEqual([...counts].sort((a, b) => b - a));
     });
 
     it('returns empty lists when no plan exists for today', async () => {
       const aggregate = await getTodayAggregate();
 
-      expect(aggregate).toEqual({ topExercises: [], topMuscleGroups: [] });
+      expect(aggregate).toEqual({ topExercises: [], topMuscles: [] });
     });
   });
 });

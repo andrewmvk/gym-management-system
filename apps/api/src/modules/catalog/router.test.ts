@@ -78,7 +78,7 @@ describe('catalog', () => {
       await expect(
         caller.catalog.createExercise({
           name: 'Test Exercise',
-          muscleGroup: 'legs',
+          muscles: [{ muscle: 'quads', role: 'primary' }],
           instructions: 'Do it.',
           equipmentIds: [],
         }),
@@ -110,13 +110,31 @@ describe('catalog', () => {
 
       const exercise = await caller.catalog.createExercise({
         name: 'Test Deadlift',
-        muscleGroup: 'back',
+        muscles: [
+          { muscle: 'lower-back', role: 'primary' },
+          { muscle: 'glutes', role: 'primary' },
+          { muscle: 'hamstrings', role: 'secondary' },
+        ],
         instructions: 'Hinge and lift.',
         equipmentIds: [barbell!.id],
       });
 
       const [reloaded] = (await caller.catalog.list()).filter((item) => item.id === exercise.id);
       expect(reloaded?.equipment.map((item) => item.id)).toEqual([barbell!.id]);
+      expect(reloaded?.muscles).toHaveLength(3);
+    });
+
+    it('refuses an exercise without a primary muscle', async () => {
+      const caller = await callerFor(await adminToken());
+
+      await expect(
+        caller.catalog.createExercise({
+          name: 'Test No Primary',
+          muscles: [{ muscle: 'biceps', role: 'secondary' }],
+          instructions: 'Do it.',
+          equipmentIds: [],
+        }),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
     it('can create a new piece of equipment', async () => {

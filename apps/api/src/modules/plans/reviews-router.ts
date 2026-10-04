@@ -59,8 +59,10 @@ export const reviewsRouter = router({
     return result;
   }),
 
+  // Changing a plan needs the plan-editing policy as well as the review one; a note needs only the review one.
   editPlan: authedProcedure.input(EditPlanInputSchema).mutation(async ({ ctx, input }) => {
     assertCan(ctx.ability, 'manage', 'PlanReview');
+    assertCan(ctx.ability, 'update', ANY_TRAINING_PLAN);
     const result = await service.editPlan(input.planId, ctx.user.id, input.exercises, input.note);
     if (!result) throw new TRPCError({ code: 'NOT_FOUND', message: 'Plan not found' });
     return result;

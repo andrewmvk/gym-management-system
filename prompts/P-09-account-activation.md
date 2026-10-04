@@ -3,6 +3,7 @@ Covers: FR-9
 MVP: 2
 Artifacts: auth.setPassword in apps/api/src/modules/auth/, a member-activated hook, the set-password step in apps/web/src/app/signup/
 Evidence: Vitest against Postgres: a cleared applicant sets a password, receives the member policies and a session cookie; pending and rejected applicants are refused; a second call is refused
+Status: Superseded by P-31 (audit-log item 20): there is no clearance and no separate activation step. The account, its password, the member group and the `active` membership are created by the single registration request (FR-9 is rewritten, RN-03 is removed), and the member-activated hook becomes a registration-completed hook. The code stays until P-31 lands
 
 Task: implement the moment an applicant who is cleared sets a password and becomes a member.
 

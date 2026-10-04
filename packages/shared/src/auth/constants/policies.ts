@@ -5,6 +5,7 @@ export const MANAGE_OWN_ONBOARDING = 'manage_own_onboarding';
 export const READ_OWN_PLANS = 'read_own_plans';
 export const UPDATE_OWN_PLANS = 'update_own_plans';
 export const USE_CHAT = 'use_chat';
+export const MANAGE_OWN_PROFILE_EVENTS = 'manage_own_profile_events';
 export const READ_OWN_METRICS = 'read_own_metrics';
 export const READ_CATALOG = 'read_catalog';
 export const READ_GYM_INFO = 'read_gym_info';
@@ -18,6 +19,8 @@ export const MANAGE_TURNSTILE_CONFIG = 'manage_turnstile_config';
 export const MANAGE_POLICY_ASSIGNMENTS = 'manage_policy_assignments';
 export const READ_MEMBERS = 'read_members';
 export const READ_CHECKINS = 'read_checkins';
+export const MANAGE_MEMBERSHIPS = 'manage_memberships';
+export const MANAGE_GYM_SETTINGS = 'manage_gym_settings';
 
 export type PolicyId =
   | typeof READ_MEMBER_APP
@@ -25,6 +28,7 @@ export type PolicyId =
   | typeof READ_OWN_PLANS
   | typeof UPDATE_OWN_PLANS
   | typeof USE_CHAT
+  | typeof MANAGE_OWN_PROFILE_EVENTS
   | typeof READ_OWN_METRICS
   | typeof READ_CATALOG
   | typeof READ_GYM_INFO
@@ -37,7 +41,9 @@ export type PolicyId =
   | typeof MANAGE_TURNSTILE_CONFIG
   | typeof MANAGE_POLICY_ASSIGNMENTS
   | typeof READ_MEMBERS
-  | typeof READ_CHECKINS;
+  | typeof READ_CHECKINS
+  | typeof MANAGE_MEMBERSHIPS
+  | typeof MANAGE_GYM_SETTINGS;
 
 export interface PolicyDefinition {
   id: PolicyId;
@@ -74,6 +80,13 @@ export const POLICY_CATALOG: readonly PolicyDefinition[] = [
     id: USE_CHAT,
     description: 'Use the AI chat, which records facts about themselves',
     operation: 'create',
+    resource: 'ProfileEvent',
+    scope: 'self',
+  },
+  {
+    id: MANAGE_OWN_PROFILE_EVENTS,
+    description: 'See the facts the AI remembers about them and mark them resolved',
+    operation: 'manage',
     resource: 'ProfileEvent',
     scope: 'self',
   },
@@ -150,6 +163,20 @@ export const POLICY_CATALOG: readonly PolicyDefinition[] = [
   },
   { id: READ_MEMBERS, description: 'View the member list', operation: 'read', resource: 'Member', scope: 'all' },
   { id: READ_CHECKINS, description: 'View every check-in', operation: 'read', resource: 'CheckIn', scope: 'all' },
+  {
+    id: MANAGE_MEMBERSHIPS,
+    description: 'Switch a member membership between active and inactive',
+    operation: 'update',
+    resource: 'Member',
+    scope: 'all',
+  },
+  {
+    id: MANAGE_GYM_SETTINGS,
+    description: 'Edit the gym opening hours',
+    operation: 'manage',
+    resource: 'GymSettings',
+    scope: 'all',
+  },
 ];
 
 // Removing one of these from your own account locks you out of the staff area or of policy management.
@@ -161,6 +188,7 @@ export const MEMBER_POLICY_IDS = [
   READ_OWN_PLANS,
   UPDATE_OWN_PLANS,
   USE_CHAT,
+  MANAGE_OWN_PROFILE_EVENTS,
   READ_OWN_METRICS,
   READ_CATALOG,
   READ_GYM_INFO,
@@ -171,6 +199,7 @@ export const TRAINER_POLICY_IDS = [
   READ_ALL_PLANS,
   UPDATE_ALL_PLANS,
   MANAGE_PLAN_REVIEWS,
+  READ_MEMBERS,
   READ_CATALOG,
   READ_GYM_INFO,
 ] as const satisfies readonly PolicyId[];
@@ -182,6 +211,8 @@ export const ADMIN_POLICY_IDS = [
   MANAGE_TURNSTILE_CONFIG,
   MANAGE_POLICY_ASSIGNMENTS,
   READ_MEMBERS,
+  MANAGE_MEMBERSHIPS,
+  MANAGE_GYM_SETTINGS,
   READ_ALL_PLANS,
   READ_CHECKINS,
   READ_CATALOG,

@@ -4,6 +4,7 @@ import { seedBase } from '@api/db/seed';
 import { todayLocal } from '@api/lib/dates';
 import type { AdjustPlanResult, ChatContext, EvaluateChat, EvaluateCorrection } from '@api/modules/chat/service';
 import { adjustPlan, buildChatUserPrompt, sendMessage, summarizeOlderEvents } from '@api/modules/chat/service';
+import type { EvaluatePlan } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import type { ProfileEventFact } from '@cadence/shared/schemas/profile-events';
 import { eq } from 'drizzle-orm';
@@ -70,6 +71,10 @@ describe('chat', () => {
       const result = await sendMessage(member.id, 'I hurt my knee and started a new medication.', { evaluateChat });
 
       expect(result).toMatchObject({ reply: 'Noted, take it easy on that knee.', factsSaved: 2 });
+      expect(result.facts).toEqual([
+        { eventType: 'injury', summary: 'Injury: a injury event' },
+        { eventType: 'medication_change', summary: 'Medication change: a medication_change event' },
+      ]);
       const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
       expect(rows.map((r) => r.eventType).sort()).toEqual(['injury', 'medication_change'].sort());
       expect(rows.every((r) => (r.payload as { description: string }).description)).toBe(true);
@@ -141,6 +146,65 @@ describe('chat', () => {
       expect(capturedPrompt).toContain('Barbell Back Squat');
       expect(capturedPrompt).toContain('Push-Up (1)');
     });
+
+    it('leaves a resolved fact out of the context', async () => {
+      const member = await createMember();
+      await db.insert(fProfileEvents).values([
+        {
+          userId: member.id,
+          eventType: 'injury',
+          payload: { description: 'healed shoulder strain' },
+          resolvedAt: new Date(),
+        },
+        { userId: member.id, eventType: 'life_event', payload: { description: 'moved to a new flat' } },
+      ]);
+      let capturedPrompt = '';
+      const evaluateChat: EvaluateChat = async (contextPrompt) => {
+        capturedPrompt = contextPrompt;
+        return { ok: true, data: { reply: 'Ok.', facts: [] } };
+      };
+
+      await sendMessage(member.id, 'Hi', { evaluateChat });
+
+      expect(capturedPrompt).not.toContain('healed shoulder strain');
+      expect(capturedPrompt).toContain('moved to a new flat');
+    });
+
+    it('keeps an old unresolved injury in the detailed block even when 50 newer events push it out of the window', async () => {
+      const member = await createMember();
+      await db.insert(fProfileEvents).values([
+        {
+          userId: member.id,
+          eventType: 'injury',
+          payload: { description: 'torn ligament from years ago' },
+          createdAt: new Date('2020-01-01T10:00:00Z'),
+        },
+        {
+          userId: member.id,
+          eventType: 'medication_change',
+          payload: { description: 'long term beta blocker' },
+          createdAt: new Date('2020-01-02T10:00:00Z'),
+        },
+        ...Array.from({ length: 55 }, (_, index) => ({
+          userId: member.id,
+          eventType: 'life_event' as const,
+          payload: { description: `busy week ${index}` },
+          createdAt: new Date(Date.now() - index * 60_000),
+        })),
+      ]);
+      let capturedPrompt = '';
+      const evaluateChat: EvaluateChat = async (contextPrompt) => {
+        capturedPrompt = contextPrompt;
+        return { ok: true, data: { reply: 'Ok.', facts: [] } };
+      };
+
+      await sendMessage(member.id, 'Is squatting ok?', { evaluateChat });
+
+      const activeBlock = capturedPrompt.split('Available exercise catalog')[0]!;
+      expect(activeBlock).toContain('torn ligament from years ago');
+      expect(activeBlock).toContain('long term beta blocker');
+      expect(capturedPrompt).toContain('5 older events not shown in detail: 5 life_event.');
+    });
   });
 
   describe('adjustPlan', () => {
@@ -163,7 +227,52 @@ describe('chat', () => {
 
         const result = await adjustPlan(member.id, todayLocal(), 'swap squats for lunges');
 
-        expect(result).toMatchObject({ status: 'needs_confirmation', editedBy: 'Chat Test Member' });
+        expect(result).toMatchObject({
+          status: 'needs_confirmation',
+          reason: 'trainer_edited',
+          editedBy: 'Chat Test Member',
+        });
+      });
+
+      it('reports needs_confirmation when the member already ticked an exercise', async () => {
+        const member = await createMember();
+        const { plan, exercises } = await createPastPlan(member.id, todayLocal(), ['Barbell Back Squat']);
+        await db
+          .update(fTrainingPlanExercises)
+          .set({ completed: true })
+          .where(eq(fTrainingPlanExercises.id, exercises[0]!.id));
+
+        const result = await adjustPlan(member.id, todayLocal(), 'swap squats for lunges');
+
+        expect(result).toMatchObject({ status: 'needs_confirmation', reason: 'has_completed', completedCount: 1 });
+        const rows = await db
+          .select()
+          .from(fTrainingPlanExercises)
+          .where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
+        expect(rows).toHaveLength(1);
+      });
+
+      it("passes the member's instruction and the other members' demand into the regeneration prompt", async () => {
+        const member = await createMember();
+        const other = await createMember('chat-demand-other@example.com');
+        await createPastPlan(other.id, todayLocal(), ['Barbell Back Squat']);
+        const squatId = await exerciseIdByName('Barbell Back Squat');
+        let capturedPrompt = '';
+        const evaluatePlan: EvaluatePlan = async (contextPrompt) => {
+          capturedPrompt = contextPrompt;
+          return { ok: true, data: { exercises: [{ exerciseId: squatId, sets: 3, reps: 5 }] } };
+        };
+
+        expectOk(
+          await adjustPlan(member.id, todayLocal(), 'keep it under 40 minutes', false, {
+            generate: { generator: 'ai', evaluatePlan },
+          }),
+        );
+
+        expect(capturedPrompt).toContain('Member request for this plan');
+        expect(capturedPrompt).toContain('keep it under 40 minutes');
+        expect(capturedPrompt).toContain("Other members' plans for");
+        expect(capturedPrompt).toContain('Equipment in demand');
       });
     });
 
@@ -270,13 +379,31 @@ describe('chat', () => {
 
   describe('context builder (unit)', () => {
     it('summarizes older events as a single-line count by type', () => {
-      const events = [{ eventType: 'injury' }, { eventType: 'injury' }, { eventType: 'life_event' }] as never;
+      const events = [
+        { eventType: 'state_update' },
+        { eventType: 'state_update' },
+        { eventType: 'life_event' },
+      ] as never;
 
-      expect(summarizeOlderEvents(events)).toBe('3 older events not shown in detail: 2 injury, 1 life_event.');
+      expect(summarizeOlderEvents(events)).toBe('3 older events not shown in detail: 2 state_update, 1 life_event.');
     });
 
     it('returns null when there are no older events', () => {
       expect(summarizeOlderEvents([])).toBeNull();
+    });
+
+    it('never folds an injury or a medication change into the older-events count', () => {
+      const events = [
+        { eventType: 'injury' },
+        { eventType: 'medication_change' },
+        { eventType: 'life_event' },
+        { eventType: 'state_update' },
+      ] as never;
+
+      const summary = summarizeOlderEvents(events);
+
+      expect(summary).toBe('2 older events not shown in detail: 1 life_event, 1 state_update.');
+      expect(summarizeOlderEvents([{ eventType: 'injury' }, { eventType: 'medication_change' }] as never)).toBeNull();
     });
 
     it('includes profile, onboarding, plan, risk, catalog, and aggregate data in the prompt', () => {

@@ -1,4 +1,4 @@
-import type { ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
+import type { ProfileEvent } from '@api/db/schema';
 import { todayLocal } from '@api/lib/dates';
 import { type AiResult, runStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
@@ -10,14 +10,22 @@ import * as plansRepository from '@api/modules/plans/repository';
 import {
   type AvailableExercise,
   buildMuscleFocusLines,
+  checkOverwriteGuard,
   formatCatalogLine,
+  type GenerateForDateOverrides,
+  type GenerateForDateResult,
   generateForDate,
   getToday,
   getTodayAggregate,
   type PlanAggregate,
 } from '@api/modules/plans/service';
 import type { MemberMuscleFocus } from '@cadence/shared/schemas/muscles';
-import { type ChatResponse, ChatResponseSchema } from '@cadence/shared/schemas/profile-events';
+import {
+  type ChatResponse,
+  ChatResponseSchema,
+  describeProfileEvent,
+  type ProfileEventType,
+} from '@cadence/shared/schemas/profile-events';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -35,18 +43,19 @@ function computeAge(birthdate: string | null): number | null {
   return age;
 }
 
+// An injury or medication change stays active until the member resolves it, however old it is, so these
+// types are always shown in detail and never folded into a count.
+const ACTIVE_HEALTH_EVENT_TYPES = new Set(['injury', 'medication_change']);
+
 // One line, counted by event type - "compact" per this prompt's own wording, not a per-event digest.
 export function summarizeOlderEvents(events: readonly ProfileEvent[]): string | null {
-  if (events.length === 0) return null;
+  const foldable = events.filter((event) => !ACTIVE_HEALTH_EVENT_TYPES.has(event.eventType));
+  if (foldable.length === 0) return null;
   const counts = new Map<string, number>();
-  for (const event of events) counts.set(event.eventType, (counts.get(event.eventType) ?? 0) + 1);
+  for (const event of foldable) counts.set(event.eventType, (counts.get(event.eventType) ?? 0) + 1);
   const byType = [...counts.entries()].map(([type, count]) => `${count} ${type}`).join(', ');
-  return `${events.length} older events not shown in detail: ${byType}.`;
+  return `${foldable.length} older events not shown in detail: ${byType}.`;
 }
-
-// No "resolved"/expiry concept exists on f_profile_events (docs/05-data-model.md), so "active" means
-// reported and still within the recent-events window, not a separately tracked status.
-const ACTIVE_HEALTH_EVENT_TYPES = new Set(['injury', 'medication_change']);
 
 export interface ChatContext {
   ageYears: number | null;
@@ -65,7 +74,7 @@ async function assembleChatContext(userId: string): Promise<ChatContext> {
   const [user, onboardingSubmissions, profileEvents, todayPlan, catalog, aggregate, muscleFocus] = await Promise.all([
     findUserById(userId),
     findSubmissionsByUserId(userId),
-    plansRepository.findProfileEventsByUserId(userId),
+    plansRepository.findUnresolvedProfileEvents(userId),
     getToday(userId),
     listExercises(),
     getTodayAggregate(),
@@ -80,7 +89,7 @@ async function assembleChatContext(userId: string): Promise<ChatContext> {
     gender: user?.gender ?? null,
     onboardingSubmissions,
     recentEvents,
-    activeHealthEvents: recentEvents.filter((event) => ACTIVE_HEALTH_EVENT_TYPES.has(event.eventType)),
+    activeHealthEvents: allEvents.filter((event) => ACTIVE_HEALTH_EVENT_TYPES.has(event.eventType)),
     olderEventsSummary: summarizeOlderEvents(allEvents.slice(RECENT_EVENTS_LIMIT)),
     todayPlan,
     availableExercises: catalog.filter((exercise) => exercise.isAvailable),
@@ -114,7 +123,9 @@ export function buildChatUserPrompt(context: ChatContext, message: string): stri
   lines.push(context.ageYears !== null ? `Member age: ${context.ageYears}` : 'Member age: unknown');
   lines.push(`Member gender: ${context.gender ?? 'unknown'}`);
 
-  lines.push('Onboarding submissions (most recent first):');
+  lines.push(
+    'Onboarding submissions (most recent first; the first is the current truth, older ones only add history that it does not contradict):',
+  );
   for (const submission of context.onboardingSubmissions) {
     const conditions = submission.physicalConditions.conditions.join(', ') || 'none';
     const otherNotes = submission.physicalConditions.otherNotes ? ` (${submission.physicalConditions.otherNotes})` : '';
@@ -188,9 +199,15 @@ export interface SendMessageOverrides {
   evaluateChat?: EvaluateChat;
 }
 
+export interface SavedFactSummary {
+  eventType: ProfileEventType;
+  summary: string;
+}
+
 export interface SendMessageResult {
   reply: string;
   factsSaved: number;
+  facts: SavedFactSummary[];
   adjustment?: ChatResponse['adjustment'];
 }
 
@@ -209,7 +226,15 @@ export async function sendMessage(
     result.data.facts.map((fact) => ({ userId, eventType: fact.eventType, payload: fact.payload, sourceMessage })),
   );
 
-  return { reply: result.data.reply, factsSaved: result.data.facts.length, adjustment: result.data.adjustment };
+  return {
+    reply: result.data.reply,
+    factsSaved: result.data.facts.length,
+    facts: result.data.facts.map((fact) => ({
+      eventType: fact.eventType,
+      summary: describeProfileEvent(fact.eventType, fact.payload),
+    })),
+    adjustment: result.data.adjustment,
+  };
 }
 
 const PlanCorrectionExerciseSchema = z.object({
@@ -268,20 +293,20 @@ async function defaultEvaluateCorrection(contextPrompt: string): Promise<AiResul
   });
 }
 
-export type AdjustPlanResult =
-  | { status: 'ok'; plan: TrainingPlan & { exercises: TrainingPlanExercise[] } }
-  | { status: 'needs_confirmation'; editedBy: string; editedAt: Date };
+export type AdjustPlanResult = GenerateForDateResult;
 
 export interface AdjustPlanOverrides {
   evaluateCorrection?: EvaluateCorrection;
+  generate?: GenerateForDateOverrides;
 }
 
-// FR-21/FR-23/RN-06/RN-07: today or a future date goes through the exact same regeneration guard as the
-// member's own plan screen (P-13/P-15) - the instruction text itself doesn't feed into that path, since
-// any fact chat.send already recorded in the same turn already shapes that regeneration's context. Only
-// a past date needs a dedicated AI call, since regenerating history is meaningless - it asks the AI to
-// return the corrected full exercise list (completed flags included) and writes it in place, keeping the
-// same plan row (RN-07: no history table, the corrected version is the only version).
+// FR-21/FR-23/RN-06/RN-07: today or a future date goes through the same regeneration path and guards as
+// the member's own plan screen (P-13/P-15), with the member's instruction added to the prompt; that path
+// also assembles the cross-member demand for the date itself. Only a past date needs a dedicated AI call,
+// since regenerating history is meaningless - it asks the AI to return the corrected full exercise list
+// (completed flags included) and writes it in place, keeping the same plan row (RN-07: no history table,
+// the corrected version is the only version). The correction states every tick explicitly, so only a
+// trainer edit needs confirming there.
 export async function adjustPlan(
   userId: string,
   date: string,
@@ -290,19 +315,15 @@ export async function adjustPlan(
   overrides: AdjustPlanOverrides = {},
 ): Promise<AdjustPlanResult> {
   if (date >= todayLocal()) {
-    return generateForDate(userId, date, confirmOverwrite);
+    return generateForDate(userId, date, confirmOverwrite, { ...overrides.generate, instruction });
   }
 
   const existing = await plansRepository.findPlanByUserAndDate(userId, date);
   if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'No plan exists for that date' });
 
-  if (existing.status === 'trainer_edited' && !confirmOverwrite) {
-    const editor = existing.lastEditedByUserId ? await findUserById(existing.lastEditedByUserId) : null;
-    return {
-      status: 'needs_confirmation',
-      editedBy: editor?.name ?? 'a trainer',
-      editedAt: existing.lastEditedAt ?? existing.aiGeneratedAt ?? new Date(),
-    };
+  if (!confirmOverwrite) {
+    const guard = await checkOverwriteGuard(existing, { countCompleted: false });
+    if (guard) return guard;
   }
 
   const [currentExercises, catalog, aggregate] = await Promise.all([
@@ -320,36 +341,7 @@ export async function adjustPlan(
 
   const availableIds = new Set(availableExercises.map((exercise) => exercise.id));
   const corrected = result.data.exercises.filter((exercise) => availableIds.has(exercise.exerciseId));
-  const completedExerciseIds = new Set(
-    corrected.filter((exercise) => exercise.completed).map((exercise) => exercise.exerciseId),
-  );
 
-  const exercisesInput: plansRepository.PlanExerciseInput[] = corrected.map(
-    ({ exerciseId, sets, reps, load, notes }) => ({
-      exerciseId,
-      sets,
-      reps,
-      load,
-      notes,
-    }),
-  );
-  const plan = await plansRepository.replacePlan({ userId, planDate: date, exercises: exercisesInput });
-
-  // replacePlan always inserts fresh rows with completed=false - reapply completed=true for whichever
-  // corrected exercises the AI marked done, matching the new row ids replacePlan just created.
-  await Promise.all(
-    plan.exercises
-      .filter((exercise) => completedExerciseIds.has(exercise.exerciseId))
-      .map((exercise) => plansRepository.setExerciseCompleted(exercise.id, true)),
-  );
-
-  return {
-    status: 'ok',
-    plan: {
-      ...plan,
-      exercises: plan.exercises.map((exercise) =>
-        completedExerciseIds.has(exercise.exerciseId) ? { ...exercise, completed: true } : exercise,
-      ),
-    },
-  };
+  const plan = await plansRepository.replacePlan({ userId, planDate: date, exercises: corrected });
+  return { status: 'ok', plan };
 }

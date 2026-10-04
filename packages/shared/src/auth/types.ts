@@ -11,6 +11,7 @@ export const SUBJECTS = [
   'CheckIn',
   'TurnstileConfig',
   'GymInfo',
+  'GymSettings',
   'Metrics',
   'Member',
   'UserPolicyAssignment',

@@ -1,12 +1,37 @@
 import { db, pool } from '@api/db/client';
-import { dExercises, dUsers, fTrainingPlanExercises, fTrainingPlans } from '@api/db/schema';
-import { seedBase } from '@api/db/seed';
-import { todayLocal } from '@api/lib/dates';
+import {
+  dExercises,
+  dUsers,
+  fAptitudeQuestionnaires,
+  fCheckIns,
+  fPlanReviews,
+  fProfileEvents,
+  fTrainingPlanExercises,
+  fTrainingPlans,
+} from '@api/db/schema';
+import { SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
+import { localDateString, todayLocal } from '@api/lib/dates';
+import { editPlan } from '@api/modules/plans/reviews-service';
 import type { EvaluatePlan, GenerateForDateResult } from '@api/modules/plans/service';
-import { generateForDate, generatePlaceholderExercises, getTodayAggregate } from '@api/modules/plans/service';
+import {
+  buildDemandLines,
+  computePlanDemand,
+  generateForDate,
+  generatePlaceholderExercises,
+  getPlanForDate,
+  getTodayAggregate,
+  listUpcomingPlans,
+} from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
-import { eq } from 'drizzle-orm';
+import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
+import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+
+function dateOffset(date: string, days: number) {
+  const shifted = new Date(`${date}T12:00:00`);
+  shifted.setDate(shifted.getDate() + days);
+  return localDateString(shifted);
+}
 
 async function createMember(email = 'member@example.com') {
   const [user] = await db
@@ -144,19 +169,41 @@ describe('plans', () => {
       expect(plan.exercises[0]?.sets).toBe(5);
     });
 
-    it('discards an unavailable or unknown suggestion and falls back to the placeholder if none remain', async () => {
+    it('drops an unavailable suggestion but keeps the valid ones', async () => {
       const member = await createMember();
       const rowingId = await exerciseIdByName('Rowing Machine Sprint');
+      const squatId = await exerciseIdByName('Barbell Back Squat');
       const evaluatePlan: EvaluatePlan = async () => ({
         ok: true,
-        data: { exercises: [{ exerciseId: rowingId, sets: 3, reps: 10 }] },
+        data: {
+          exercises: [
+            { exerciseId: rowingId, sets: 3, reps: 10 },
+            { exerciseId: squatId, sets: 3, reps: 10 },
+          ],
+        },
       });
 
       const plan = expectOk(await generateForDate(member.id, '2026-10-01', false, { generator: 'ai', evaluatePlan }));
 
-      const chosenExerciseIds = plan.exercises.map((e) => e.exerciseId);
-      expect(chosenExerciseIds).not.toContain(rowingId);
-      expect(plan.exercises.length).toBeGreaterThanOrEqual(3);
+      expect(plan.exercises.map((e) => e.exerciseId)).toEqual([squatId]);
+    });
+
+    it('throws instead of publishing a placeholder when the AI returns no usable catalog exercise', async () => {
+      const member = await createMember();
+      const rowingId = await exerciseIdByName('Rowing Machine Sprint');
+      const unusable: EvaluatePlan[] = [
+        async () => ({ ok: true, data: { exercises: [{ exerciseId: rowingId, sets: 3, reps: 10 }] } }),
+        async () => ({ ok: true, data: { exercises: [] } }),
+      ];
+
+      for (const evaluatePlan of unusable) {
+        await expect(
+          generateForDate(member.id, '2026-10-01', false, { generator: 'ai', evaluatePlan }),
+        ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
+      }
+
+      const rows = await db.select().from(fTrainingPlans).where(eq(fTrainingPlans.userId, member.id));
+      expect(rows).toHaveLength(0);
     });
 
     it('throws INTERNAL_SERVER_ERROR on an AI failure and creates no plan', async () => {
@@ -181,10 +228,273 @@ describe('plans', () => {
         .where(eq(fTrainingPlans.userId, member.id));
 
       const blocked = await generateForDate(member.id, '2026-10-01', false, { generator: 'placeholder' });
-      expect(blocked).toMatchObject({ status: 'needs_confirmation', editedBy: 'Plan Test Member' });
+      expect(blocked).toMatchObject({
+        status: 'needs_confirmation',
+        reason: 'trainer_edited',
+        editedBy: 'Plan Test Member',
+      });
 
       const plan = expectOk(await generateForDate(member.id, '2026-10-01', true, { generator: 'placeholder' }));
       expect(plan.status).toBe('ai_published');
+    });
+  });
+
+  describe('ticked exercises', () => {
+    async function tick(planId: string, exerciseName: string) {
+      await db
+        .update(fTrainingPlanExercises)
+        .set({ completed: true })
+        .where(
+          and(
+            eq(fTrainingPlanExercises.trainingPlanId, planId),
+            eq(fTrainingPlanExercises.exerciseId, await exerciseIdByName(exerciseName)),
+          ),
+        );
+    }
+
+    it('asks for confirmation instead of regenerating a plan that has ticked exercises', async () => {
+      const member = await createMember();
+      const plan = await createPlanWithExercises(member.id, '2026-10-01', ['Barbell Back Squat', 'Push-Up']);
+      await tick(plan.id, 'Barbell Back Squat');
+
+      const result = await generateForDate(member.id, '2026-10-01', false, { generator: 'placeholder' });
+
+      expect(result).toMatchObject({
+        status: 'needs_confirmation',
+        reason: 'has_completed',
+        editedBy: null,
+        editedAt: null,
+        completedCount: 1,
+      });
+      const rows = await db
+        .select()
+        .from(fTrainingPlanExercises)
+        .where(eq(fTrainingPlanExercises.trainingPlanId, plan.id));
+      expect(rows).toHaveLength(2);
+    });
+
+    it('keeps the tick of an exercise that stays in a confirmed regeneration', async () => {
+      const member = await createMember();
+      const plan = await createPlanWithExercises(member.id, '2026-10-01', ['Barbell Back Squat', 'Push-Up']);
+      await tick(plan.id, 'Barbell Back Squat');
+      await tick(plan.id, 'Push-Up');
+      const squatId = await exerciseIdByName('Barbell Back Squat');
+      const plankId = await exerciseIdByName('Plank');
+      const evaluatePlan: EvaluatePlan = async () => ({
+        ok: true,
+        data: {
+          exercises: [
+            { exerciseId: squatId, sets: 4, reps: 6 },
+            { exerciseId: plankId, sets: 3, reps: 30 },
+          ],
+        },
+      });
+
+      const regenerated = expectOk(
+        await generateForDate(member.id, '2026-10-01', true, { generator: 'ai', evaluatePlan }),
+      );
+
+      const byExercise = new Map(regenerated.exercises.map((exercise) => [exercise.exerciseId, exercise]));
+      expect(byExercise.get(squatId)).toMatchObject({ sets: 4, completed: true });
+      expect(byExercise.get(plankId)?.completed).toBe(false);
+      expect(regenerated.exercises).toHaveLength(2);
+    });
+
+    it('keeps the ticks of the exercises a trainer leaves in the plan', async () => {
+      const member = await createMember();
+      const trainer = await createMember('ticks-trainer@example.com');
+      const today = todayLocal();
+      const plan = await createPlanWithExercises(member.id, today, ['Barbell Back Squat', 'Push-Up']);
+      await tick(plan.id, 'Barbell Back Squat');
+      const squatId = await exerciseIdByName('Barbell Back Squat');
+      const plankId = await exerciseIdByName('Plank');
+
+      const edited = await editPlan(plan.id, trainer.id, [
+        { exerciseId: squatId, sets: 5, reps: 5 },
+        { exerciseId: plankId, sets: 3, reps: 30 },
+      ]);
+
+      const byExercise = new Map(edited!.exercises.map((exercise) => [exercise.exerciseId, exercise]));
+      expect(byExercise.get(squatId)).toMatchObject({ sets: 5, completed: true });
+      expect(byExercise.get(plankId)?.completed).toBe(false);
+    });
+
+    it('refuses a trainer edit of a plan dated before today', async () => {
+      const member = await createMember();
+      const trainer = await createMember('past-trainer@example.com');
+      const plan = await createPlanWithExercises(member.id, '2020-01-01', ['Push-Up']);
+
+      await expect(
+        editPlan(plan.id, trainer.id, [{ exerciseId: await exerciseIdByName('Plank'), sets: 3, reps: 30 }]),
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: 'Past plans cannot be edited' });
+    });
+  });
+
+  describe('history does not rewrite', () => {
+    it('shows a past plan as it was while equipment going down only affects today and later', async () => {
+      const member = await createMember();
+      const rowing = 'Rowing Machine Sprint';
+      const past = await createPlanWithExercises(member.id, '2020-01-01', [rowing]);
+      const today = await createPlanWithExercises(member.id, todayLocal(), [rowing]);
+
+      const pastView = await getPlanForDate(member.id, '2020-01-01');
+      const todayView = await getPlanForDate(member.id, todayLocal());
+
+      expect(pastView?.id).toBe(past.id);
+      expect(pastView?.exercises[0]).toMatchObject({ isPerformable: true, equipmentDown: [] });
+      expect(Object.keys(pastView!.muscleLoad).length).toBeGreaterThan(0);
+      expect(pastView?.needsReview).toBe(false);
+      expect(todayView?.id).toBe(today.id);
+      expect(todayView?.exercises[0]?.isPerformable).toBe(false);
+      expect(todayView?.exercises[0]?.equipmentDown.length).toBeGreaterThan(0);
+      expect(todayView?.muscleLoad).toEqual({});
+    });
+
+    it('can fetch a future plan and lists the upcoming dates with their exercise counts', async () => {
+      const member = await createMember();
+      const tomorrow = dateOffset(todayLocal(), 1);
+      const later = dateOffset(todayLocal(), 5);
+      await createPlanWithExercises(member.id, dateOffset(todayLocal(), -1), ['Push-Up']);
+      await createPlanWithExercises(member.id, later, ['Push-Up', 'Plank', 'Pull-Up']);
+      await createPlanWithExercises(member.id, tomorrow, ['Push-Up', 'Plank']);
+
+      const view = await getPlanForDate(member.id, tomorrow);
+      const upcoming = await listUpcomingPlans(member.id);
+
+      expect(view?.planDate).toBe(tomorrow);
+      expect(upcoming).toEqual([
+        { planDate: tomorrow, status: 'ai_published', exerciseCount: 2 },
+        { planDate: later, status: 'ai_published', exerciseCount: 3 },
+      ]);
+    });
+  });
+
+  describe('plan prompt context', () => {
+    // Today, so the days before it read as done or not done rather than planned.
+    const planDate = todayLocal();
+
+    async function captureAiPrompt(userId: string) {
+      const squatId = await exerciseIdByName('Barbell Back Squat');
+      let prompt = '';
+      const evaluatePlan: EvaluatePlan = async (contextPrompt) => {
+        prompt = contextPrompt;
+        return { ok: true, data: { exercises: [{ exerciseId: squatId, sets: 3, reps: 5 }] } };
+      };
+      expectOk(await generateForDate(userId, planDate, false, { generator: 'ai', evaluatePlan }));
+      return prompt;
+    }
+
+    it('skips resolved facts and keeps unresolved ones', async () => {
+      const member = await createMember();
+      await db.insert(fProfileEvents).values([
+        {
+          userId: member.id,
+          eventType: 'injury',
+          payload: { description: 'old shoulder strain' },
+          resolvedAt: new Date(),
+        },
+        { userId: member.id, eventType: 'injury', payload: { description: 'sore left knee' } },
+      ]);
+
+      const prompt = await captureAiPrompt(member.id);
+
+      expect(prompt).toContain('sore left knee');
+      expect(prompt).not.toContain('old shoulder strain');
+    });
+
+    it('carries the recent plans with done and not done, the check-in dates, trainer notes, questionnaire and demand', async () => {
+      const member = await createMember();
+      const other = await createMember('demand-other@example.com');
+      const [trainer] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_TRAINER_EMAIL));
+      const doneDate = dateOffset(planDate, -2);
+      const missedDate = dateOffset(planDate, -4);
+      const outsideWindow = dateOffset(planDate, -20);
+
+      const donePlan = await createPlanWithExercises(member.id, doneDate, ['Barbell Back Squat']);
+      await db
+        .update(fTrainingPlanExercises)
+        .set({ completed: true, load: '60kg' })
+        .where(eq(fTrainingPlanExercises.trainingPlanId, donePlan.id));
+      await createPlanWithExercises(member.id, missedDate, ['Push-Up']);
+      await createPlanWithExercises(member.id, outsideWindow, ['Pull-Up']);
+      await db.insert(fCheckIns).values({
+        userId: member.id,
+        checkedInAt: new Date(`${doneDate}T10:00:00`),
+        turnstileStatus: 'success',
+        turnstileResponse: {},
+      });
+      await db.insert(fPlanReviews).values({
+        trainingPlanId: donePlan.id,
+        userId: trainer!.id,
+        note: 'Keep squats shallow for now',
+        isEdit: false,
+      });
+      await db.insert(fAptitudeQuestionnaires).values({
+        userId: member.id,
+        answers: QUESTIONNAIRE_V1.map((question) => ({
+          questionId: question.id,
+          answer: question.id === 'current_injury',
+          ...(question.id === 'current_injury' ? { detail: 'recovering from a torn meniscus' } : {}),
+        })),
+        aiResult: 'cleared',
+        aiNotes: 'Cleared with a note about the knee.',
+      });
+      await createPlanWithExercises(member.id, planDate, ['Plank']);
+      await createPlanWithExercises(other.id, planDate, ['Barbell Back Squat', 'Push-Up']);
+
+      const prompt = await captureAiPrompt(member.id);
+
+      expect(prompt).toContain(`- ${doneDate}: Barbell Back Squat 3x10 60kg (done)`);
+      expect(prompt).toContain(`- ${missedDate}: Push-Up 3x10 (not done)`);
+      expect(prompt).not.toContain('Pull-Up 3x10');
+      expect(prompt).toContain(`Gym check-in dates in the same period: ${doneDate}`);
+      expect(prompt).toContain('note by');
+      expect(prompt).toContain(`on the plan for ${doneDate}: Keep squats shallow for now`);
+      expect(prompt).toContain('Yes: Do you have any current injury');
+      expect(prompt).toContain('Detail: recovering from a torn meniscus');
+      expect(prompt).toContain('Screening notes: Cleared with a note about the knee.');
+      expect(prompt).toContain(`Other members' plans for ${planDate}`);
+      expect(prompt).toMatch(/counted in plans, not exercises\): 1\n/);
+      expect(prompt).toContain('Equipment in demand (plans that use each piece):');
+    });
+  });
+
+  describe('computePlanDemand', () => {
+    const squat = {
+      id: 'squat',
+      muscles: [{ muscle: 'quads', role: 'primary' }],
+      equipment: [{ id: 'rack', name: 'Squat Rack', isAvailable: true }],
+    } as const;
+    const press = {
+      id: 'press',
+      muscles: [{ muscle: 'quads', role: 'primary' }],
+      equipment: [
+        { id: 'rack', name: 'Squat Rack', isAvailable: true },
+        { id: 'sled', name: 'Press Sled', isAvailable: false },
+      ],
+    } as const;
+    const catalog = [squat, press];
+
+    it('counts plans that use a piece, not the exercise rows that use it', () => {
+      const demand = computePlanDemand(
+        [
+          { trainingPlanId: 'plan-a', exerciseId: 'squat', sets: 3 },
+          { trainingPlanId: 'plan-a', exerciseId: 'press', sets: 3 },
+          { trainingPlanId: 'plan-b', exerciseId: 'squat', sets: 4 },
+        ],
+        catalog,
+      );
+
+      expect(demand.otherPlanCount).toBe(2);
+      expect(demand.equipment).toEqual([{ id: 'rack', name: 'Squat Rack', planCount: 2 }]);
+      expect(demand.muscleLoad).toEqual({ quads: 10 });
+    });
+
+    it('is empty when no other member has a plan', () => {
+      const demand = computePlanDemand([], catalog);
+
+      expect(demand).toEqual({ otherPlanCount: 0, equipment: [], muscleLoad: {} });
+      expect(buildDemandLines(demand, '2026-10-10').join('\n')).toContain('no other member plans for this date yet');
     });
   });
 

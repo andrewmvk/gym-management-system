@@ -1,8 +1,10 @@
 'use client';
 
 import {
+  BanIcon,
   CircleCheckBigIcon,
   DoorOpenIcon,
+  IdCardIcon,
   type LucideIcon,
   RefreshCwIcon,
   ScanFaceIcon,
@@ -17,11 +19,17 @@ import { cn } from '@/lib/utils';
 
 export const RESULT_COOLDOWN_MS = 5000;
 
+const IS_PRODUCTION = process.env.NODE_ENV === 'production';
+
+// no_match_limit is a run of misses, not a determination about the person: it keeps the dashed form.
+// see_staff and membership_inactive are settled decisions about access, so they are solid.
 export type KioskResult =
   | { kind: 'granted' }
   | { kind: 'turnstile_failed' }
   | { kind: 'retry' }
+  | { kind: 'no_match_limit' }
   | { kind: 'see_staff' }
+  | { kind: 'membership_inactive' }
   | { kind: 'request_failed' };
 
 export type KioskSource = 'camera' | 'image';
@@ -29,10 +37,18 @@ export type KioskSource = 'camera' | 'image';
 export type KioskStatusState =
   | { kind: 'preparing' }
   | { kind: 'scanning'; severalFaces: boolean; source: KioskSource }
-  | { kind: 'unavailable'; title: string; detail: string; onRetry: () => void }
+  | { kind: 'unavailable'; title: string; detail: string; devNote?: string; onRetry: () => void }
   | KioskResult;
 
-const COPY: Record<KioskResult['kind'], { title: string; detail: string; tone: string; icon: LucideIcon }> = {
+interface ResultCopy {
+  title: string;
+  detail: string;
+  staffNote?: string;
+  tone: string;
+  icon: LucideIcon;
+}
+
+const COPY: Record<KioskResult['kind'], ResultCopy> = {
   granted: {
     title: 'Access granted',
     detail: 'Welcome in. Your check-in is recorded.',
@@ -40,8 +56,9 @@ const COPY: Record<KioskResult['kind'], { title: string; detail: string; tone: s
     icon: CircleCheckBigIcon,
   },
   turnstile_failed: {
-    title: 'Open the turnstile manually',
-    detail: 'Staff: the turnstile did not respond. The check-in is recorded, so let this member through.',
+    title: 'Please wait',
+    detail: 'A staff member will open the door for you.',
+    staffNote: 'Staff: the turnstile did not respond. The check-in is recorded, so let this member through.',
     tone: 'outline-tape bg-tape text-tape-foreground',
     icon: DoorOpenIcon,
   },
@@ -51,15 +68,28 @@ const COPY: Record<KioskResult['kind'], { title: string; detail: string; tone: s
     tone: 'outline-dashed outline-kit-muted text-kit-foreground',
     icon: RefreshCwIcon,
   },
-  see_staff: {
-    title: 'See the front desk',
-    detail: 'We cannot let you in from here. Ask staff for help.',
+  no_match_limit: {
+    title: 'Please see the front desk',
+    detail: 'We could not match your face after a few tries. Staff will help you in.',
     tone: 'outline-dashed outline-kit-muted text-kit-foreground',
     icon: UserRoundIcon,
   },
+  see_staff: {
+    title: 'Access not available',
+    detail: 'We cannot let you in from here. Please see the front desk.',
+    tone: 'outline-destructive text-kit-foreground',
+    icon: BanIcon,
+  },
+  membership_inactive: {
+    title: 'Membership inactive',
+    detail: 'Please see the front desk.',
+    tone: 'outline-destructive text-kit-foreground',
+    icon: IdCardIcon,
+  },
   request_failed: {
-    title: 'Check-in not recorded',
-    detail: 'Something went wrong on our side. Try again in a moment.',
+    title: 'Check-in unavailable',
+    detail:
+      'We could not reach the check-in service, so nothing was recorded. Try again in a moment, or see the front desk.',
     tone: 'outline-dashed outline-destructive text-kit-foreground',
     icon: TriangleAlertIcon,
   },
@@ -193,6 +223,7 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
           <TriangleAlertIcon className={ICON} aria-hidden />
           <h1 className={TITLE}>{state.title}</h1>
           <p className={cn(DETAIL, 'text-kit-muted')}>{state.detail}</p>
+          {!IS_PRODUCTION && state.devNote && <p className="text-base text-kit-muted">Dev only: {state.devNote}</p>}
         </div>
         <Button size="lg" variant="outline" className="self-start" onClick={state.onRetry}>
           Retry
@@ -209,6 +240,7 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
         <Icon className={ICON} aria-hidden />
         <h1 className={TITLE}>{copy.title}</h1>
         <p className={DETAIL}>{copy.detail}</p>
+        {copy.staffNote && <p className="text-lg opacity-80">{copy.staffNote}</p>}
       </div>
       <CooldownBar />
     </section>

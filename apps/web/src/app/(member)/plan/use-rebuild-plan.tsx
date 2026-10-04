@@ -3,59 +3,61 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { type PlanOverwriteConfirmation, PlanOverwriteDialog } from '@/app/(member)/plan/plan-overwrite-dialog';
 import { useTRPC } from '@/lib/trpc';
 
 interface UseRebuildPlanOptions {
-  planStatus: 'ai_published' | 'trainer_edited';
-  hasCompleted: boolean;
-  successMessage: string;
+  successMessage?: string;
+  // The caller shows the failure in place (an error panel with a retry), so no toast repeats it.
+  isErrorInline?: boolean;
 }
 
-// One place for "rebuild today's plan": the confirm dialog says what gets replaced, and the rebuild
-// always runs confirmed because the dialog already named the trainer edit it would overwrite.
-export function useRebuildPlan({ planStatus, hasCompleted, successMessage }: UseRebuildPlanOptions) {
+export const PLAN_BUILD_FAILED_MESSAGE = "We couldn't build your plan right now. Nothing was changed. Try again.";
+
+// One place for "build or rebuild today's plan". The server asks for confirmation only when the plan holds
+// something worth protecting (a trainer edit or ticked exercises), so a plain rebuild runs straight away and
+// a guarded one waits for the dialog.
+export function useRebuildPlan({ successMessage, isErrorInline }: UseRebuildPlanOptions = {}) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [isConfirming, setIsConfirming] = useState(false);
+  const [confirmation, setConfirmation] = useState<PlanOverwriteConfirmation | null>(null);
 
   const rebuild = useMutation(
     trpc.plans.generateToday.mutationOptions({
-      onSuccess: () => {
+      onSuccess: (result) => {
+        if (result.status === 'needs_confirmation') {
+          setConfirmation(result);
+          return;
+        }
         queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
-        toast.message(successMessage);
+        queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
+        queryClient.invalidateQueries({ queryKey: trpc.plans.listUpcoming.queryKey() });
+        if (successMessage) toast.message(successMessage);
       },
-      onError: () => toast.error("We couldn't rebuild your plan. Try again."),
+      onError: () => {
+        if (!isErrorInline) toast.error(PLAN_BUILD_FAILED_MESSAGE);
+      },
     }),
   );
 
+  function confirmOverwrite() {
+    setConfirmation(null);
+    rebuild.mutate({ confirmOverwrite: true });
+  }
+
   const dialog = (
-    <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Rebuild today&apos;s plan?</AlertDialogTitle>
-          <AlertDialogDescription>
-            Your coach builds a new plan from what can be done right now.
-            {hasCompleted ? ' Exercises you already ticked off are cleared.' : ''}
-            {planStatus === 'trainer_edited' ? ' A trainer edited this plan, and rebuilding replaces their edits.' : ''}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Keep this plan</AlertDialogCancel>
-          <AlertDialogAction onClick={() => rebuild.mutate({ confirmOverwrite: true })}>Rebuild</AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+    <PlanOverwriteDialog
+      confirmation={confirmation}
+      intent="rebuild"
+      onConfirm={confirmOverwrite}
+      onCancel={() => setConfirmation(null)}
+    />
   );
 
-  return { isPending: rebuild.isPending, requestRebuild: () => setIsConfirming(true), dialog };
+  return {
+    isPending: rebuild.isPending,
+    isError: rebuild.isError,
+    requestRebuild: () => rebuild.mutate({ confirmOverwrite: false }),
+    dialog,
+  };
 }

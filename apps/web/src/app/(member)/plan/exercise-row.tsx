@@ -22,6 +22,8 @@ interface ExerciseRowProps {
   equipmentDown?: readonly string[];
   onToggle?: (completed: boolean) => void;
   disabled?: boolean;
+  // A day that has not come yet shows the same box as today's plan, switched off.
+  isTickLocked?: boolean;
 }
 
 // onToggle is only passed for today's plan; history rows omit it and render read-only.
@@ -40,6 +42,7 @@ function ExerciseRowRoot({
   equipmentDown,
   onToggle,
   disabled,
+  isTickLocked,
 }: ExerciseRowProps) {
   const primaryLabels = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
   const secondaryLabels = muscles
@@ -54,13 +57,13 @@ function ExerciseRowRoot({
         isDimmed && 'opacity-45',
       )}
     >
-      {onToggle ? (
+      {onToggle || isTickLocked ? (
         <Checkbox
           checked={completed}
-          disabled={!isPerformable || disabled}
-          onCheckedChange={(checked) => onToggle(checked === true)}
-          className="mt-0.5 size-6 [&_svg]:size-4.5!"
-          aria-label={`Mark ${name} as completed`}
+          disabled={isTickLocked || !isPerformable || disabled}
+          onCheckedChange={(checked) => onToggle?.(checked === true)}
+          className="mt-0.5 size-6 after:-inset-2.5 [&_svg]:size-4.5!"
+          aria-label={isTickLocked ? `${name}, can be ticked on the day` : `Mark ${name} as completed`}
         />
       ) : (
         <span
@@ -112,7 +115,7 @@ function ExerciseRowRoot({
           <Badge variant="outline" className="text-muted-foreground">
             {equipmentDown?.length
               ? `${equipmentDown.join(', ')} ${equipmentDown.length === 1 ? 'is' : 'are'} out of service`
-              : 'Equipment unavailable right now'}
+              : 'Out of service'}
           </Badge>
         )}
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">{instructions}</p>

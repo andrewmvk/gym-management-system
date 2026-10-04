@@ -6,6 +6,7 @@ const KIOSK_KEY_HEADER = 'x-kiosk-key';
 export type CheckInResult =
   | { kind: 'recorded'; turnstileStatus: 'success' | 'failed' }
   | { kind: 'member_not_cleared' }
+  | { kind: 'membership_inactive' }
   | { kind: 'member_not_found' };
 
 function kioskHeaders(extra: Record<string, string> = {}) {
@@ -33,7 +34,10 @@ export async function postCheckIn(memberId: string): Promise<CheckInResult> {
     body: JSON.stringify({ memberId }),
   });
   if (response.status === 404) return { kind: 'member_not_found' };
-  if (response.status === 403) return { kind: 'member_not_cleared' };
+  if (response.status === 403) {
+    const body: { reason?: string } | null = await response.json().catch(() => null);
+    return { kind: body?.reason === 'membership_inactive' ? 'membership_inactive' : 'member_not_cleared' };
+  }
   if (!response.ok) throw new Error(`Check-in request failed with status ${response.status}`);
 
   const body: { turnstileStatus: 'success' | 'failed' } = await response.json();

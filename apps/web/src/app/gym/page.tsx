@@ -13,7 +13,7 @@ import { PublicHeader } from '@/components/public-header';
 import { useTRPC } from '@/lib/trpc';
 
 const TITLE = 'Gym info';
-const DESCRIPTION = 'Whether the gym is open, how busy it is, and what people are training today.';
+const DESCRIPTION = 'Whether the gym is open today and roughly how many people are on the floor right now.';
 
 // The page is public, so the header follows whoever is looking: the staff or member area they came from,
 // or the public one for a visitor.

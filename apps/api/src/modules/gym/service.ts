@@ -1,5 +1,4 @@
 import { endOfLocalDay, startOfLocalDay, todayLocal } from '@api/lib/dates';
-import { isExerciseAvailable } from '@api/modules/catalog/service';
 import * as repository from '@api/modules/gym/repository';
 import {
   type DayHours,
@@ -9,15 +8,9 @@ import {
   WEEKDAYS,
   type Weekday,
 } from '@cadence/shared/schemas/gym';
-import { computeMuscleLoad } from '@cadence/shared/schemas/muscle-heat';
 
 const MS_PER_MINUTE = 60 * 1000;
 const HOURS_PER_DAY = 24;
-
-export interface DemandEntry {
-  name: string;
-  count: number;
-}
 
 function toMinutes(time: string) {
   const [hours, minutes] = time.split(':').map(Number);
@@ -53,41 +46,6 @@ export function getNextChange(openingHours: OpeningHours, now: Date): NextChange
   return null;
 }
 
-function tally(names: string[]): DemandEntry[] {
-  const counts = new Map<string, number>();
-  for (const name of names) counts.set(name, (counts.get(name) ?? 0) + 1);
-  return [...counts]
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
-}
-
-// Today's published plans of members who checked in today. An exercise whose equipment is all
-// unavailable is skipped entirely, and so is any unavailable piece of equipment of one that is not.
-async function getDemandToday(now: Date) {
-  const today = todayLocal(now);
-  const planned = await repository.findPlannedExercisesOfCheckedInMembers(
-    today,
-    startOfLocalDay(today),
-    endOfLocalDay(today),
-  );
-  const equipmentRows = await repository.findEquipmentForExercises([...new Set(planned.map((row) => row.exerciseId))]);
-
-  const equipmentByExercise = new Map<string, typeof equipmentRows>();
-  for (const row of equipmentRows) {
-    equipmentByExercise.set(row.exerciseId, [...(equipmentByExercise.get(row.exerciseId) ?? []), row]);
-  }
-
-  const available: typeof planned = [];
-  const equipment: string[] = [];
-  for (const row of planned) {
-    const linked = equipmentByExercise.get(row.exerciseId) ?? [];
-    if (!isExerciseAvailable(linked)) continue;
-    available.push(row);
-    for (const item of linked) if (item.isAvailable) equipment.push(item.name);
-  }
-  return { muscleLoad: computeMuscleLoad(available), equipment: tally(equipment) };
-}
-
 // The clock is injectable so the window and the opening edges are testable without waiting.
 export async function getGymInfo(now: Date = new Date()) {
   const settings = await repository.getOrCreateSettings();
@@ -99,19 +57,27 @@ export async function getGymInfo(now: Date = new Date()) {
     isOpen: isOpenAt(todayHours, now),
     todayHours,
     nextChange: getNextChange(openingHours, now),
-    occupancyEstimate: await repository.countCheckInsBetween(windowStart, now),
+    occupancyEstimate: await repository.countMembersCheckedInBetween(windowStart, now),
     isEstimate: true as const,
     occupancyWindowMinutes: OCCUPANCY_WINDOW_MINUTES,
-    demand: await getDemandToday(now),
   };
 }
 
+// Each bucket counts distinct members, so a re-scan inside the same hour is not a second visitor.
 export async function getGymAdminDetail(now: Date = new Date()) {
   const today = todayLocal(now);
-  const times = await repository.findCheckInTimes(startOfLocalDay(today), endOfLocalDay(today));
-  const checkInsPerHour = Array.from({ length: HOURS_PER_DAY }, (_, hour) => ({
-    hour,
-    count: times.filter((time) => time.getHours() === hour).length,
-  }));
+  const checkIns = await repository.findCheckIns(startOfLocalDay(today), endOfLocalDay(today));
+  const membersPerHour = Array.from({ length: HOURS_PER_DAY }, () => new Set<string>());
+  for (const checkIn of checkIns) membersPerHour[checkIn.checkedInAt.getHours()]!.add(checkIn.userId);
+  const checkInsPerHour = membersPerHour.map((members, hour) => ({ hour, count: members.size }));
   return { ...(await getGymInfo(now)), checkInsPerHour, currentHour: now.getHours() };
+}
+
+export async function getOpeningHours(): Promise<OpeningHours> {
+  return OpeningHoursSchema.parse((await repository.getOrCreateSettings()).openingHours);
+}
+
+export async function updateOpeningHours(openingHours: OpeningHours): Promise<OpeningHours> {
+  const settings = await repository.updateOpeningHours(openingHours);
+  return OpeningHoursSchema.parse(settings.openingHours);
 }

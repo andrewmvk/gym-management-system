@@ -2,8 +2,12 @@ import { db, pool } from '@api/db/client';
 import { dUsers } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import type { ComputeFaceEmbedding } from '@api/lib/face-embedding';
-import type { EvaluateCertificate } from '@api/modules/aptitude/certificate-service';
-import { listQueue, reviewCertificate, uploadCertificate } from '@api/modules/aptitude/certificate-service';
+import {
+  listQueue,
+  reviewCertificate,
+  UNINSPECTED_CERTIFICATE_NOTES,
+  uploadCertificate,
+} from '@api/modules/aptitude/certificate-service';
 import { insertPendingApplicant } from '@api/modules/aptitude/repository';
 import type { EvaluateAptitude } from '@api/modules/aptitude/service';
 import { submitSignup } from '@api/modules/aptitude/service';
@@ -31,12 +35,6 @@ const alwaysNotCleared: EvaluateAptitude = async () => ({
 });
 const alwaysCleared: EvaluateAptitude = async () => ({ ok: true, data: { verdict: 'cleared', notes: 'ok' } });
 const alwaysPendingAptitude: EvaluateAptitude = async () => ({ ok: false, reason: 'unavailable' });
-
-const alwaysCertificateOk: EvaluateCertificate = async () => ({
-  ok: true,
-  data: { verdict: 'not_cleared', notes: 'cannot inspect content' },
-});
-const alwaysCertificateFails: EvaluateCertificate = async () => ({ ok: false, reason: 'unavailable' });
 
 const alwaysEmbedding: ComputeFaceEmbedding = async () => ({ ok: true, embedding: Array(128).fill(0.01) });
 
@@ -87,7 +85,7 @@ describe('certificate-service', () => {
     it('refuses before any questionnaire has been submitted', async () => {
       const userId = await applicantId();
 
-      const result = await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      const result = await uploadCertificate(uploadInput(userId));
 
       expect(result).toEqual({ status: 'unavailable' });
     });
@@ -95,7 +93,7 @@ describe('certificate-service', () => {
     it('refuses when the questionnaire already cleared the applicant', async () => {
       const userId = await submittedApplicant(alwaysCleared);
 
-      const result = await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      const result = await uploadCertificate(uploadInput(userId));
 
       expect(result).toEqual({ status: 'unavailable' });
     });
@@ -103,7 +101,7 @@ describe('certificate-service', () => {
     it('succeeds after a not_cleared questionnaire and enters the AI result, still pending', async () => {
       const userId = await notClearedApplicant();
 
-      const result = await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      const result = await uploadCertificate(uploadInput(userId));
 
       expect(result).toEqual({ status: 'ok' });
       expect(await aptitudeStatusOf(userId)).toBe('pending');
@@ -112,23 +110,24 @@ describe('certificate-service', () => {
     it('succeeds after a persistent pending_retry questionnaire', async () => {
       const userId = await submittedApplicant(alwaysPendingAptitude);
 
-      const result = await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      const result = await uploadCertificate(uploadInput(userId));
 
       expect(result).toEqual({ status: 'ok' });
     });
 
-    it('stores pending_retry on a certificate AI failure, without throwing', async () => {
+    it('stores pending_retry with an honest note, never a not_cleared the AI could not have decided', async () => {
       const userId = await notClearedApplicant();
 
-      const result = await uploadCertificate(uploadInput(userId), alwaysCertificateFails);
+      const result = await uploadCertificate(uploadInput(userId));
 
       expect(result).toEqual({ status: 'ok' });
       const [queued] = await listQueue();
-      expect(queued?.aiResult).toBe('pending_retry');
+      expect(queued).toMatchObject({ aiResult: 'pending_retry', aiNotes: UNINSPECTED_CERTIFICATE_NOTES });
+      expect(await aptitudeStatusOf(userId)).toBe('pending');
     });
 
     it('refuses an unknown userId', async () => {
-      const result = await uploadCertificate(uploadInput('00000000-0000-0000-0000-000000000000'), alwaysCertificateOk);
+      const result = await uploadCertificate(uploadInput('00000000-0000-0000-0000-000000000000'));
 
       expect(result).toEqual({ status: 'unavailable' });
     });
@@ -137,7 +136,7 @@ describe('certificate-service', () => {
   describe('listQueue', () => {
     it('includes every certificate regardless of its AI result', async () => {
       const userId = await notClearedApplicant();
-      await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      await uploadCertificate(uploadInput(userId));
 
       const queue = await listQueue();
 
@@ -145,8 +144,36 @@ describe('certificate-service', () => {
       expect(queue[0]).toMatchObject({
         applicantName: APPLICANT.name,
         applicantEmail: APPLICANT.email,
-        aiResult: 'not_cleared',
+        aiResult: 'pending_retry',
+        reviewedByUserId: null,
+        reviewedByName: null,
+        adminReviewedAt: null,
       });
+    });
+
+    it('shows what the questionnaire concluded and why, so the admin sees why a certificate was asked for', async () => {
+      const userId = await notClearedApplicant();
+      await uploadCertificate(uploadInput(userId));
+
+      const [entry] = await listQueue();
+
+      expect(entry).toMatchObject({ questionnaireResult: 'not_cleared', questionnaireNotes: 'needs certificate' });
+    });
+
+    it('names the reviewing admin and the decision time once reviewed', async () => {
+      const userId = await notClearedApplicant();
+      await uploadCertificate(uploadInput(userId));
+      const [certificate] = await listQueue();
+      await reviewCertificate(await reviewerId(), { certificateId: certificate!.id, result: 'cleared' });
+
+      const [entry] = await listQueue();
+
+      expect(entry).toMatchObject({
+        reviewedByUserId: await reviewerId(),
+        reviewedByName: 'Demo Admin',
+        adminOverrideResult: 'cleared',
+      });
+      expect(entry?.adminReviewedAt).toBeInstanceOf(Date);
     });
   });
 
@@ -160,30 +187,34 @@ describe('certificate-service', () => {
       expect(result).toEqual({ status: 'not_found' });
     });
 
-    it('refuses to confirm a pending_retry certificate', async () => {
+    it('refuses to confirm a certificate the AI could not inspect, and leaves the applicant untouched', async () => {
       const userId = await notClearedApplicant();
-      await uploadCertificate(uploadInput(userId), alwaysCertificateFails);
+      await uploadCertificate(uploadInput(userId));
       const [certificate] = await listQueue();
 
       const result = await reviewCertificate(await reviewerId(), { certificateId: certificate!.id, result: 'confirm' });
 
       expect(result).toEqual({ status: 'no_decision_to_confirm' });
+      expect(await aptitudeStatusOf(userId)).toBe('pending');
     });
 
-    it('confirm materializes a not_cleared AI result into rejection', async () => {
+    it('an explicit not_cleared from the admin rejects the applicant', async () => {
       const userId = await notClearedApplicant();
-      await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      await uploadCertificate(uploadInput(userId));
       const [certificate] = await listQueue();
 
-      const result = await reviewCertificate(await reviewerId(), { certificateId: certificate!.id, result: 'confirm' });
+      const result = await reviewCertificate(await reviewerId(), {
+        certificateId: certificate!.id,
+        result: 'not_cleared',
+      });
 
       expect(result).toMatchObject({ status: 'ok', aptitudeStatus: 'rejected' });
       expect(await aptitudeStatusOf(userId)).toBe('rejected');
     });
 
-    it('overriding a not_cleared AI result to cleared is the recovery path', async () => {
+    it('an explicit cleared from the admin clears the applicant', async () => {
       const userId = await notClearedApplicant();
-      await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      await uploadCertificate(uploadInput(userId));
       const [certificate] = await listQueue();
 
       const result = await reviewCertificate(await reviewerId(), { certificateId: certificate!.id, result: 'cleared' });
@@ -194,7 +225,7 @@ describe('certificate-service', () => {
 
     it('never changes aptitude_status once the applicant already has a password', async () => {
       const userId = await notClearedApplicant();
-      await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      await uploadCertificate(uploadInput(userId));
       const [certificate] = await listQueue();
       await db.update(dUsers).set({ passwordHash: 'already-activated' }).where(eq(dUsers.id, userId));
 
@@ -206,7 +237,7 @@ describe('certificate-service', () => {
 
     it('a rejected applicant cannot start a new signup with that e-mail', async () => {
       const userId = await notClearedApplicant();
-      await uploadCertificate(uploadInput(userId), alwaysCertificateOk);
+      await uploadCertificate(uploadInput(userId));
       const [certificate] = await listQueue();
       await reviewCertificate(await reviewerId(), { certificateId: certificate!.id, result: 'not_cleared' });
 

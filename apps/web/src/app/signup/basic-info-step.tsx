@@ -33,17 +33,17 @@ export function BasicInfoStep({ defaultValues, onContinue, onResume }: BasicInfo
     defaultValues,
   });
 
-  // Nothing is stored here: the check only rejects an unusable e-mail, or sends a returning applicant
+  // Nothing is stored here: the check only rejects an unusable email, or sends a returning applicant
   // straight to their verdict, before they fill in the rest of the signup.
   const checkEmail = useMutation(
     trpc.aptitude.checkEmail.mutationOptions({
       onSuccess: (result) => {
         if (result.status === 'email_blocked') {
-          toast.error("This e-mail can't be used to sign up.");
+          toast.error("This email can't be used to sign up.");
           return;
         }
         if (result.status === 'already_registered') {
-          toast.error('An account already exists for this e-mail. Try signing in instead.');
+          toast.error('An account already exists for this email. Try signing in instead.');
           return;
         }
         if (result.status === 'resumable') {
@@ -53,7 +53,7 @@ export function BasicInfoStep({ defaultValues, onContinue, onResume }: BasicInfo
         }
         onContinue(form.getValues());
       },
-      onError: () => toast.error("We couldn't check your e-mail. Try again."),
+      onError: () => toast.error("We couldn't check your email. Try again."),
     }),
   );
 
@@ -77,7 +77,7 @@ export function BasicInfoStep({ defaultValues, onContinue, onResume }: BasicInfo
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="signup-email">E-mail</FieldLabel>
+                <FieldLabel htmlFor="signup-email">Email</FieldLabel>
                 <Input
                   {...field}
                   id="signup-email"

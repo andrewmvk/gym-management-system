@@ -2,9 +2,9 @@
 
 ## Domain "failure" is data, not an exception
 
-`pending_retry`, a rejected face-match, and a `turnstile_status: 'failed'` check-in are all **expected outcomes**, not errors to throw and catch. Model them as the enum/status columns `docs/05-data-model.md` already defines, and let the request complete normally with that status. Never:
+An AI generation failure, a rejected face-match, and a `turnstile_status: 'failed'` check-in are all **expected outcomes**, not unhandled errors. A turnstile failure is a status column `docs/05-data-model.md` defines, and the request completes normally with that status. An AI failure has no status row to hold it, because it never produces a result: it surfaces as a controlled, retryable `TRPCError` and nothing is saved (see "AI call sites"). Never:
 
-- let an AI timeout bubble up as an unhandled `500` on the aptitude/certificate procedures - catch it and write `ai_result = 'pending_retry'`.
+- let an AI timeout bubble up as an unhandled `500` on plan generation or chat - catch it and surface the controlled "AI is temporarily unavailable" error, and never save a plan (or substitute a placeholder one) when the live AI returned nothing usable.
 - treat "ambiguous top-two face match" as a caught exception - it's a normal branch in the matching logic that returns "no match, retry."
 - let a failed turnstile REST call prevent the check-in row from being written - it always writes, tagged `turnstile_status: 'failed'`.
 
@@ -16,9 +16,8 @@ Use zod for every tRPC procedure input; a validation failure is handled automati
 
 ## AI call sites
 
-Every OpenRouter call (aptitude eval, certificate review, plan generation, chat) goes through the shared AI module (`rules/backend.md`). On a request-level failure (timeout, rate-limit, network error) or a structured-output parse failure after one retry:
+Every OpenRouter call (plan generation, chat) goes through the shared AI module (`rules/backend.md`). On a request-level failure (timeout, rate-limit, network error) or a structured-output parse failure after one retry:
 
-- **Aptitude/certificate evaluation** → resolve to `pending_retry`, return normally.
 - **Plan generation/chat** → throw `TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' })`; the frontend shows this as a retryable toast, not a crash.
 
 ## Frontend
@@ -30,6 +29,6 @@ Every OpenRouter call (aptitude eval, certificate review, plan generation, chat)
 ## Logging
 
 - `pino` on the backend, structured (`requestId`, `userId`, `route`).
-- `warn` level: expected-but-notable failures (AI call failed → `pending_retry`, turnstile call failed, face-match rejected).
+- `warn` level: expected-but-notable failures (AI call failed, turnstile call failed, face-match rejected).
 - `error` level: anything unexpected (unhandled exception, DB error).
 - Never log raw biometric data (embeddings, photo paths' contents), password hashes, or full JWTs - log ids, not payloads.

@@ -3,6 +3,7 @@ Covers: FR-1, FR-2
 MVP: 2
 Artifacts: apps/api/src/modules/aptitude/{router,service,repository}.ts (signup part), packages/shared/src/schemas/signup.ts, apps/web/src/app/signup/ (basic info and photo steps)
 Evidence: Vitest against Postgres: a new signup creates one row, the same e-mail resumes it without duplicates, a rejected e-mail is blocked, a registered e-mail is refused, the photo and its embedding are stored; manual: the two steps work on a phone
+Status: Partly superseded by P-31 (audit-log item 20): registration happens only at the gym and is one request that also carries a password; the wizard steps become Details, Consent, Photo, Password, and the resume-by-e-mail and rejected-e-mail parts no longer apply (FR-1 is rewritten, FR-2 stays). Already superseded in part by audit-log item 16 (a single submit call)
 
 Task: implement the first two steps of the signup wizard: basic information with resume-by-e-mail, and the webcam reference photo.
 

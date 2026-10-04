@@ -13,6 +13,9 @@ export function PublicHeader() {
       </Link>
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
         <ThemeToggle />
+        <Button asChild variant="ghost" className="hidden text-kit-foreground hover:bg-white/10 sm:inline-flex">
+          <Link href="/gym">Gym info</Link>
+        </Button>
         <Button asChild variant="ghost" className="text-kit-foreground hover:bg-white/10">
           <Link href={LOGIN_PATH}>Sign in</Link>
         </Button>

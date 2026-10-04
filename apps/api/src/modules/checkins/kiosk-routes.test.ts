@@ -160,6 +160,28 @@ describe('POST /kiosk/checkins', () => {
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
   });
 
+  it('says why a member who is not cleared is refused', async () => {
+    const pending = await createMember('pending');
+
+    const response = await postCheckIn({ memberId: pending }, env.KIOSK_API_KEY);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ reason: 'not_cleared' });
+  });
+
+  it('answers 403 with reason membership_inactive for an inactive member and records nothing', async () => {
+    const [lapsed] = await db
+      .insert(dUsers)
+      .values({ email: 'lapsed@example.com', name: 'Lapsed', aptitudeStatus: 'cleared', membershipStatus: 'inactive' })
+      .returning();
+
+    const response = await postCheckIn({ memberId: lapsed!.id }, env.KIOSK_API_KEY);
+
+    expect(response.status).toBe(403);
+    expect(await response.json()).toMatchObject({ reason: 'membership_inactive' });
+    expect(await db.select().from(fCheckIns)).toHaveLength(0);
+  });
+
   it('records the check-in as failed and still answers 200 when the turnstile is not configured', async () => {
     const memberId = await createMember('cleared');
 

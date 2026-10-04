@@ -10,9 +10,11 @@ Vitest only. No component-testing library, no Playwright/e2e. Verify user-facing
 
 Pure, easy-to-get-subtly-wrong logic with no UI:
 
-- Aptitude/certificate result resolution - `cleared`/`not_cleared`/`pending_retry` never coalescing into each other (`rules/error-handling.md`).
+- Inactive membership (FR-40, RN-15): login refused only after a correct password, an existing session stopping, and the kiosk refusing with no turnstile call and no check-in row.
+- Completed exercises preserved (RN-16): regenerating or trainer-editing a plan keeps `completed` for exercises that remain, and asks for confirmation first when ticks exist.
+- AI failure saves no plan (FR-15, RN-01): a live AI that returns nothing usable fails the generation with the unavailable error and writes no plan row, never falling back to the placeholder.
 - Exercise availability rule (FR-17): no-equipment-needed OR ≥1 linked equipment available.
-- Occupancy rolling-window query (FR-37).
+- Occupancy rolling-window query counting distinct members (FR-37).
 - Face-match threshold/ambiguity decision (best vs. second-best candidate).
 - Retroactive correction overwrite behavior (FR-23) and that metrics reflect the corrected version.
 - Turnstile-call-failure still records a check-in, tagged `failed` (FR-33/34).

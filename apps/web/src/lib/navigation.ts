@@ -36,12 +36,8 @@ export const NAV_ENTRIES: Record<AppArea, NavEntry[]> = {
       label: 'Gym',
       items: [
         { href: '/gym', label: 'Gym info' },
+        { href: '/checkins', label: 'Check-ins', isVisible: (ability) => ability.can('read', 'CheckIn') },
         { href: '/catalog', label: 'Catalog' },
-        {
-          href: '/settings/turnstile',
-          label: 'Turnstile',
-          isVisible: (ability) => ability.can('manage', 'TurnstileConfig'),
-        },
       ],
     },
     {
@@ -57,6 +53,21 @@ export const NAV_ENTRIES: Record<AppArea, NavEntry[]> = {
           href: '/policies',
           label: 'Policies',
           isVisible: (ability) => ability.can('manage', 'UserPolicyAssignment'),
+        },
+      ],
+    },
+    {
+      label: 'Setup',
+      items: [
+        {
+          href: '/settings/turnstile',
+          label: 'Turnstile',
+          isVisible: (ability) => ability.can('manage', 'TurnstileConfig'),
+        },
+        {
+          href: '/settings/hours',
+          label: 'Opening hours',
+          isVisible: (ability) => ability.can('manage', 'GymSettings'),
         },
       ],
     },

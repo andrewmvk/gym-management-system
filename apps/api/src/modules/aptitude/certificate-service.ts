@@ -1,44 +1,22 @@
 import { saveUpload } from '@api/lib/uploads';
-import { type AiResult, type AiVerdict, AiVerdictSchema, runStructured } from '@api/modules/ai';
 import * as repository from '@api/modules/aptitude/repository';
 import { type AdminResult, resolveAptitudeStatus } from '@api/modules/aptitude/resolve-aptitude-status';
 import type { CertificateReviewInput, CertificateUploadInput } from '@cadence/shared/schemas/certificates';
 
-// FR-2 of this prompt's own review (see prompts/P-10, "the AI can't see the image" caveat): the AI
-// module only carries text, so this reviewer is only ever given the file's name and type, never its
-// actual content. It cannot verify what the document says, so it defaults to not_cleared and explains
-// why - the real decision always comes from the admin queue (RN-02), this is not a bypass of it.
-const CERTIFICATE_SYSTEM_PROMPT =
-  "You are a first-pass reviewer for a gym applicant's medical certificate. You are only given the " +
-  "file's name and type, not its actual content, so you cannot verify what the document says. Because " +
-  'every certificate is routed to a human admin regardless of your answer, respond not_cleared and ' +
-  "explain in your notes that you could not inspect the file's content, so a human must review it.";
-
-function buildCertificateUserPrompt(filename: string, mimeType: string): string {
-  return `Certificate filename: ${filename}\nFile type: ${mimeType}`;
-}
-
-export type EvaluateCertificate = (filename: string, mimeType: string) => Promise<AiResult<AiVerdict>>;
-
-async function defaultEvaluateCertificate(filename: string, mimeType: string): Promise<AiResult<AiVerdict>> {
-  return runStructured({
-    purpose: 'certificate',
-    system: CERTIFICATE_SYSTEM_PROMPT,
-    user: buildCertificateUserPrompt(filename, mimeType),
-    schema: AiVerdictSchema,
-  });
-}
+// The AI module only carries text, so a model could only ever be handed the file's name and type, never what
+// the document says. A verdict from that would be a guess dressed up as a determination, so the AI is not
+// asked: the certificate is stored as pending_retry (the technical-failure state of rules/error-handling.md,
+// never a real not_cleared) and the admin queue is the only decision, exactly as RN-02 already requires.
+export const UNINSPECTED_CERTIFICATE_NOTES =
+  'The AI could not inspect the uploaded file, so it made no determination. An admin must review it.';
 
 export type UploadCertificateResult = { status: 'ok' } | { status: 'unavailable' };
 
 // FR-5: allowed only once the questionnaire itself needs one - not_cleared, or a persistent
 // pending_retry (so a member isn't stuck forever if the questionnaire AI keeps failing). Uploading
-// never changes aptitude_status by itself (RN-02/FR-6): every certificate, whatever its AI result,
-// waits in the admin queue for a human decision.
-export async function uploadCertificate(
-  input: CertificateUploadInput,
-  evaluateCertificate: EvaluateCertificate = defaultEvaluateCertificate,
-): Promise<UploadCertificateResult> {
+// never changes aptitude_status by itself (RN-02/FR-6): every certificate waits in the admin queue
+// for a human decision.
+export async function uploadCertificate(input: CertificateUploadInput): Promise<UploadCertificateResult> {
   const user = await repository.findById(input.userId);
   if (user?.aptitudeStatus !== 'pending') return { status: 'unavailable' };
 
@@ -53,13 +31,12 @@ export async function uploadCertificate(
     base64: input.base64,
   });
 
-  const evaluation = await evaluateCertificate(input.filename, input.mimeType);
-  const aiResult = evaluation.ok ? evaluation.data.verdict : 'pending_retry';
-  const aiNotes = evaluation.ok
-    ? evaluation.data.notes
-    : 'AI evaluation unavailable; an admin will review this certificate.';
-
-  await repository.insertCertificate({ userId: input.userId, filePath: saved.path, aiResult, aiNotes });
+  await repository.insertCertificate({
+    userId: input.userId,
+    filePath: saved.path,
+    aiResult: 'pending_retry',
+    aiNotes: UNINSPECTED_CERTIFICATE_NOTES,
+  });
   return { status: 'ok' };
 }
 
@@ -71,9 +48,12 @@ export interface CertificateQueueEntry {
   aiResult: 'cleared' | 'not_cleared' | 'pending_retry';
   aiNotes: string;
   reviewedByUserId: string | null;
+  reviewedByName: string | null;
   adminReviewedAt: Date | null;
   adminOverrideResult: 'cleared' | 'not_cleared' | null;
   uploadedAt: Date;
+  questionnaireResult: 'cleared' | 'not_cleared' | 'pending_retry' | null;
+  questionnaireNotes: string | null;
 }
 
 export async function listQueue(): Promise<CertificateQueueEntry[]> {

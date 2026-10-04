@@ -3,6 +3,7 @@ import type { AppAbility } from '@cadence/shared/auth';
 export const LOGIN_PATH = '/login';
 export const MEMBER_HOME_PATH = '/home';
 export const STAFF_HOME_PATH = '/staff';
+export const HEALTH_PROFILE_PATH = '/onboarding';
 
 export function homePathFor(ability: AppAbility): string | null {
   if (ability.can('read', 'StaffApp')) return STAFF_HOME_PATH;

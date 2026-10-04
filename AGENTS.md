@@ -1,6 +1,6 @@
 # Cadence - AI Gym Management System - Agent Instructions
 
-Academic project (not deployed to real users) replacing a gym's fingerprint access control and manual trainer interviews with face-recognition check-in and an AI that builds/refines training plans from accumulated structured facts, not a single interview. Full product context: [`PRODUCT.md`](./PRODUCT.md). Full functional/technical detail: [`docs/`](./docs/) (`01-product-overview.md`, `02-requirements.md` with FR-1..FR-56, `03-features-and-flows.md`, `04-architecture.md`, `05-data-model.md`).
+Academic project (not deployed to real users) replacing a gym's fingerprint access control and manual trainer interviews with face-recognition check-in and an AI that builds/refines training plans from accumulated structured facts, not a single interview. Full product context: [`PRODUCT.md`](./PRODUCT.md). Full functional/technical detail: [`docs/`](./docs/) (`01-product-overview.md`, `02-requirements.md` with FR-1..FR-62, `03-features-and-flows.md`, `04-architecture.md`, `05-data-model.md`).
 
 This file is the always-loaded index. It stays short by design - code-level conventions live in `rules/`, linked below. Don't duplicate FR/architecture detail here; link to `docs/` instead.
 
@@ -37,7 +37,7 @@ rules/            Code-level conventions for AI agents - see table below
 | `pnpm db:generate` | Generate a Drizzle migration from schema changes |
 | `pnpm db:migrate` | Apply pending migrations |
 | `pnpm db:seed` | Load the seed data |
-| `pnpm db:seed:demo` | Run the base seed, then load the fake demo data (members, check-ins, plans, certificates); idempotent |
+| `pnpm db:seed:demo` | Run the base seed, then load the fake demo data (members, check-ins, plans, remembered facts, trainer notes); idempotent |
 | `pnpm db:reset` | Drop and recreate the schema, then re-migrate and re-seed |
 | `pnpm db:studio` | Open Drizzle Studio to browse the database |
 
@@ -60,7 +60,7 @@ Every change should respect these (from `PRODUCT.md`):
 1. **AI acts, humans oversee asynchronously** - plans publish immediately; trainer review never blocks publication.
 2. **History over interviews** - future plans reason from accumulated structured facts (`f_profile_events`), never the raw chat transcript.
 3. **Minimize biometric exposure at each trust boundary** - only the backend ever sees raw reference photos; only embeddings reach the kiosk.
-4. **Distinguish technical failure from a real determination** - an AI/turnstile failure is always its own state (`pending_retry`, `failed`), never coalesced into a real clinical or access decision.
+4. **Distinguish technical failure from a real determination** - a failed turnstile call is its own state (`failed`), and an AI failure fails plan generation with an error instead of publishing a placeholder plan; neither is ever coalesced into a real plan or access decision.
 5. **Scope matches an academic, single-location demo** - no multi-tenancy, no production hardening, no payment processing. Don't gold-plate beyond `docs/02-requirements.md`.
 
 ## Rules index
@@ -90,5 +90,5 @@ Every change should respect these (from `PRODUCT.md`):
 
 ## Before you start
 
-- Don't invent scope beyond FR-1..FR-56 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
+- Don't invent scope beyond FR-1..FR-62 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
 - Follow the repo layout above rather than improvising a different structure.

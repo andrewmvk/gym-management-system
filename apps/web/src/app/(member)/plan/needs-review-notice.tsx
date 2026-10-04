@@ -14,19 +14,13 @@ interface NoticeExercise {
 
 interface NeedsReviewNoticeProps {
   exercises: readonly NoticeExercise[];
-  planStatus: 'ai_published' | 'trainer_edited';
-  hasCompleted: boolean;
   className?: string;
 }
 
 // Pace Tape means "look at this": a plan with an exercise that cannot be done is flagged for the trainers
 // too, and the member can skip the wait by rebuilding it from what is available.
-export function NeedsReviewNotice({ exercises, planStatus, hasCompleted, className }: NeedsReviewNoticeProps) {
-  const rebuild = useRebuildPlan({
-    planStatus,
-    hasCompleted,
-    successMessage: "Your plan was rebuilt without what can't be done.",
-  });
+export function NeedsReviewNotice({ exercises, className }: NeedsReviewNoticeProps) {
+  const rebuild = useRebuildPlan({ successMessage: "Your plan was rebuilt without what can't be done." });
   const blocked = exercises.filter((exercise) => !exercise.isPerformable);
 
   return (

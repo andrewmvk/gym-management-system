@@ -5,6 +5,7 @@ import { ClipboardCheckIcon, MessageSquareIcon } from 'lucide-react';
 import { useAppAbility } from '@/abilities';
 import { CertificatesWaiting } from '@/app/(staff)/staff/certificates-waiting';
 import { OverviewRow } from '@/app/(staff)/staff/overview-row';
+import { TurnstileStatus } from '@/app/(staff)/staff/turnstile-status';
 import { Deferred } from '@/components/deferred';
 import { QueryError } from '@/components/query-error';
 import { formatDateTime, formatPlanDate } from '@/lib/format';
@@ -19,12 +20,13 @@ function OverviewBoardSkeleton() {
       <OverviewRow.Skeleton />
       <OverviewRow.Skeleton />
       {ability.can('manage', 'MedicalCertificate') && <OverviewRow.Skeleton />}
+      {ability.can('read', 'CheckIn') && <OverviewRow.Skeleton />}
     </ul>
   );
 }
 
-// Three lines that each open the page that owns them: plans that must be reviewed, plans a trainer
-// already touched, and (admin) certificates waiting.
+// Lines that each open the page that owns them: plans that must be reviewed, plans a trainer touched
+// recently, and (admin) certificates waiting and failed turnstile check-ins.
 function OverviewBoardRoot() {
   const trpc = useTRPC();
   const query = useQuery(trpc.reviews.overview.queryOptions());
@@ -37,7 +39,7 @@ function OverviewBoardRoot() {
     );
   }
 
-  if (query.isError) {
+  if (!query.data) {
     return (
       <QueryError
         title="We couldn't load the overview"
@@ -78,16 +80,17 @@ function OverviewBoardRoot() {
         detail={
           latest ? (
             <>
-              Latest: {latest.authorName} {latest.isEdit ? 'edited' : 'noted'} {latest.memberName}&apos;s plan for{' '}
-              {formatPlanDate(latest.planDate)},{' '}
-              <span className="numerals text-base">{formatDateTime(latest.createdAt)}</span>
+              Plans edited or noted in the last {trainerActivity.windowDays} days. Latest: {latest.authorName}{' '}
+              {latest.isEdit ? 'edited' : 'noted'} {latest.memberName}&apos;s plan for {formatPlanDate(latest.planDate)}
+              , <span className="numerals text-base">{formatDateTime(latest.createdAt)}</span>
             </>
           ) : (
-            'No trainer has edited or left a note on a plan yet.'
+            `No trainer has edited or left a note on a plan in the last ${trainerActivity.windowDays} days.`
           )
         }
       />
       <CertificatesWaiting />
+      <TurnstileStatus />
     </ul>
   );
 }

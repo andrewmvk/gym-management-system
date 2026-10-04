@@ -136,6 +136,65 @@ describe('auth', () => {
         code: 'UNAUTHORIZED',
       });
     });
+
+    describe('inactive membership', () => {
+      async function deactivate(memberId: string) {
+        await db.update(dUsers).set({ membershipStatus: 'inactive' }).where(eq(dUsers.id, memberId));
+      }
+
+      it('refuses a correct password with the front-desk message and sets no cookie', async () => {
+        const member = await createMember();
+        await deactivate(member.id);
+        const { caller, res } = await callerFor();
+
+        await expect(caller.auth.login({ email: MEMBER_EMAIL, password: MEMBER_PASSWORD })).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+          message: 'Your membership is inactive. Ask the front desk to reactivate it.',
+        });
+        expect(res.cookie).not.toHaveBeenCalled();
+      });
+
+      it('keeps the generic error for a wrong password so inactivity is not revealed', async () => {
+        const member = await createMember();
+        await deactivate(member.id);
+        const { caller } = await callerFor();
+
+        await expect(caller.auth.login({ email: MEMBER_EMAIL, password: 'nope' })).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'Invalid e-mail or password',
+        });
+      });
+
+      it('signs in again once the membership is reactivated', async () => {
+        const member = await createMember();
+        await deactivate(member.id);
+        await db.update(dUsers).set({ membershipStatus: 'active' }).where(eq(dUsers.id, member.id));
+        const { caller } = await callerFor();
+
+        expect((await caller.auth.login({ email: MEMBER_EMAIL, password: MEMBER_PASSWORD }))?.user.email).toBe(
+          MEMBER_EMAIL,
+        );
+      });
+
+      it('turns an existing session cookie into no session at all', async () => {
+        const member = await createMember();
+        const token = signSessionToken(member.id);
+        expect((await (await callerFor(token)).caller.auth.me())?.user.id).toBe(member.id);
+
+        await deactivate(member.id);
+
+        expect(await (await callerFor(token)).caller.auth.me()).toBeNull();
+        await expect((await callerFor(token)).caller.auth.listMembers()).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+        });
+      });
+
+      it('never affects staff, who have no membership status', async () => {
+        const token = signSessionToken(await adminId());
+
+        expect((await (await callerFor(token)).caller.auth.me())?.user.email).toBe(SEED_ADMIN_EMAIL);
+      });
+    });
   });
 
   describe('me', () => {

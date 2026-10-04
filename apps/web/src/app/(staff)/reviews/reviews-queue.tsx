@@ -4,6 +4,20 @@ import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, ClipboardListIcon, SearchXIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import {
+  filterQueue,
+  matchesStatus,
+  matchesWhen,
+  queueSearch,
+  resolveWhen,
+  STATUS_FILTERS,
+  type StatusFilter,
+  WHEN_FILTERS,
+  WHEN_LABELS,
+  WHEN_PARAMS,
+  type WhenFilter,
+  type WhenParam,
+} from '@/app/(staff)/reviews/queue-filter';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { Pagination } from '@/components/pagination';
@@ -15,14 +29,18 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
+import { toIsoDate } from '@/lib/calendar-date';
 import { formatPlanDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
 const PAGE_SIZE = 10;
 
-const STATUS_FILTERS = ['all', 'must_review', 'ai_published', 'trainer_edited'] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number];
+const WHEN_SCOPE_PHRASES: Record<WhenFilter, string> = {
+  upcoming: 'dated today or later',
+  past: 'dated before today',
+  all: '',
+};
 
 function QueueHead() {
   return (
@@ -53,7 +71,10 @@ function ReviewsQueueSkeleton() {
     <div className="overflow-hidden rounded-lg border bg-card">
       <Toolbar>
         <Skeleton className="h-10 w-full sm:w-72" />
-        <Skeleton className="h-10 w-full sm:w-80" />
+        <div className="flex flex-col gap-3 lg:flex-row">
+          <Skeleton className="h-10 w-full sm:w-72" />
+          <Skeleton className="h-10 w-full sm:w-96" />
+        </div>
       </Toolbar>
       <Table>
         <QueueHead />
@@ -88,21 +109,14 @@ function ReviewsQueueRoot() {
   const queueQuery = useQuery(trpc.reviews.queue.queryOptions());
   const [search, setSearch] = useUrlState<string>('q', '');
   const [status, setStatus] = useUrlState<StatusFilter>('status', 'all', oneOf(STATUS_FILTERS));
+  const [whenParam, setWhenParam] = useUrlState<WhenParam>('when', 'auto', oneOf(WHEN_PARAMS));
+  const when = resolveWhen(whenParam, status);
+  const today = toIsoDate(new Date());
 
   const entries = queueQuery.data ?? [];
-  const term = search.trim().toLowerCase();
-  const matchesStatus = (entry: (typeof entries)[number], value: StatusFilter) => {
-    if (value === 'all') return true;
-    if (value === 'must_review') return entry.needsReview;
-    // The trainer tab holds every plan a trainer touched, by an edit or a note; AI holds the rest.
-    const hasTrainerActivity = entry.status === 'trainer_edited' || entry.noteCount > 0;
-    return value === 'trainer_edited' ? hasTrainerActivity : !hasTrainerActivity;
-  };
-  // The sort is stable, so inside each group the queue keeps the order the server gave it.
-  const filtered = entries
-    .filter((entry) => matchesStatus(entry, status) && (!term || entry.memberName.toLowerCase().includes(term)))
-    .sort((a, b) => Number(b.needsReview) - Number(a.needsReview));
+  const filtered = filterQueue(entries, { status, when, term: search, today });
   const pagination = usePagination(filtered, PAGE_SIZE);
+  const detailSearch = queueSearch({ status, q: search, when: whenParam });
 
   if (queueQuery.isPending) {
     return (
@@ -134,7 +148,10 @@ function ReviewsQueueRoot() {
     );
   }
 
-  const countOf = (value: StatusFilter) => entries.filter((entry) => matchesStatus(entry, value)).length;
+  const inScope = entries.filter((entry) => matchesWhen(entry, when, today));
+  const countOf = (value: StatusFilter) => inScope.filter((entry) => matchesStatus(entry, value)).length;
+  const scopePhrase = WHEN_SCOPE_PHRASES[when];
+  const scopeSuffix = scopePhrase ? ` ${scopePhrase}` : '';
 
   return (
     <div className="flex flex-col gap-4">
@@ -149,31 +166,44 @@ function ReviewsQueueRoot() {
             placeholder="Search by member"
             className="sm:w-72"
           />
-          <SegmentedFilter
-            label="Filter by status"
-            value={status}
-            onChange={(value) => {
-              setStatus(value);
-              pagination.setPage(1);
-            }}
-            options={[
-              { value: 'all', label: 'All', count: countOf('all') },
-              { value: 'must_review', label: 'Must review', count: countOf('must_review') },
-              { value: 'ai_published', label: 'AI', count: countOf('ai_published') },
-              { value: 'trainer_edited', label: 'Trainer', count: countOf('trainer_edited') },
-            ]}
-          />
+          <div className="flex flex-col gap-3 lg:flex-row">
+            <SegmentedFilter
+              label="Filter by plan date"
+              value={when}
+              onChange={(value) => {
+                setWhenParam(value);
+                pagination.setPage(1);
+              }}
+              options={WHEN_FILTERS.map((value) => ({ value, label: WHEN_LABELS[value] }))}
+            />
+            <SegmentedFilter
+              label="Filter by status"
+              value={status}
+              onChange={(value) => {
+                setStatus(value);
+                pagination.setPage(1);
+              }}
+              options={[
+                { value: 'all', label: 'All', count: countOf('all') },
+                { value: 'must_review', label: 'Must review', count: countOf('must_review') },
+                { value: 'ai_published', label: 'AI', count: countOf('ai_published') },
+                { value: 'trainer_edited', label: 'Trainer', count: countOf('trainer_edited') },
+              ]}
+            />
+          </div>
         </Toolbar>
         {filtered.length === 0 ? (
           <EmptyState
             icon={SearchXIcon}
             title="No matches"
             description={
-              status === 'must_review' && !term
-                ? 'No upcoming plan holds an exercise that cannot be done right now.'
-                : status === 'trainer_edited' && !term
-                  ? 'No trainer has edited or left a note on a plan yet.'
-                  : 'Try another name or status.'
+              search.trim()
+                ? `No plan${scopeSuffix} matches that name and status. Try another name, status or date range.`
+                : status === 'must_review'
+                  ? `No plan${scopeSuffix} holds an exercise that cannot be done right now.`
+                  : status === 'trainer_edited'
+                    ? `No trainer has edited or left a note on a plan${scopeSuffix}.`
+                    : `No plan${scopeSuffix} is in the queue for this status.`
             }
           />
         ) : (
@@ -184,7 +214,7 @@ function ReviewsQueueRoot() {
                 <TableRow key={entry.id} className="relative">
                   <TableCell>
                     <Link
-                      href={`/reviews/${entry.id}`}
+                      href={`/reviews/${entry.id}${detailSearch}`}
                       className="font-semibold outline-none after:absolute after:inset-0 hover:underline"
                     >
                       {entry.memberName}

@@ -37,9 +37,10 @@ export async function submit(userId: string, input: OnboardingSubmitInput) {
   });
 
   // FR-13: best effort only - a failure here never fails the onboarding submission itself. The member
-  // can always retry via plans.generateToday (P-13).
+  // can always retry via plans.generateToday (P-13). A needs_confirmation result (trainer edit or ticked
+  // exercises on an existing plan) is skipped on purpose: nothing here may overwrite the member's work.
   try {
-    await generateForDate(userId, todayLocal());
+    await generateForDate(userId, todayLocal(), false);
   } catch (error) {
     log.warn({ error, userId }, 'best-effort plan generation after onboarding submission failed');
   }

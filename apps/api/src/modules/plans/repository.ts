@@ -1,4 +1,4 @@
-import { type DatabaseExecutor, db } from '@api/db/client';
+import { type DatabaseExecutor, db, type Transaction } from '@api/db/client';
 import {
   dExercises,
   dUsers,
@@ -13,7 +13,7 @@ import {
 } from '@api/db/schema';
 import { findMusclesByExerciseIds } from '@api/modules/catalog/repository';
 import type { ExerciseMuscle } from '@cadence/shared/schemas/muscles';
-import { and, asc, desc, eq, gte, inArray, lte } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 export async function findPlanByUserAndDate(
@@ -28,20 +28,183 @@ export async function findPlanByUserAndDate(
   return plan ?? null;
 }
 
-export function findRecentPlans(userId: string, sinceDate: string, executor: DatabaseExecutor = db) {
-  return executor
-    .select()
-    .from(fTrainingPlans)
-    .where(and(eq(fTrainingPlans.userId, userId), gte(fTrainingPlans.planDate, sinceDate)))
-    .orderBy(desc(fTrainingPlans.planDate));
+export interface PlanHistoryRow {
+  planDate: string;
+  exerciseName: string;
+  sets: number;
+  reps: number;
+  load: string | null;
+  completed: boolean;
 }
 
-export function findProfileEventsByUserId(userId: string, executor: DatabaseExecutor = db): Promise<ProfileEvent[]> {
+// The member's own plans in [sinceDate, beforeDate), newest date first and in plan order within a date.
+// beforeDate is exclusive so the plan about to be regenerated never reads as its own history.
+export function findPlanHistory(
+  userId: string,
+  sinceDate: string,
+  beforeDate: string,
+  executor: DatabaseExecutor = db,
+): Promise<PlanHistoryRow[]> {
+  return executor
+    .select({
+      planDate: fTrainingPlans.planDate,
+      exerciseName: dExercises.name,
+      sets: fTrainingPlanExercises.sets,
+      reps: fTrainingPlanExercises.reps,
+      load: fTrainingPlanExercises.load,
+      completed: fTrainingPlanExercises.completed,
+    })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
+    .where(
+      and(
+        eq(fTrainingPlans.userId, userId),
+        gte(fTrainingPlans.planDate, sinceDate),
+        lt(fTrainingPlans.planDate, beforeDate),
+      ),
+    )
+    .orderBy(desc(fTrainingPlans.planDate), asc(fTrainingPlanExercises.orderIndex));
+}
+
+// Resolved events are the member's way of saying a fact no longer applies, so no prompt may see them.
+export function findUnresolvedProfileEvents(userId: string, executor: DatabaseExecutor = db): Promise<ProfileEvent[]> {
   return executor
     .select()
     .from(fProfileEvents)
-    .where(eq(fProfileEvents.userId, userId))
+    .where(and(eq(fProfileEvents.userId, userId), isNull(fProfileEvents.resolvedAt)))
     .orderBy(desc(fProfileEvents.createdAt));
+}
+
+export interface MemberReviewRow {
+  planDate: string;
+  note: string;
+  isEdit: boolean;
+  createdAt: Date;
+  authorName: string;
+}
+
+// Trainer notes and edits across every plan of one member, newest first.
+export function findRecentReviewsForMember(
+  userId: string,
+  limit: number,
+  executor: DatabaseExecutor = db,
+): Promise<MemberReviewRow[]> {
+  return executor
+    .select({
+      planDate: fTrainingPlans.planDate,
+      note: fPlanReviews.note,
+      isEdit: fPlanReviews.isEdit,
+      createdAt: fPlanReviews.createdAt,
+      authorName: dUsers.name,
+    })
+    .from(fPlanReviews)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fPlanReviews.trainingPlanId))
+    .innerJoin(dUsers, eq(dUsers.id, fPlanReviews.userId))
+    .where(eq(fTrainingPlans.userId, userId))
+    .orderBy(desc(fPlanReviews.createdAt))
+    .limit(limit);
+}
+
+export interface DemandRow {
+  trainingPlanId: string;
+  exerciseId: string;
+  sets: number;
+}
+
+// One row per exercise of every plan on the date except the excluded member's own, so the caller counts
+// plans (distinct trainingPlanId), never rows.
+export function findDemandRowsForDate(
+  planDate: string,
+  excludeUserId: string,
+  executor: DatabaseExecutor = db,
+): Promise<DemandRow[]> {
+  return executor
+    .select({
+      trainingPlanId: fTrainingPlanExercises.trainingPlanId,
+      exerciseId: fTrainingPlanExercises.exerciseId,
+      sets: fTrainingPlanExercises.sets,
+    })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .where(and(eq(fTrainingPlans.planDate, planDate), ne(fTrainingPlans.userId, excludeUserId)));
+}
+
+export interface UpcomingPlanRow {
+  planDate: string;
+  status: TrainingPlan['status'];
+  exerciseCount: number;
+}
+
+export async function findUpcomingPlans(
+  userId: string,
+  fromDate: string,
+  executor: DatabaseExecutor = db,
+): Promise<UpcomingPlanRow[]> {
+  const rows = await executor
+    .select({
+      planDate: fTrainingPlans.planDate,
+      status: fTrainingPlans.status,
+      exerciseCount: count(fTrainingPlanExercises.id),
+    })
+    .from(fTrainingPlans)
+    .leftJoin(fTrainingPlanExercises, eq(fTrainingPlanExercises.trainingPlanId, fTrainingPlans.id))
+    .where(and(eq(fTrainingPlans.userId, userId), gte(fTrainingPlans.planDate, fromDate)))
+    .groupBy(fTrainingPlans.id, fTrainingPlans.planDate, fTrainingPlans.status)
+    .orderBy(asc(fTrainingPlans.planDate));
+  return rows;
+}
+
+export interface MemberPlanSummary {
+  id: string;
+  planDate: string;
+  status: TrainingPlan['status'];
+  exerciseCount: number;
+  completedCount: number;
+  // Plain trainer notes only: the entry an edit leaves behind is not a note.
+  noteCount: number;
+}
+
+// Every plan of one member dated fromDate or later, newest date first: the staff member page reads
+// completion and notes off this without opening each plan.
+export async function findPlanSummariesForMember(
+  userId: string,
+  fromDate: string,
+  executor: DatabaseExecutor = db,
+): Promise<MemberPlanSummary[]> {
+  const plans = await executor
+    .select({
+      id: fTrainingPlans.id,
+      planDate: fTrainingPlans.planDate,
+      status: fTrainingPlans.status,
+      exerciseCount: count(fTrainingPlanExercises.id),
+      completedCount:
+        sql<number>`count(${fTrainingPlanExercises.id}) filter (where ${fTrainingPlanExercises.completed})`.mapWith(
+          Number,
+        ),
+    })
+    .from(fTrainingPlans)
+    .leftJoin(fTrainingPlanExercises, eq(fTrainingPlanExercises.trainingPlanId, fTrainingPlans.id))
+    .where(and(eq(fTrainingPlans.userId, userId), gte(fTrainingPlans.planDate, fromDate)))
+    .groupBy(fTrainingPlans.id, fTrainingPlans.planDate, fTrainingPlans.status)
+    .orderBy(desc(fTrainingPlans.planDate));
+  if (plans.length === 0) return [];
+
+  const notes = await executor
+    .select({ trainingPlanId: fPlanReviews.trainingPlanId, noteCount: count() })
+    .from(fPlanReviews)
+    .where(
+      and(
+        inArray(
+          fPlanReviews.trainingPlanId,
+          plans.map((plan) => plan.id),
+        ),
+        eq(fPlanReviews.isEdit, false),
+      ),
+    )
+    .groupBy(fPlanReviews.trainingPlanId);
+  const noteCountByPlanId = new Map(notes.map((row) => [row.trainingPlanId, row.noteCount]));
+  return plans.map((plan) => ({ ...plan, noteCount: noteCountByPlanId.get(plan.id) ?? 0 }));
 }
 
 export function findExercisesForPlan(trainingPlanId: string, executor: DatabaseExecutor = db) {
@@ -58,6 +221,37 @@ export interface PlanExerciseInput {
   reps: number;
   load?: string;
   notes?: string;
+  // Left out, the tick of the same exercise in the plan being replaced is kept.
+  completed?: boolean;
+}
+
+// Swaps a plan's whole exercise list while keeping the ticks of exercises that stay (matched by
+// exerciseId): a regeneration or a trainer edit must not erase work the member already marked done.
+async function replaceExerciseRows(tx: Transaction, planId: string, inputs: readonly PlanExerciseInput[]) {
+  const previous = await tx
+    .select({ exerciseId: fTrainingPlanExercises.exerciseId, completed: fTrainingPlanExercises.completed })
+    .from(fTrainingPlanExercises)
+    .where(eq(fTrainingPlanExercises.trainingPlanId, planId));
+  const completedBefore = new Set(previous.filter((row) => row.completed).map((row) => row.exerciseId));
+
+  await tx.delete(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, planId));
+  if (inputs.length === 0) return [];
+
+  return tx
+    .insert(fTrainingPlanExercises)
+    .values(
+      inputs.map((exercise, index) => ({
+        trainingPlanId: planId,
+        exerciseId: exercise.exerciseId,
+        sets: exercise.sets,
+        reps: exercise.reps,
+        load: exercise.load,
+        notes: exercise.notes,
+        orderIndex: index,
+        completed: exercise.completed ?? completedBefore.has(exercise.exerciseId),
+      })),
+    )
+    .returning();
 }
 
 export interface PlanExerciseDetail extends TrainingPlanExercise {
@@ -162,26 +356,7 @@ export async function replacePlan(input: {
       })
       .returning();
 
-    await tx.delete(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, plan!.id));
-
-    const exercises =
-      input.exercises.length > 0
-        ? await tx
-            .insert(fTrainingPlanExercises)
-            .values(
-              input.exercises.map((exercise, index) => ({
-                trainingPlanId: plan!.id,
-                exerciseId: exercise.exerciseId,
-                sets: exercise.sets,
-                reps: exercise.reps,
-                load: exercise.load,
-                notes: exercise.notes,
-                orderIndex: index,
-              })),
-            )
-            .returning()
-        : [];
-
+    const exercises = await replaceExerciseRows(tx, plan!.id, input.exercises);
     return { ...plan!, exercises };
   });
 }
@@ -243,6 +418,26 @@ export function findExerciseRowsForPlans(planIds: readonly string[], executor: D
     .where(inArray(fTrainingPlanExercises.trainingPlanId, [...planIds]));
 }
 
+// One row per planned exercise (among the given exercises) of every plan dated fromDate or later, with the
+// member who owns it, so a caller counts distinct plans and members instead of rows.
+export function findPlannedExerciseRowsFrom(
+  exerciseIds: readonly string[],
+  fromDate: string,
+  executor: DatabaseExecutor = db,
+) {
+  if (exerciseIds.length === 0) return Promise.resolve([]);
+  return executor
+    .select({
+      trainingPlanId: fTrainingPlans.id,
+      userId: fTrainingPlans.userId,
+      planDate: fTrainingPlans.planDate,
+      exerciseId: fTrainingPlanExercises.exerciseId,
+    })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .where(and(inArray(fTrainingPlanExercises.exerciseId, [...exerciseIds]), gte(fTrainingPlans.planDate, fromDate)));
+}
+
 export interface RecentReviewEntry {
   id: string;
   trainingPlanId: string;
@@ -276,6 +471,15 @@ export async function findRecentReviews(limit: number, executor: DatabaseExecuto
     .innerJoin(member, eq(member.id, fTrainingPlans.userId))
     .orderBy(desc(fPlanReviews.createdAt))
     .limit(limit);
+}
+
+// Notes and edit entries alike: both are a trainer touching the plan.
+export async function findPlanIdsReviewedSince(since: Date, executor: DatabaseExecutor = db): Promise<string[]> {
+  const rows = await executor
+    .selectDistinct({ trainingPlanId: fPlanReviews.trainingPlanId })
+    .from(fPlanReviews)
+    .where(gte(fPlanReviews.createdAt, since));
+  return rows.map((row) => row.trainingPlanId);
 }
 
 export interface PlanWithMember extends TrainingPlan {
@@ -382,26 +586,7 @@ export async function editPlanExercises(input: {
       .where(eq(fTrainingPlans.id, input.planId))
       .returning();
 
-    await tx.delete(fTrainingPlanExercises).where(eq(fTrainingPlanExercises.trainingPlanId, input.planId));
-
-    const exercises =
-      input.exercises.length > 0
-        ? await tx
-            .insert(fTrainingPlanExercises)
-            .values(
-              input.exercises.map((exercise, index) => ({
-                trainingPlanId: input.planId,
-                exerciseId: exercise.exerciseId,
-                sets: exercise.sets,
-                reps: exercise.reps,
-                load: exercise.load,
-                notes: exercise.notes,
-                orderIndex: index,
-              })),
-            )
-            .returning()
-        : [];
-
+    const exercises = await replaceExerciseRows(tx, input.planId, input.exercises);
     return { ...plan!, exercises };
   });
 }

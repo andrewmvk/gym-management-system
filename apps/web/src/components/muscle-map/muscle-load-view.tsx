@@ -22,6 +22,10 @@ interface MuscleLoadViewProps {
   // For a narrow column: one body at a time behind the Front/Back toggle at every width.
   isSingleView?: boolean;
   emptyNote?: string;
+  // Says what the numbers count when it is not weighted sets. `null` hides the line.
+  note?: string | null;
+  // Labels the ramp ends and, when it has a gap label, outlines the muscles with no work in dashes.
+  legend?: { lowLabel: string; highLabel: string; gapLabel?: string };
   selected?: MuscleId | null;
   onSelectedChange?: (muscle: MuscleId | null) => void;
   className?: string;
@@ -38,6 +42,8 @@ function MuscleLoadViewRoot({
   isSplit,
   isSingleView,
   emptyNote = 'No muscle work to show yet.',
+  note = 'Counted in weighted sets. A supporting muscle counts half.',
+  legend,
   selected: controlledSelected,
   onSelectedChange,
   className,
@@ -64,6 +70,14 @@ function MuscleLoadViewRoot({
     bias: focus?.[muscle],
   }));
 
+  const marks = marksFromLoad(load, focus);
+  if (legend?.gapLabel) {
+    for (const muscle of MUSCLE_IDS) {
+      const mark = marks[muscle];
+      if (mark && !load[muscle]) mark.isGap = true;
+    }
+  }
+
   const summary =
     ranked.length > 0
       ? `Most work: ${ranked
@@ -77,15 +91,20 @@ function MuscleLoadViewRoot({
       <div className="flex flex-col gap-3">
         <MuscleMap
           isSingleView={isSingleView}
-          marks={marksFromLoad(load, focus)}
+          marks={marks}
           label={label}
           selected={selected}
           highlighted={hovered}
           onSelect={toggle}
           onHover={setHovered}
         />
-        <MuscleLegend />
-        <p className="text-xs text-muted-foreground">Counted in weighted sets. A supporting muscle counts half.</p>
+        <MuscleLegend
+          lowLabel={legend?.lowLabel}
+          highLabel={legend?.highLabel}
+          hasGap={Boolean(legend?.gapLabel)}
+          gapLabel={legend?.gapLabel}
+        />
+        {note && <p className="text-xs text-muted-foreground">{note}</p>}
       </div>
       <div className="flex min-w-0 flex-col gap-4">
         <p className="text-sm text-pretty text-muted-foreground" aria-live="polite">

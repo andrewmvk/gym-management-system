@@ -33,6 +33,12 @@ export const plansRouter = router({
     return service.listPlanDates(ctx.user.id, input.from, input.to);
   }),
 
+  // Today and later dates that already hold a plan, soonest first, so the member can reach a future plan.
+  listUpcoming: authedProcedure.query(({ ctx }) => {
+    assertCan(ctx.ability, 'read', subject('TrainingPlan', { userId: ctx.user.id }));
+    return service.listUpcomingPlans(ctx.user.id);
+  }),
+
   // The owner is resolved from the database, never assumed to be the caller, before the ability check
   // runs - planExerciseId is a client-supplied id and proves nothing about who it belongs to on its own.
   markExerciseCompleted: authedProcedure.input(MarkExerciseCompletedInputSchema).mutation(async ({ ctx, input }) => {

@@ -93,6 +93,9 @@ export const fProfileEvents = pgTable('f_profile_events', {
   payload: jsonb('payload').notNull(),
   sourceMessage: text('source_message'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // Set when the member says the fact no longer applies (an injury that healed); resolved events stay
+  // as history but never reach a prompt.
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 });
 
 export type ProfileEvent = typeof fProfileEvents.$inferSelect;

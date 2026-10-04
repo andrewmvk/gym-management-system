@@ -55,7 +55,17 @@ Filters, search terms, and tabs live in the URL's search params through `useUrlS
 
 ## Routing / access structure
 
-Route groups mirror which permissions a user holds, not a role field: `(member)/`, `(staff)/`, `kiosk/`. Each group's `layout.tsx`/`AuthGuard` checks the user's CASL ability for that area's designated permission (e.g. `read_member_app` / `read_staff_app`) - there is no role column to branch on (`docs/05-data-model.md`).
+Route groups mirror which permissions a user holds, not a role field: `(member)/`, `(staff)/`, `kiosk/`. Each group's `layout.tsx`/`AuthGuard` checks the user's CASL ability for that area's designated permission (e.g. `read_member_app` / `read_staff_app`) - there is no role column to branch on (`docs/05-data-model.md`). Outside the groups, `/` (landing), `/login`, `/signup` (registration, done at the gym; the restriction is on paper only) and `/gym` (the public Gym info page) need no permission. A member who has not completed onboarding is redirected to it from every member route.
+
+## Page titles
+
+Every route has its own title, set through a per-route `layout.tsx` that exports `metadata` (`export const metadata: Metadata = { title: 'Plan' }`). The pages are client components and can't export metadata themselves, so the layout is the server component that does. The root layout's title template renders it as "Plan · Cadence".
+
+## Copy and help text
+
+- Staff-facing demand is called "Today's demand" and lives on the staff Overview, counted in plans; the word "pool" is retired, and the public Gym info page shows no demand. Every count in the UI says what it counts.
+- "Out of service" is the one user-facing phrase for unavailable equipment (the internal name stays `is_available` / the `unavailable` badge variant).
+- To explain a label without a second visible line, use `HelpTip` (`components/help-tip.tsx`, a `?` button with a tooltip). Its text is also the accessible name, and nothing a reader must act on goes in it, because a tap on a phone may not open the bubble.
 
 ## Authorization (CASL)
 

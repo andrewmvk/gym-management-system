@@ -38,7 +38,7 @@ export function MuscleLegend({
       {hasLost && (
         <div className="flex items-center gap-2">
           <span className="size-4 rounded-xs bg-heat-3" style={HATCH_STYLE} aria-hidden />
-          <span>Lost to unavailable equipment</span>
+          <span>Lost to equipment out of service</span>
         </div>
       )}
       {hasGap && (

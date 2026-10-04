@@ -73,6 +73,7 @@ export function SignupWizard() {
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
   const [photoRejection, setPhotoRejection] = useState<string | null>(null);
   const [answers, setAnswers] = useState<AnswerState>(initialAnswers);
+  const [hasSkippedRetry, setHasSkippedRetry] = useState(false);
 
   // The stored id can outlive its signup (a finished account, a reset database); drop it and start over.
   function restart() {
@@ -88,6 +89,7 @@ export function SignupWizard() {
   }
 
   function goToAptitudeStep(status: ResumeStatus) {
+    setHasSkippedRetry(false);
     if (status === 'cleared') return setStep('password');
     if (status === 'rejected') return setStep('rejected');
     if (status === 'certificate_required') return setStep('certificate-upload');
@@ -95,7 +97,7 @@ export function SignupWizard() {
     setStep('aptitude-result');
   }
 
-  // Routes a returning applicant (a reload, or an e-mail whose questionnaire was already submitted) to
+  // Routes a returning applicant (a reload, or an email whose questionnaire was already submitted) to
   // wherever their verdict left them. A row with no questionnaire is not resumable: start over.
   function resume(resumedUserId: string) {
     sessionStorage.setItem(STORAGE_KEY, resumedUserId);
@@ -121,12 +123,12 @@ export function SignupWizard() {
     trpc.aptitude.submitSignup.mutationOptions({
       onSuccess: (result) => {
         if (result.status === 'email_blocked') {
-          toast.error("This e-mail can't be used to sign up.");
+          toast.error("This email can't be used to sign up.");
           setStep('basic-info');
           return;
         }
         if (result.status === 'already_registered') {
-          toast.error('An account already exists for this e-mail. Try signing in instead.');
+          toast.error('An account already exists for this email. Try signing in instead.');
           setStep('basic-info');
           return;
         }
@@ -210,7 +212,16 @@ export function SignupWizard() {
       />
     );
   } else if (step === 'aptitude-result' && userId) {
-    content = <AptitudeResultStep userId={userId} onRechecked={(result) => goToAptitudeStep(result)} />;
+    content = (
+      <AptitudeResultStep
+        userId={userId}
+        onRechecked={(result) => goToAptitudeStep(result)}
+        onUseCertificate={() => {
+          setHasSkippedRetry(true);
+          setStep('certificate-upload');
+        }}
+      />
+    );
   } else if (step === 'certificate-upload' && userId) {
     content = <CertificateStep userId={userId} onUploaded={() => setStep('certificate-waiting')} />;
   } else if (step === 'certificate-waiting' && userId) {
@@ -220,7 +231,8 @@ export function SignupWizard() {
     content = <PasswordStep userId={userId} onActivated={() => sessionStorage.removeItem(STORAGE_KEY)} />;
   }
 
-  const previousStep = PREVIOUS_STEP[step];
+  // A certificate chosen while the automatic check is down can be backed out of; one the verdict demanded cannot.
+  const previousStep = step === 'certificate-upload' && hasSkippedRetry ? 'aptitude-result' : PREVIOUS_STEP[step];
 
   return (
     <div className="flex flex-col gap-8">

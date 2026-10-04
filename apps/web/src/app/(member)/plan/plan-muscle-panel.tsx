@@ -39,20 +39,11 @@ function PlanMusclePanelSkeleton() {
 interface PlanMusclePanelProps {
   muscleLoad: MuscleLoad;
   exercises: readonly PanelExercise[];
-  planStatus: 'ai_published' | 'trainer_edited';
-  hasCompleted: boolean;
   selected: MuscleId | null;
   onSelectedChange: (muscle: MuscleId | null) => void;
 }
 
-function PlanMusclePanelRoot({
-  muscleLoad,
-  exercises,
-  planStatus,
-  hasCompleted,
-  selected,
-  onSelectedChange,
-}: PlanMusclePanelProps) {
+function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange }: PlanMusclePanelProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const focusQuery = useQuery(trpc.focus.get.queryOptions());
@@ -82,11 +73,7 @@ function PlanMusclePanelRoot({
     }),
   );
 
-  const rebuild = useRebuildPlan({
-    planStatus,
-    hasCompleted,
-    successMessage: 'Your plan was rebuilt with your muscle focus.',
-  });
+  const rebuild = useRebuildPlan({ successMessage: 'Your plan was rebuilt with your muscle focus.' });
 
   const focus = focusToMap(focusQuery.data ?? []);
   const canEditFocus = focusQuery.isSuccess;

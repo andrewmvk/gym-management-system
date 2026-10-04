@@ -188,8 +188,8 @@ function CoverageSectionRoot() {
   let summary: string;
   if (selectedPiece) {
     summary = selectedImpact
-      ? `${selectedPiece.name} being down takes out ${selectedImpact.exerciseIds.length} ${selectedImpact.exerciseIds.length === 1 ? 'exercise' : 'exercises'}, hitting ${selectedImpact.muscles.map(muscleLabel).join(', ')}.`
-      : `${selectedPiece.name} is down, but every exercise that uses it has another option.`;
+      ? `With ${selectedPiece.name} out of service, ${selectedImpact.exerciseIds.length} ${selectedImpact.exerciseIds.length === 1 ? 'exercise is' : 'exercises are'} lost, hitting ${selectedImpact.muscles.map(muscleLabel).join(', ')}.`
+      : `${selectedPiece.name} out of service loses nothing, because every exercise that uses it has another option.`;
   } else if (mode === 'lost') {
     summary =
       items.length > 0
@@ -232,7 +232,7 @@ function CoverageSectionRoot() {
       <div className="min-w-0 lg:col-span-2">
         <PanelSection
           title="Muscle coverage"
-          description="How well the catalog covers each muscle, and what broken equipment costs."
+          description="How well the catalog covers each muscle, and what out-of-service equipment costs."
         >
           <div className="flex flex-col gap-5 px-5 py-5 sm:px-6">
             {selectedPiece ? (
@@ -309,7 +309,7 @@ function CoverageSectionRoot() {
                               <span className="flex shrink-0 items-center gap-2">
                                 <Badge variant={role === 'primary' ? 'default' : 'outline'}>{role}</Badge>
                                 <Badge variant={exercise.isAvailable ? 'live' : 'unavailable'}>
-                                  {exercise.isAvailable ? 'Available' : 'Unavailable'}
+                                  {exercise.isAvailable ? 'Available' : 'Out of service'}
                                 </Badge>
                               </span>
                             </li>

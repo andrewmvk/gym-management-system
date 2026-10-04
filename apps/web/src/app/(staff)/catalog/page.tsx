@@ -12,7 +12,13 @@ import { oneOf, useUrlState } from '@/hooks/use-url-state';
 
 const TITLE = 'Catalog';
 const DESCRIPTION =
-  'The exercises plans are built from. An exercise is performable when it needs no equipment or at least one linked item is available.';
+  'The exercises plans are built from. An exercise can be done when it needs no equipment or at least one linked item is in service.';
+
+const TAB_BASIS = {
+  exercises: 'Every exercise in the catalog, and whether it can be done today.',
+  equipment: 'Every piece of equipment, and whether it is in service today. Plans are not counted here.',
+  coverage: "What the catalog could train, regardless of today's plans.",
+} as const;
 
 const CATALOG_TABS = ['exercises', 'equipment', 'coverage'] as const;
 type CatalogTab = (typeof CATALOG_TABS)[number];
@@ -34,9 +40,18 @@ function CatalogTabs({
         <TabsTrigger value="equipment">Equipment</TabsTrigger>
         <TabsTrigger value="coverage">Coverage</TabsTrigger>
       </TabsList>
-      <TabsContent value="exercises">{exercises}</TabsContent>
-      <TabsContent value="equipment">{equipment}</TabsContent>
-      <TabsContent value="coverage">{coverage}</TabsContent>
+      <TabsContent value="exercises" className="flex flex-col gap-4">
+        <p className="text-sm text-muted-foreground">{TAB_BASIS.exercises}</p>
+        {exercises}
+      </TabsContent>
+      <TabsContent value="equipment" className="flex flex-col gap-4">
+        <p className="text-sm text-muted-foreground">{TAB_BASIS.equipment}</p>
+        {equipment}
+      </TabsContent>
+      <TabsContent value="coverage" className="flex flex-col gap-4">
+        <p className="text-sm text-muted-foreground">{TAB_BASIS.coverage}</p>
+        {coverage}
+      </TabsContent>
     </Tabs>
   );
 }

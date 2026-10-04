@@ -176,6 +176,7 @@ function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant:
         <>
           {policy ? `${policyMeta(policy)} · direct · ` : 'direct · '}
           {expiryText(grant.expiresOn, grant.isActive)}
+          {mayLockOut && ' · revoking is refused if no group still gives you this access'}
         </>
       }
       actions={
@@ -197,7 +198,6 @@ function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant:
           </LineButton>
           <LineButton
             disabled={!grant.isActive}
-            title={mayLockOut ? 'Refused if no group still gives you this access' : undefined}
             aria-label={`${grant.effect === 'denied' ? 'Lift denial of' : 'Revoke'} ${label} for ${user.name}`}
             onClick={() =>
               onDialog({ kind: 'revoke', userId: user.id, userName: user.name, target, effect: grant.effect })
@@ -221,11 +221,10 @@ function GroupSuppliedLine({ context, effective }: { context: RowContext; effect
   return (
     <Line
       label={label}
-      meta={`${policy ? `${policyMeta(policy)} · ` : ''}${sources.join(', ')}`}
+      meta={`${policy ? `${policyMeta(policy)} · ` : ''}${sources.join(', ')} · a denial overrides what the group gives`}
       actions={
         <LineButton
           aria-label={`Deny ${label} for ${user.name}`}
-          title="Overrides what the group gives them"
           onClick={() =>
             onDialog({
               kind: 'grant',

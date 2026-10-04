@@ -24,6 +24,9 @@ import { cn } from '@/lib/utils';
 
 const EMBEDDINGS_REFRESH_MS = 5 * 60 * 1000;
 const SCAN_INTERVAL_MS = 600;
+const MISSES_BEFORE_FRONT_DESK = 3;
+const MISSES_IDLE_RESET_MS = 3 * 60 * 1000;
+const UNAVAILABLE_DETAIL = 'This check-in panel is not available right now. Please see the front desk.';
 
 type CameraState = 'starting' | 'ready' | 'failed';
 
@@ -50,15 +53,31 @@ export function KioskPanel() {
     retry: 1,
   });
 
+  const misses = useRef({ count: 0, lastAt: 0 });
+
+  // The member's name is never shown here: the kiosk is the public, least-trusted screen, so results carry no identity.
   const checkIn = useMutation({
     mutationFn: postCheckIn,
     onSuccess: (outcome) => {
-      if (outcome.kind !== 'recorded') setResult({ kind: 'see_staff' });
-      else setResult({ kind: outcome.turnstileStatus === 'failed' ? 'turnstile_failed' : 'granted' });
+      if (outcome.kind === 'recorded') {
+        misses.current = { count: 0, lastAt: 0 };
+        setResult({ kind: outcome.turnstileStatus === 'failed' ? 'turnstile_failed' : 'granted' });
+        return;
+      }
+      // Any other outcome, including one this panel does not know yet, sends the person to the front desk.
+      setResult({ kind: outcome.kind === 'membership_inactive' ? 'membership_inactive' : 'see_staff' });
     },
     onError: () => setResult({ kind: 'request_failed' }),
   });
   const { mutate: submitCheckIn } = checkIn;
+
+  useEffect(() => {
+    if (engine.isError) console.error('Kiosk face model failed to load', engine.error);
+  }, [engine.isError, engine.error]);
+
+  useEffect(() => {
+    if (embeddings.isError) console.error('Kiosk could not load the members dataset', embeddings.error);
+  }, [embeddings.isError, embeddings.error]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: cameraAttempt only exists to restart the camera on Retry.
   useEffect(() => {
@@ -107,12 +126,20 @@ export function KioskPanel() {
   const ready = faceApi !== undefined && gallery !== undefined && result === null;
   const scanning = source === 'camera' && camera === 'ready' && ready;
 
-  // Returns true when a member was matched and the check-in was sent.
+  // A run of no-match or ambiguous results stops looping "try again" and sends the person to the front desk.
+  const registerMiss = () => {
+    const now = Date.now();
+    const previous = now - misses.current.lastAt > MISSES_IDLE_RESET_MS ? 0 : misses.current.count;
+    misses.current = { count: previous + 1, lastAt: now };
+    setResult({ kind: misses.current.count >= MISSES_BEFORE_FRONT_DESK ? 'no_match_limit' : 'retry' });
+  };
+
+  // Returns true when a face was read and either a check-in was sent or a miss was registered.
   const handleReading = (reading: FaceReading, members: NonNullable<typeof gallery>) => {
     if (reading.kind !== 'one') return false;
     const match = matchFace(reading.descriptor, members);
     if (match.status === 'match') submitCheckIn(match.memberId);
-    else setResult({ kind: 'retry' });
+    else registerMiss();
     return true;
   };
 
@@ -149,9 +176,9 @@ export function KioskPanel() {
       const canvas = await fileToCanvas(file);
       setImagePreview(canvas.toDataURL('image/jpeg', 0.8));
       const reading = await readFace(faceApi, canvas);
-      if (!handleReading(reading, gallery)) setResult({ kind: 'retry' });
+      if (!handleReading(reading, gallery)) registerMiss();
     } catch {
-      setResult({ kind: 'retry' });
+      registerMiss();
     } finally {
       setAnalyzing(false);
     }
@@ -179,15 +206,17 @@ export function KioskPanel() {
   } else if (engine.isError) {
     state = {
       kind: 'unavailable',
-      title: 'Face model not loaded',
-      detail: 'The recognition files could not be loaded. Staff: see packages/shared/face-models/README.md.',
+      title: 'Check-in unavailable',
+      detail: UNAVAILABLE_DETAIL,
+      devNote: 'The recognition files could not be loaded. See packages/shared/face-models/README.md.',
       onRetry: () => void engine.refetch(),
     };
   } else if (embeddings.isError && !gallery) {
     state = {
       kind: 'unavailable',
-      title: 'Members not loaded',
-      detail: 'The panel cannot reach the check-in service. Staff: check the API and the kiosk key.',
+      title: 'Check-in unavailable',
+      detail: UNAVAILABLE_DETAIL,
+      devNote: 'The panel cannot reach the check-in service. Check the API and the kiosk key.',
       onRetry: () => void embeddings.refetch(),
     };
   } else if (result) {

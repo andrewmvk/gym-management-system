@@ -29,7 +29,7 @@ function ApiStatusRoot() {
         aria-hidden
         className={cn('size-2 rounded-full', isUp ? 'bg-success' : 'border border-dashed border-destructive')}
       />
-      {health.isError ? 'API unreachable. Is the backend running?' : `API ${health.data.status}`}
+      {health.isError ? "We can't reach Cadence right now. Try again in a moment." : `API ${health.data.status}`}
     </p>
   );
 }

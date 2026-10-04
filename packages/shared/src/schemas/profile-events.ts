@@ -16,6 +16,24 @@ export type ProfileEventType = (typeof PROFILE_EVENT_TYPES)[number];
 // consume this more deeply, are out of scope here.
 const FactPayloadSchema = z.object({ description: z.string().trim().min(1) });
 
+export const PROFILE_EVENT_LABELS: Record<ProfileEventType, string> = {
+  injury: 'Injury',
+  skipped_exercise: 'Skipped exercise',
+  medication_change: 'Medication change',
+  life_event: 'Life event',
+  state_update: 'Update',
+  plan_adjustment_request: 'Plan request',
+  muscle_focus_changed: 'Muscle focus',
+};
+
+// One short line for a remembered fact, e.g. "Injury: sore left knee". Falls back to the label alone when
+// the stored payload does not match the expected shape, so a malformed row never breaks the list.
+export function describeProfileEvent(eventType: ProfileEventType, payload: unknown): string {
+  const label = PROFILE_EVENT_LABELS[eventType];
+  const parsed = FactPayloadSchema.safeParse(payload);
+  return parsed.success ? `${label}: ${parsed.data.description}` : label;
+}
+
 export const ProfileEventFactSchema = z.discriminatedUnion('eventType', [
   z.object({ eventType: z.literal('injury'), payload: FactPayloadSchema }),
   z.object({ eventType: z.literal('skipped_exercise'), payload: FactPayloadSchema }),

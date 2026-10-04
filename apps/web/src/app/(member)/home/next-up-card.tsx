@@ -1,11 +1,11 @@
 'use client';
 
 import { muscleLabel } from '@cadence/shared/schemas/muscles';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { CheckIcon, DumbbellIcon, SparklesIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { toast } from 'sonner';
+import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
 import { useToggleExercise } from '@/app/(member)/plan/use-toggle-exercise';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
@@ -45,16 +45,9 @@ function NextUpCardSkeleton() {
 
 function NextUpCardRoot() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const todayQuery = useQuery(trpc.plans.getToday.queryOptions());
   const toggle = useToggleExercise();
-
-  const generate = useMutation(
-    trpc.plans.generateToday.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() }),
-      onError: () => toast.error("We couldn't generate your plan. Try again."),
-    }),
-  );
+  const generate = useRebuildPlan({ isErrorInline: true });
 
   if (todayQuery.isPending) {
     return (
@@ -79,17 +72,26 @@ function NextUpCardRoot() {
   if (!plan) {
     return (
       <CardShell>
-        <EmptyState
-          icon={DumbbellIcon}
-          title="No plan yet for today"
-          description="Your plan is built from your health profile and everything you've told your coach."
-          action={
-            <Button size="lg" disabled={generate.isPending} onClick={() => generate.mutate({})}>
-              <SparklesIcon data-icon="inline-start" />
-              {generate.isPending ? 'Building your plan...' : 'Build my plan'}
-            </Button>
-          }
-        />
+        {generate.isError ? (
+          <QueryError
+            title="We couldn't build your plan right now"
+            onRetry={generate.requestRebuild}
+            className="m-5 sm:m-6"
+          />
+        ) : (
+          <EmptyState
+            icon={DumbbellIcon}
+            title="No plan yet for today"
+            description="Your plan is built from your health profile and everything you've told your coach."
+            action={
+              <Button size="lg" disabled={generate.isPending} onClick={generate.requestRebuild}>
+                <SparklesIcon data-icon="inline-start" />
+                {generate.isPending ? 'Building your plan...' : 'Build my plan'}
+              </Button>
+            }
+          />
+        )}
+        {generate.dialog}
       </CardShell>
     );
   }

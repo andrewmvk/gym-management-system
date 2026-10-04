@@ -51,15 +51,26 @@ export function listMembers() {
   return listMemberRows();
 }
 
+export const MEMBERSHIP_INACTIVE_MESSAGE = 'Your membership is inactive. Ask the front desk to reactivate it.';
+
+// Staff accounts have no membership status, so only an explicit 'inactive' blocks access.
+function isMembershipInactive(user: Pick<User, 'membershipStatus'>) {
+  return user.membershipStatus === 'inactive';
+}
+
+// Inactivity is only revealed after a correct password, so the message cannot be used to probe which e-mails exist.
 export async function verifyCredentials(email: string, password: string): Promise<User | null> {
   const user = await findUserByEmail(email);
   const isValid = await bcrypt.compare(password, user?.passwordHash ?? DUMMY_PASSWORD_HASH);
-  return user?.passwordHash && isValid ? user : null;
+  if (!user?.passwordHash || !isValid) return null;
+  if (isMembershipInactive(user)) throw new TRPCError({ code: 'FORBIDDEN', message: MEMBERSHIP_INACTIVE_MESSAGE });
+  return user;
 }
 
+// An inactive member is unauthenticated, so a cookie issued before the lapse stops working immediately.
 export async function loadSession(userId: string, now = new Date()): Promise<Session | null> {
   const user = await findUserById(userId);
-  if (!user) return null;
+  if (!user || isMembershipInactive(user)) return null;
 
   const grants = await findActiveGrants(user.id, now);
   return {

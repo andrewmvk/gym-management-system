@@ -1,13 +1,14 @@
 'use client';
 
 import type { MuscleId } from '@cadence/shared/schemas/muscles';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { DumbbellIcon, SparklesIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
-import { toast } from 'sonner';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
 import { NeedsReviewNotice } from '@/app/(member)/plan/needs-review-notice';
 import { PlanMusclePanel } from '@/app/(member)/plan/plan-muscle-panel';
+import { TrainerNotes } from '@/app/(member)/plan/trainer-notes';
+import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
 import { useToggleExercise } from '@/app/(member)/plan/use-toggle-exercise';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
@@ -84,17 +85,9 @@ function TodayPlanSkeleton() {
 
 function TodayPlanRoot() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const todayQuery = useQuery(trpc.plans.getToday.queryOptions());
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
-
-  const generate = useMutation(
-    trpc.plans.generateToday.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() }),
-      onError: () => toast.error("We couldn't generate your plan. Try again."),
-    }),
-  );
-
+  const generate = useRebuildPlan({ isErrorInline: true });
   const toggle = useToggleExercise();
 
   if (todayQuery.isPending) {
@@ -121,17 +114,26 @@ function TodayPlanRoot() {
   if (!todayQuery.data) {
     return (
       <PlanShell tally={<p className="numerals text-5xl leading-none font-extrabold text-kit-muted">0</p>}>
-        <EmptyState
-          icon={DumbbellIcon}
-          title="No plan yet for today"
-          description="Your plan is built from your health profile and everything you've told your coach."
-          action={
-            <Button size="lg" disabled={generate.isPending} onClick={() => generate.mutate({})}>
-              <SparklesIcon data-icon="inline-start" />
-              {generate.isPending ? 'Building your plan...' : 'Build my plan'}
-            </Button>
-          }
-        />
+        {generate.isError ? (
+          <QueryError
+            title="We couldn't build your plan right now"
+            onRetry={generate.requestRebuild}
+            className="m-5 sm:m-6"
+          />
+        ) : (
+          <EmptyState
+            icon={DumbbellIcon}
+            title="No plan yet for today"
+            description="Your plan is built from your health profile and everything you've told your coach."
+            action={
+              <Button size="lg" disabled={generate.isPending} onClick={generate.requestRebuild}>
+                <SparklesIcon data-icon="inline-start" />
+                {generate.isPending ? 'Building your plan...' : 'Build my plan'}
+              </Button>
+            }
+          />
+        )}
+        {generate.dialog}
       </PlanShell>
     );
   }
@@ -154,21 +156,19 @@ function TodayPlanRoot() {
           }
           aside={
             <>
-              {plan.status === 'trainer_edited' && <Badge variant="tape">Edited by a trainer</Badge>}
+              {plan.status === 'trainer_edited' ? (
+                <Badge variant="tape">Edited by a trainer</Badge>
+              ) : (
+                plan.trainerNotes.length > 0 && <Badge variant="secondary">Trainer note</Badge>
+              )}
               <p className="text-sm text-kit-muted">
                 {remaining === 0 ? 'All done. Nice work.' : `${remaining} to go`}
               </p>
             </>
           }
         >
-          {plan.needsReview && (
-            <NeedsReviewNotice
-              exercises={plan.exercises}
-              planStatus={plan.status}
-              hasCompleted={doneCount > 0}
-              className="border-b"
-            />
-          )}
+          {plan.needsReview && <NeedsReviewNotice exercises={plan.exercises} className="border-b" />}
+          <TrainerNotes notes={plan.trainerNotes} className="border-b px-5 py-4 sm:px-6" />
           {plan.exercises.length > 0 && <ProgressSegments states={doneStates} />}
           {plan.exercises.map((exercise, index) => (
             <ExerciseRow
@@ -195,8 +195,6 @@ function TodayPlanRoot() {
         <PlanMusclePanel
           muscleLoad={plan.muscleLoad}
           exercises={plan.exercises}
-          planStatus={plan.status}
-          hasCompleted={doneCount > 0}
           selected={selectedMuscle}
           onSelectedChange={setSelectedMuscle}
         />

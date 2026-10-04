@@ -78,6 +78,26 @@ export async function insertEquipment(input: { name: string }, executor: Databas
   return equipment!;
 }
 
+export async function findExistingExerciseIds(exerciseIds: readonly string[], executor: DatabaseExecutor = db) {
+  if (exerciseIds.length === 0) return new Set<string>();
+  const rows = await executor
+    .select({ id: dExercises.id })
+    .from(dExercises)
+    .where(inArray(dExercises.id, [...exerciseIds]));
+  return new Set(rows.map((row) => row.id));
+}
+
+// Only the link table changes: exercises are never edited or deleted (FR-24), so this swaps which of them a
+// piece of equipment serves.
+export function replaceEquipmentLinks(equipmentId: string, exerciseIds: readonly string[]) {
+  return db.transaction(async (tx) => {
+    await tx.delete(dExerciseEquipment).where(eq(dExerciseEquipment.equipmentId, equipmentId));
+    if (exerciseIds.length > 0) {
+      await tx.insert(dExerciseEquipment).values(exerciseIds.map((exerciseId) => ({ exerciseId, equipmentId })));
+    }
+  });
+}
+
 export async function setEquipmentAvailability(id: string, isAvailable: boolean, executor: DatabaseExecutor = db) {
   const [equipment] = await executor
     .update(dGymEquipment)

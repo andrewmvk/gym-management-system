@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
 
 const TITLE = 'My plan';
-const DESCRIPTION = "Today's training, and every plan you've had before.";
+const DESCRIPTION = "Today's training, the plans you've had before and the ones coming up.";
 
 const PLAN_TABS = ['today', 'history'] as const;
 type PlanTab = (typeof PLAN_TABS)[number];
@@ -24,7 +24,7 @@ function PlanTabs({
     <Tabs defaultValue="today" {...tabsProps}>
       <TabsList>
         <TabsTrigger value="today">Today</TabsTrigger>
-        <TabsTrigger value="history">History</TabsTrigger>
+        <TabsTrigger value="history">Other days</TabsTrigger>
       </TabsList>
       <TabsContent value="today">{today}</TabsContent>
       <TabsContent value="history">{history}</TabsContent>

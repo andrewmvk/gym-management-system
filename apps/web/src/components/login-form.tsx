@@ -33,10 +33,12 @@ export function LoginForm() {
         queryClient.setQueryData(trpc.auth.me.queryKey(), session);
       },
       onError: (error) => {
+        if (error.data?.code === 'FORBIDDEN') return;
         toast.error(error.data?.code === 'UNAUTHORIZED' ? error.message : "We couldn't sign you in. Try again.");
       },
     }),
   );
+  const forbiddenMessage = login.error?.data?.code === 'FORBIDDEN' ? login.error.message : null;
 
   const session = me.data;
   useEffect(() => {
@@ -45,7 +47,7 @@ export function LoginForm() {
   }, [session, returnPath, router]);
 
   return (
-    <StepPanel title="Sign in" description="Use the e-mail and password of your Cadence account.">
+    <StepPanel title="Sign in" description="Use the email and password of your Cadence account.">
       <form noValidate onSubmit={form.handleSubmit((values) => login.mutate(values))}>
         <FieldGroup>
           <Controller
@@ -53,7 +55,7 @@ export function LoginForm() {
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="login-email">E-mail</FieldLabel>
+                <FieldLabel htmlFor="login-email">Email</FieldLabel>
                 <Input
                   {...field}
                   id="login-email"
@@ -82,6 +84,11 @@ export function LoginForm() {
               </Field>
             )}
           />
+          {forbiddenMessage && (
+            <p role="alert" className="rounded-md border border-destructive px-4 py-3 text-sm text-destructive">
+              {forbiddenMessage}
+            </p>
+          )}
           <Button type="submit" size="lg" className="mt-4 w-full" disabled={login.isPending || Boolean(session)}>
             {login.isPending ? 'Signing in...' : 'Sign in'}
           </Button>

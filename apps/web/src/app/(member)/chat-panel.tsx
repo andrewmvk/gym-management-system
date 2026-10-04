@@ -2,21 +2,16 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CalendarCheckIcon, MessageCircleIcon, SendHorizontalIcon, XIcon } from 'lucide-react';
+import Link from 'next/link';
+import { Dialog } from 'radix-ui';
 import { type FormEvent, type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 import { useAppAbility } from '@/abilities';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { type PlanOverwriteConfirmation, PlanOverwriteDialog } from '@/app/(member)/plan/plan-overwrite-dialog';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { formatPlanDate } from '@/lib/format';
+import { HEALTH_PROFILE_PATH } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -25,18 +20,29 @@ interface PlanAdjustment {
   instruction: string;
 }
 
+interface RememberedFact {
+  eventType: string;
+  summary: string;
+}
+
 interface ChatMessage {
   id: string;
   role: 'member' | 'assistant';
   text: string;
   adjustment?: PlanAdjustment;
+  facts?: RememberedFact[];
 }
 
 interface PendingConfirmation extends PlanAdjustment {
-  editedBy: string;
+  confirmation: PlanOverwriteConfirmation;
 }
 
 const PROMPTS = ['My left knee hurts today', 'I only have 30 minutes', 'I started a new medication'];
+
+// A toast or the confirm dialog opening is not the member leaving the chat.
+function isToastTarget(target: EventTarget | null) {
+  return target instanceof Element && target.closest('[data-sonner-toast]') !== null;
+}
 
 // FR-25/FR-26: messages live only in this component's state - no persisted thread, so a reload forgets
 // them. Durability lives entirely in the facts chat.send extracts server-side.
@@ -53,11 +59,21 @@ export function ChatPanel() {
 
   const send = useMutation(
     trpc.chat.send.mutationOptions({
-      onSuccess: (result) =>
+      onSuccess: (result) => {
         setMessages((current) => [
           ...current,
-          { id: crypto.randomUUID(), role: 'assistant', text: result.reply, adjustment: result.adjustment },
-        ]),
+          {
+            id: crypto.randomUUID(),
+            role: 'assistant',
+            text: result.reply,
+            adjustment: result.adjustment,
+            facts: result.facts,
+          },
+        ]);
+        if (result.facts.length > 0) {
+          queryClient.invalidateQueries({ queryKey: trpc.profile.listMine.queryKey() });
+        }
+      },
       onError: () => toast.error("We couldn't get a reply. Try again."),
     }),
   );
@@ -65,23 +81,20 @@ export function ChatPanel() {
   const invalidatePlanQueries = () => {
     queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
     queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
+    queryClient.invalidateQueries({ queryKey: trpc.plans.listUpcoming.queryKey() });
   };
 
   const adjustPlan = useMutation(
     trpc.chat.adjustPlan.mutationOptions({
       onSuccess: (result, variables) => {
         if (result.status === 'needs_confirmation') {
-          setPendingConfirmation({
-            date: variables.date,
-            instruction: variables.instruction,
-            editedBy: result.editedBy,
-          });
+          setPendingConfirmation({ date: variables.date, instruction: variables.instruction, confirmation: result });
           return;
         }
         invalidatePlanQueries();
-        toast.message(`Plan for ${variables.date} updated.`);
+        toast.message(`Plan for ${formatPlanDate(variables.date)} updated.`);
       },
-      onError: () => toast.error("We couldn't apply that change. Try again."),
+      onError: () => toast.error("We couldn't apply that change right now. Nothing was changed. Try again."),
     }),
   );
 
@@ -89,10 +102,6 @@ export function ChatPanel() {
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' });
   }, [messages, send.isPending]);
-
-  useEffect(() => {
-    if (open) inputRef.current?.focus();
-  }, [open]);
 
   if (!ability.can('create', 'ProfileEvent')) return null;
 
@@ -114,7 +123,6 @@ export function ChatPanel() {
       event.preventDefault();
       sendMessage(draft);
     }
-    if (event.key === 'Escape') setOpen(false);
   }
 
   function handleConfirm() {
@@ -129,145 +137,168 @@ export function ChatPanel() {
 
   return (
     <>
-      {open && (
-        <section
-          aria-label="AI coach"
-          className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-card duration-300 animate-in fade-in-0 slide-in-from-bottom-4 sm:inset-auto sm:right-6 sm:bottom-24 sm:h-144 sm:max-h-[calc(100dvh-8rem)] sm:w-96 sm:rounded-lg sm:border sm:shadow-overlay"
-        >
-          <div className="flex items-start gap-3 bg-kit px-5 pt-4 pb-3 text-kit-foreground">
-            <div className="flex-1">
-              <p className="font-display text-xl font-bold tracking-wide uppercase">AI coach</p>
-              <p className="text-xs text-kit-muted">
-                What you share here is remembered for future plans. The chat itself isn&apos;t saved.
-              </p>
-            </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="-mr-2 text-kit-foreground hover:bg-white/10"
-              onClick={() => setOpen(false)}
-            >
-              <XIcon className="size-5" />
-              <span className="sr-only">Close chat</span>
-            </Button>
-          </div>
+      <Dialog.Root open={open} onOpenChange={setOpen}>
+        <Dialog.Trigger asChild>
+          <Button
+            type="button"
+            size="lg"
+            className="fixed right-4 bottom-4 z-40 rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6"
+          >
+            <MessageCircleIcon data-icon="inline-start" />
+            Coach
+          </Button>
+        </Dialog.Trigger>
 
-          <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" aria-live="polite">
-            {messages.length === 0 && (
-              <div className="flex flex-col gap-3 py-2">
-                <p className="text-sm text-muted-foreground">
-                  Ask about your plan, report an injury, or share an update.
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {PROMPTS.map((prompt) => (
-                    <button
-                      key={prompt}
-                      type="button"
-                      onClick={() => sendMessage(prompt)}
-                      className="rounded-full border border-input px-3 py-1.5 text-sm transition-colors outline-none hover:border-primary/60 hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/45"
-                    >
-                      {prompt}
-                    </button>
+        <Dialog.Portal>
+          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 duration-300 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 sm:bg-black/20" />
+          <Dialog.Content
+            onOpenAutoFocus={(event) => {
+              event.preventDefault();
+              inputRef.current?.focus();
+            }}
+            onInteractOutside={(event) => {
+              if (isToastTarget(event.target)) event.preventDefault();
+            }}
+            className="fixed inset-0 z-50 flex flex-col overflow-hidden bg-card outline-none duration-300 data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4 sm:inset-auto sm:right-6 sm:bottom-24 sm:h-144 sm:max-h-[calc(100dvh-8rem)] sm:w-96 sm:rounded-lg sm:border sm:shadow-overlay"
+          >
+            <div className="flex items-start gap-3 bg-kit px-5 pt-4 pb-3 text-kit-foreground">
+              <div className="flex-1">
+                <Dialog.Title className="font-display text-xl font-bold tracking-wide uppercase">AI coach</Dialog.Title>
+                <Dialog.Description className="text-xs text-kit-muted">
+                  What you share here is remembered for future plans. The chat itself isn&apos;t saved.
+                </Dialog.Description>
+              </div>
+              <Dialog.Close asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="-mt-1 -mr-3 size-11 text-kit-foreground hover:bg-white/10"
+                >
+                  <XIcon className="size-5" />
+                  <span className="sr-only">Close chat</span>
+                </Button>
+              </Dialog.Close>
+            </div>
+
+            <div ref={scrollRef} className="flex flex-1 flex-col gap-3 overflow-y-auto px-4 py-4" aria-live="polite">
+              {messages.length === 0 && (
+                <div className="flex flex-col gap-3 py-2">
+                  <p className="text-sm text-muted-foreground">
+                    Ask about your plan, report an injury, or share an update.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {PROMPTS.map((prompt) => (
+                      <button
+                        key={prompt}
+                        type="button"
+                        onClick={() => sendMessage(prompt)}
+                        className="min-h-11 rounded-full border border-input px-4 text-sm transition-colors outline-none hover:border-primary/60 hover:bg-accent/60 focus-visible:ring-3 focus-visible:ring-ring/45"
+                      >
+                        {prompt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              {messages.map((message) => (
+                <div
+                  key={message.id}
+                  className={cn(
+                    'flex max-w-5/6 flex-col gap-1.5',
+                    message.role === 'member' ? 'self-end' : 'self-start',
+                  )}
+                >
+                  <div
+                    className={cn(
+                      'flex flex-col gap-2 rounded-lg px-3.5 py-2.5 text-sm text-pretty whitespace-pre-wrap',
+                      message.role === 'member'
+                        ? 'rounded-br-sm bg-primary text-primary-foreground'
+                        : 'rounded-bl-sm bg-muted',
+                    )}
+                  >
+                    {message.text}
+                    {message.adjustment && (
+                      <Button
+                        type="button"
+                        variant="tape"
+                        className="min-h-11 self-start"
+                        disabled={adjustPlan.isPending}
+                        onClick={() => adjustPlan.mutate(message.adjustment!)}
+                      >
+                        <CalendarCheckIcon data-icon="inline-start" />
+                        {adjustPlan.isPending
+                          ? 'Applying...'
+                          : `Apply to plan for ${formatPlanDate(message.adjustment.date)}`}
+                      </Button>
+                    )}
+                  </div>
+                  {message.facts && message.facts.length > 0 && (
+                    <div className="flex flex-col gap-0.5 rounded-sm bg-accent/60 px-3 py-2 text-xs text-accent-foreground">
+                      <p className="font-semibold">Remembered</p>
+                      <ul className="flex flex-col">
+                        {message.facts.map((fact) => (
+                          <li key={fact.summary} className="text-pretty">
+                            {fact.summary}
+                          </li>
+                        ))}
+                      </ul>
+                      <Link
+                        href={HEALTH_PROFILE_PATH}
+                        onClick={() => setOpen(false)}
+                        className="-mb-2 inline-flex min-h-11 w-fit items-center rounded-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
+                      >
+                        See everything the coach remembers
+                      </Link>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {send.isPending && (
+                <div
+                  role="status"
+                  className="flex items-center gap-1 self-start rounded-lg rounded-bl-sm bg-muted px-3.5 py-3"
+                  aria-label="Coach is typing"
+                >
+                  {[0, 1, 2].map((dot) => (
+                    <span
+                      key={dot}
+                      className="size-1.5 animate-pulse rounded-full bg-muted-foreground"
+                      style={{ animationDelay: `${dot * 120}ms` }}
+                    />
                   ))}
                 </div>
-              </div>
-            )}
-            {messages.map((message) => (
-              <div
-                key={message.id}
-                className={cn(
-                  'flex max-w-5/6 flex-col gap-2 rounded-lg px-3.5 py-2.5 text-sm text-pretty whitespace-pre-wrap',
-                  message.role === 'member'
-                    ? 'self-end rounded-br-sm bg-primary text-primary-foreground'
-                    : 'self-start rounded-bl-sm bg-muted',
-                )}
-              >
-                {message.text}
-                {message.adjustment && (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="tape"
-                    className="self-start"
-                    disabled={adjustPlan.isPending}
-                    onClick={() => adjustPlan.mutate(message.adjustment!)}
-                  >
-                    <CalendarCheckIcon data-icon="inline-start" />
-                    {adjustPlan.isPending ? 'Applying...' : `Apply to plan for ${message.adjustment.date}`}
-                  </Button>
-                )}
-              </div>
-            ))}
-            {send.isPending && (
-              <div
-                role="status"
-                className="flex items-center gap-1 self-start rounded-lg rounded-bl-sm bg-muted px-3.5 py-3"
-                aria-label="Coach is typing"
-              >
-                {[0, 1, 2].map((dot) => (
-                  <span
-                    key={dot}
-                    className="size-1.5 animate-pulse rounded-full bg-muted-foreground"
-                    style={{ animationDelay: `${dot * 120}ms` }}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
-          <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t bg-card p-3">
-            <Textarea
-              ref={inputRef}
-              value={draft}
-              onChange={(event) => setDraft(event.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="Message your coach..."
-              aria-label="Message your coach"
-              maxLength={2000}
-              rows={1}
-              className="max-h-32 min-h-10 flex-1 resize-none py-2"
-            />
-            <Button type="submit" size="icon" disabled={send.isPending || !draft.trim()}>
-              <SendHorizontalIcon className="size-5" />
-              <span className="sr-only">Send</span>
-            </Button>
-          </form>
-        </section>
-      )}
+            <form onSubmit={handleSubmit} className="flex items-end gap-2 border-t bg-card p-3">
+              <Textarea
+                ref={inputRef}
+                value={draft}
+                onChange={(event) => setDraft(event.target.value)}
+                onKeyDown={handleKeyDown}
+                placeholder="Message your coach..."
+                aria-label="Message your coach"
+                maxLength={2000}
+                rows={1}
+                className="max-h-32 min-h-11 flex-1 resize-none py-2.5"
+              />
+              <Button type="submit" size="icon" className="size-11" disabled={send.isPending || !draft.trim()}>
+                <SendHorizontalIcon className="size-5" />
+                <span className="sr-only">Send</span>
+              </Button>
+            </form>
+          </Dialog.Content>
+        </Dialog.Portal>
+      </Dialog.Root>
 
-      <Button
-        type="button"
-        size="lg"
-        aria-expanded={open}
-        className={cn(
-          'fixed right-4 bottom-4 z-40 rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6',
-          open && 'hidden sm:inline-flex',
-        )}
-        onClick={() => setOpen((current) => !current)}
-      >
-        {open ? <XIcon data-icon="inline-start" /> : <MessageCircleIcon data-icon="inline-start" />}
-        {open ? 'Close' : 'Coach'}
-      </Button>
-
-      <AlertDialog
-        open={pendingConfirmation !== null}
-        onOpenChange={(isOpen) => !isOpen && setPendingConfirmation(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>A trainer already adjusted this plan</AlertDialogTitle>
-            <AlertDialogDescription>
-              {pendingConfirmation?.editedBy ? `${pendingConfirmation.editedBy} edited it. ` : ''}Applying this change
-              will replace their edits.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel onClick={() => setPendingConfirmation(null)}>Keep trainer&apos;s plan</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirm}>Replace edits</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <PlanOverwriteDialog
+        confirmation={pendingConfirmation?.confirmation ?? null}
+        intent="adjust"
+        planDate={pendingConfirmation?.date}
+        onConfirm={handleConfirm}
+        onCancel={() => setPendingConfirmation(null)}
+      />
     </>
   );
 }

@@ -1,21 +1,21 @@
 'use client';
 
+import { DemandSection } from '@/app/(staff)/staff/demand-section';
 import { OverviewBoard } from '@/app/(staff)/staff/overview-board';
-import { PoolSection } from '@/app/(staff)/staff/pool-section';
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 
 const TITLE = 'Overview';
 const DESCRIPTION =
-  'Plans publish on their own. Here is what needs a trainer today, what trainers already touched, and what the plans cover together.';
+  'Plans publish on their own. Here is what needs a trainer, what trainers touched this week, and what today’s plans ask of the equipment.';
 
 function StaffHomeSkeleton() {
   return (
     <PageContainer>
       <PageHeading title={TITLE} description={DESCRIPTION} />
       <OverviewBoard.Skeleton />
-      <PoolSection.Skeleton />
+      <DemandSection.Skeleton />
     </PageContainer>
   );
 }
@@ -26,7 +26,7 @@ export default function StaffHomePage() {
       <PageContainer>
         <PageHeading title={TITLE} description={DESCRIPTION} />
         <OverviewBoard />
-        <PoolSection />
+        <DemandSection />
       </PageContainer>
     </GuardedContent>
   );

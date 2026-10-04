@@ -20,6 +20,7 @@ import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL } from '@api/db/seed';
 import { localDateString } from '@api/lib/dates';
 import { createFaceEmbedder } from '@api/lib/face-embedding';
 import { resolveUploadPath } from '@api/lib/uploads';
+import { UNINSPECTED_CERTIFICATE_NOTES } from '@api/modules/aptitude/certificate-service';
 import { DEFAULT_MEMBERSHIP_PLAN } from '@api/modules/auth/service';
 import { MEMBER_GROUP } from '@cadence/shared/auth';
 import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
@@ -30,6 +31,8 @@ import { eq, inArray, sql } from 'drizzle-orm';
 export const DEMO_MEMBER_COUNT = 25;
 export const DEMO_APPLICANT_COUNT = 4;
 export const DEMO_HISTORY_DAYS = 21;
+// Inactive demo members were last seen this many days ago, when their membership lapsed.
+export const DEMO_LAPSE_DAYS_AGO = 10;
 // Minutes before the run time of the check-ins that keep the occupancy estimate above zero.
 export const DEMO_RECENT_CHECK_IN_MINUTES = [5, 20, 45, 75] as const;
 
@@ -61,28 +64,83 @@ const EDIT_NOTES = [
 ];
 const COMMENT_NOTES = ['Good progression, keep the current structure.', 'Watch the knee position on squats.'];
 
-const CERTIFICATE_APPLICANTS = [
+// Members who also get a plan for tomorrow, so the upcoming plans list has something to show.
+const UPCOMING_PLAN_MEMBER_INDEXES = [3, 4];
+export const DEMO_UPCOMING_PLAN_COUNT = UPCOMING_PLAN_MEMBER_INDEXES.length;
+// Trainer notes on today's plan, which the AI reads when it rebuilds that member's plan.
+const TODAY_TRAINER_NOTES = [
+  { memberIndex: 3, note: 'Left knee is still sore: keep squats shallow and skip lunges until it settles.' },
+  { memberIndex: 4, note: 'New blood pressure medication: long rests between sets and no maximal lifts this week.' },
+];
+
+// What the chat remembered about some demo members: one fact per row, with the message it came from.
+const DEMO_FACTS = [
   {
-    aiResult: 'not_cleared',
-    aiNotes: 'The file content could not be inspected, so a human must review it.',
-    review: null,
+    memberIndex: 3,
+    eventType: 'injury',
+    description: 'Sore left knee when going down stairs',
+    sourceMessage: 'My left knee hurts a lot going down stairs since the weekend run.',
+    daysAgo: 6,
   },
   {
-    aiResult: 'pending_retry',
-    aiNotes: 'AI evaluation unavailable; an admin will review this certificate.',
-    review: null,
+    memberIndex: 3,
+    eventType: 'skipped_exercise',
+    description: 'Skipped lunges because of the left knee',
+    sourceMessage: 'I skipped the lunges today, the knee was bothering me.',
+    daysAgo: 2,
   },
-  { aiResult: 'cleared', aiNotes: 'The document looks like a standard medical certificate.', review: null },
   {
-    aiResult: 'not_cleared',
-    aiNotes: 'The file content could not be inspected, so a human must review it.',
-    review: 'not_cleared',
+    memberIndex: 4,
+    eventType: 'medication_change',
+    description: 'Started a blood pressure medication and gets dizzy when standing up fast',
+    sourceMessage: 'My doctor put me on a new blood pressure pill and I feel dizzy if I get up quickly.',
+    daysAgo: 9,
+  },
+  {
+    memberIndex: 6,
+    eventType: 'life_event',
+    description: 'Travelling for work next month, only two sessions a week',
+    sourceMessage: 'I will be travelling for work next month so I can only come twice a week.',
+    daysAgo: 4,
+  },
+  {
+    memberIndex: 7,
+    eventType: 'injury',
+    description: 'Mild right shoulder strain, now healed',
+    sourceMessage: 'I strained my right shoulder carrying boxes, it is mild.',
+    daysAgo: 18,
+    isResolved: true,
+  },
+  {
+    memberIndex: 8,
+    eventType: 'state_update',
+    description: 'Sleeping badly this week and feeling low on energy',
+    sourceMessage: 'I have been sleeping really badly this week, no energy at all.',
+    daysAgo: 1,
+  },
+  {
+    memberIndex: 9,
+    eventType: 'plan_adjustment_request',
+    description: 'Wants shorter sessions, around 40 minutes',
+    sourceMessage: 'Can you make my workouts shorter? I only have about 40 minutes.',
+    daysAgo: 3,
   },
 ] as const satisfies readonly {
-  aiResult: 'cleared' | 'not_cleared' | 'pending_retry';
-  aiNotes: string;
-  review: 'cleared' | 'not_cleared' | null;
+  memberIndex: number;
+  eventType: typeof fProfileEvents.$inferInsert.eventType;
+  description: string;
+  sourceMessage: string;
+  daysAgo: number;
+  isResolved?: boolean;
 }[];
+
+// The AI never sees the uploaded file, so every real certificate sits at pending_retry until an admin decides.
+const CERTIFICATE_APPLICANTS = [
+  { review: null },
+  { review: null },
+  { review: null },
+  { review: 'not_cleared' },
+] as const satisfies readonly { review: 'cleared' | 'not_cleared' | null }[];
 
 const stubEmbedder = createFaceEmbedder('stub');
 
@@ -275,15 +333,15 @@ async function seedCertificates(
     await tx.insert(fAptitudeQuestionnaires).values({
       userId: applicant.id,
       answers: applicantAnswers(),
-      aiResult: applicant.aiResult === 'pending_retry' ? 'pending_retry' : 'not_cleared',
+      aiResult: 'not_cleared',
       aiNotes: 'Demo applicant: a certificate is required.',
       submittedAt: uploadedAt,
     });
     await tx.insert(fMedicalCertificates).values({
       userId: applicant.id,
       filePath: relativePath,
-      aiResult: applicant.aiResult,
-      aiNotes: applicant.aiNotes,
+      aiResult: 'pending_retry',
+      aiNotes: UNINSPECTED_CERTIFICATE_NOTES,
       uploadedAt,
       ...(applicant.review
         ? { reviewedByUserId: adminId, adminReviewedAt: now, adminOverrideResult: applicant.review }
@@ -306,6 +364,24 @@ async function seedOnboarding(tx: Transaction, members: Awaited<ReturnType<typeo
   );
 }
 
+async function seedProfileEvents(tx: Transaction, members: Awaited<ReturnType<typeof upsertMembers>>, now: Date) {
+  const idByIndex = new Map(members.map((member) => [member.index, member.id]));
+  await tx.insert(fProfileEvents).values(
+    DEMO_FACTS.map((fact) => {
+      const createdAt = atLocalTime(now, fact.daysAgo, 18, 30);
+      const isResolved = 'isResolved' in fact && fact.isResolved;
+      return {
+        userId: idByIndex.get(fact.memberIndex)!,
+        eventType: fact.eventType,
+        payload: { description: fact.description },
+        sourceMessage: fact.sourceMessage,
+        createdAt,
+        resolvedAt: isResolved ? atLocalTime(now, fact.daysAgo - 8, 9, 0) : null,
+      };
+    }),
+  );
+}
+
 async function seedPlans(
   tx: Transaction,
   members: Awaited<ReturnType<typeof upsertMembers>>,
@@ -319,11 +395,19 @@ async function seedPlans(
   const stride = Math.floor(exercises.length / EXERCISES_PER_PLAN);
   const random = createRandom(7);
 
-  const plans = members.flatMap((member) =>
-    Array.from({ length: DEMO_HISTORY_DAYS + 1 }, (_, daysAgo) => ({ member, daysAgo })),
-  );
+  // A lapsed member cannot sign in, so they have no plan after the lapse.
+  const plans = [
+    ...members.flatMap((member) =>
+      Array.from({ length: DEMO_HISTORY_DAYS + 1 }, (_, daysAgo) => ({ member, daysAgo })).filter(
+        ({ daysAgo }) => member.isActive || daysAgo >= DEMO_LAPSE_DAYS_AGO,
+      ),
+    ),
+    ...members
+      .filter((member) => UPCOMING_PLAN_MEMBER_INDEXES.includes(member.index))
+      .map((member) => ({ member, daysAgo: -1 })),
+  ];
   const editedKeys = new Set(
-    Array.from({ length: TRAINER_EDITED_PLAN_COUNT }, (_, position) => `${members[position * 4]!.id}:${position + 2}`),
+    Array.from({ length: TRAINER_EDITED_PLAN_COUNT }, (_, position) => `${members[position * 3]!.id}:${position + 2}`),
   );
 
   const insertedPlans: { id: string; userId: string; daysAgo: number; edited: boolean }[] = [];
@@ -365,8 +449,8 @@ async function seedPlans(
       reps: 8 + position * 2,
       load: position === 0 ? 'moderate' : null,
       orderIndex: position,
-      // Past days were mostly done; today only the first exercises.
-      completed: plan.daysAgo === 0 ? position === 0 : random() < 0.8,
+      // Past days were mostly done; today only the first exercises; tomorrow nothing yet.
+      completed: plan.daysAgo < 0 ? false : plan.daysAgo === 0 ? position === 0 : random() < 0.8,
     }));
   });
   await insertInChunks(exerciseRows, (chunk) => tx.insert(fTrainingPlanExercises).values(chunk));
@@ -395,6 +479,19 @@ async function seedPlans(
       createdAt: atLocalTime(now, 1, 10, 0),
     });
   }
+  for (const { memberIndex, note } of TODAY_TRAINER_NOTES) {
+    const plan = insertedPlans.find(
+      (entry) => entry.daysAgo === 0 && memberIndexById.get(entry.userId) === memberIndex,
+    );
+    if (!plan) continue;
+    reviews.push({
+      trainingPlanId: plan.id,
+      userId: trainerId,
+      note,
+      isEdit: false,
+      createdAt: atLocalTime(now, 0, 7, 45),
+    });
+  }
   await tx.insert(fPlanReviews).values(reviews);
 }
 
@@ -408,7 +505,9 @@ async function seedCheckIns(tx: Transaction, members: Awaited<ReturnType<typeof 
     const dayStart = atLocalTime(now, daysAgo, 0, 0);
     if (dayStart.getDay() === 0) continue;
     const weights = hourWeights(dayStart.getDay() === 6);
-    const visitors = shuffled(active, random).slice(0, 10 + Math.floor(random() * 8));
+    // A lapsed member still trained until the lapse, then stops coming: the history the staff member page shows.
+    const pool = members.filter((member) => member.isActive || daysAgo >= DEMO_LAPSE_DAYS_AGO);
+    const visitors = shuffled(pool, random).slice(0, 10 + Math.floor(random() * 8));
     for (const member of visitors) {
       const checkedInAt = atLocalTime(now, daysAgo, pickHour(weights, random), Math.floor(random() * 60));
       // Today's regular history stays out of the occupancy window, so the recent rows below own that number.
@@ -457,6 +556,7 @@ export async function seedDemo(database: Database = defaultDb, now: Date = new D
     const applicants = await upsertApplicants(tx);
 
     await seedOnboarding(tx, members, now);
+    await seedProfileEvents(tx, members, now);
     await seedPlans(tx, members, trainerId, now);
     await seedCheckIns(tx, members, now);
     await seedCertificates(tx, applicants, adminId, now);

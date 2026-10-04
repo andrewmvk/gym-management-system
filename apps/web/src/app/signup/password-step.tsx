@@ -10,7 +10,7 @@ import { toast } from 'sonner';
 import { z } from 'zod';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
+import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { useTRPC } from '@/lib/trpc';
 
@@ -75,11 +75,13 @@ export function PasswordStep({ userId, onActivated }: PasswordStepProps) {
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
                   <FieldLabel htmlFor="signup-password">Password</FieldLabel>
+                  <FieldDescription id="signup-password-rules">Use at least 8 characters.</FieldDescription>
                   <Input
                     {...field}
                     id="signup-password"
                     type="password"
                     autoComplete="new-password"
+                    aria-describedby="signup-password-rules"
                     aria-invalid={fieldState.invalid}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}

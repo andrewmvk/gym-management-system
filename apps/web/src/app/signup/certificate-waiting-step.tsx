@@ -45,8 +45,11 @@ export function CertificateWaitingStep({ userId, onStatusChanged }: CertificateW
       icon={HourglassIcon}
       tone="pending"
       title="Under review"
-      description="A gym admin needs to review your medical certificate before you can continue. This can take a while. Come back to this page and check later."
+      description="A gym admin reviews your medical certificate before you can continue. We can't say how long that will take, and nothing is sent to you when it is done."
     >
+      <p className="rounded-md bg-muted px-4 py-3 text-sm text-muted-foreground">
+        To come back later, start again at step 1 with the same email. We will pick up where you left off.
+      </p>
       <Button size="lg" className="w-full" variant="outline" disabled={checking} onClick={() => void checkStatus()}>
         {checking ? 'Checking...' : 'Check status'}
       </Button>

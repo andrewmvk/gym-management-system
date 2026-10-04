@@ -10,6 +10,7 @@ import {
 } from '@api/db/schema';
 import type { QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
 import { and, desc, eq } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/pg-core';
 
 type Gender = User['gender'];
 type AptitudeStatus = User['aptitudeStatus'];
@@ -151,12 +152,17 @@ export async function findLatestCertificateByUserId(
 export interface CertificateQueueRow extends MedicalCertificate {
   applicantName: string;
   applicantEmail: string;
+  reviewedByName: string | null;
+  // What the questionnaire concluded and why: the reason a certificate was asked for at all.
+  questionnaireResult: AiResultValue | null;
+  questionnaireNotes: string | null;
 }
 
 // Unreviewed first (RN-02: everything must reach the queue, so nothing here skips it) - Postgres sorts
 // NULL first on DESC by default, and admin_reviewed_at is null exactly for unreviewed rows. Never
 // selects the applicant's reference_face_embedding or any other biometric column.
 export function findCertificateQueue(executor: DatabaseExecutor = db): Promise<CertificateQueueRow[]> {
+  const reviewer = alias(dUsers, 'reviewer');
   return executor
     .select({
       id: fMedicalCertificates.id,
@@ -170,9 +176,14 @@ export function findCertificateQueue(executor: DatabaseExecutor = db): Promise<C
       uploadedAt: fMedicalCertificates.uploadedAt,
       applicantName: dUsers.name,
       applicantEmail: dUsers.email,
+      reviewedByName: reviewer.name,
+      questionnaireResult: fAptitudeQuestionnaires.aiResult,
+      questionnaireNotes: fAptitudeQuestionnaires.aiNotes,
     })
     .from(fMedicalCertificates)
     .innerJoin(dUsers, eq(dUsers.id, fMedicalCertificates.userId))
+    .leftJoin(reviewer, eq(reviewer.id, fMedicalCertificates.reviewedByUserId))
+    .leftJoin(fAptitudeQuestionnaires, eq(fAptitudeQuestionnaires.userId, fMedicalCertificates.userId))
     .orderBy(desc(fMedicalCertificates.adminReviewedAt), desc(fMedicalCertificates.uploadedAt));
 }
 

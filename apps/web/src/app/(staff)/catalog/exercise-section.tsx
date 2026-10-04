@@ -297,7 +297,7 @@ function ExerciseSectionRoot() {
                     <TableCell className="hidden sm:table-cell">{describeMuscles(exercise.muscles)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={exercise.isAvailable ? 'live' : 'unavailable'}>
-                        {exercise.isAvailable ? 'Available' : 'Unavailable'}
+                        {exercise.isAvailable ? 'Available' : 'Out of service'}
                       </Badge>
                     </TableCell>
                   </TableRow>

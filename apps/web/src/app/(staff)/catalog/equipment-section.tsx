@@ -5,11 +5,13 @@ import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, WrenchIcon } from 'lucide-react';
-import { type ReactNode, useMemo } from 'react';
+import { type ComponentProps, type ReactNode, useMemo } from 'react';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { useAppAbility } from '@/abilities';
+import { EquipmentLinksSheet } from '@/app/(staff)/catalog/equipment-links-sheet';
+import { EquipmentToggle } from '@/app/(staff)/catalog/equipment-toggle';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -19,7 +21,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Field, FieldError, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { useTRPC } from '@/lib/trpc';
 
 const CreateEquipmentSchema = z.object({
@@ -41,51 +42,33 @@ function EquipmentListSkeleton() {
   );
 }
 
-function EquipmentToggle({
+function EquipmentRow({
   id,
   name,
   isAvailable,
   affects,
+  exercises,
 }: {
   id: string;
   name: string;
   isAvailable: boolean;
   affects?: string;
+  exercises: ComponentProps<typeof EquipmentLinksSheet>['exercises'] | undefined;
 }) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
-  const toggle = useMutation(
-    trpc.catalog.toggleEquipmentAvailability.mutationOptions({
-      // Exercise availability is derived from equipment availability (FR-17 / RN-04), so a toggle here
-      // must also invalidate the exercise list, not just the equipment list.
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.catalog.listEquipment.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.catalog.list.queryKey() });
-      },
-      onError: () => toast.error(`Couldn't update ${name}. Try again.`),
-    }),
-  );
-
   return (
-    <label
-      htmlFor={`equipment-${id}`}
-      className="flex min-h-15 items-center justify-between gap-4 px-5 transition-colors hover:bg-muted/60 sm:px-6"
-    >
-      <span className="flex flex-col">
+    <div className="flex min-h-15 items-center justify-between gap-4 px-5 py-2 transition-colors hover:bg-muted/60 sm:px-6">
+      <label htmlFor={`equipment-${id}`} className="flex min-w-0 flex-col">
         <span className="font-semibold">{name}</span>
         <span className="text-sm text-muted-foreground">
-          {isAvailable ? 'Available on the floor' : 'Out of service'}
-          {affects && ` · takes out ${affects}`}
+          {isAvailable ? 'In service' : 'Out of service'}
+          {affects && (isAvailable ? ` · out of service it would take out ${affects}` : ` · takes out ${affects}`)}
         </span>
-      </span>
-      <Switch
-        id={`equipment-${id}`}
-        checked={isAvailable}
-        disabled={toggle.isPending}
-        onCheckedChange={() => toggle.mutate({ id })}
-      />
-    </label>
+      </label>
+      <div className="flex shrink-0 items-center gap-3">
+        {exercises && <EquipmentLinksSheet equipmentId={id} equipmentName={name} exercises={exercises} />}
+        <EquipmentToggle id={id} name={name} isAvailable={isAvailable} />
+      </div>
+    </div>
   );
 }
 
@@ -112,7 +95,9 @@ function CreateEquipmentForm() {
     <Card>
       <CardHeader>
         <CardTitle>Add equipment</CardTitle>
-        <CardDescription>Switching an item off makes exercises that rely only on it unavailable.</CardDescription>
+        <CardDescription>
+          A new piece starts in service. Link it to its exercises afterwards with Linked exercises.
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <form
@@ -185,11 +170,12 @@ function EquipmentSectionRoot() {
         {query.data.map((item) =>
           canManage ? (
             <li key={item.id}>
-              <EquipmentToggle
+              <EquipmentRow
                 id={item.id}
                 name={item.name}
                 isAvailable={item.isAvailable}
                 affects={affectsOf(item.id)}
+                exercises={exercisesQuery.data}
               />
             </li>
           ) : (
@@ -201,7 +187,7 @@ function EquipmentSectionRoot() {
                 )}
               </span>
               <Badge variant={item.isAvailable ? 'live' : 'unavailable'}>
-                {item.isAvailable ? 'Available' : 'Unavailable'}
+                {item.isAvailable ? 'Available' : 'Out of service'}
               </Badge>
             </li>
           ),

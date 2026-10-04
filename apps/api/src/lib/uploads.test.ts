@@ -45,11 +45,7 @@ describe('saveUpload', () => {
   it.each([
     ['a PNG photo', { mimeType: 'image/png', base64: PNG.toString('base64') }, 'png'],
     ['a PDF exam', { kind: 'exam', mimeType: 'application/pdf', base64: PDF.toString('base64') }, 'pdf'],
-    [
-      'a data URL certificate',
-      { kind: 'certificate', base64: `data:image/jpeg;base64,${JPEG.toString('base64')}` },
-      'jpg',
-    ],
+    ['a data URL exam', { kind: 'exam', base64: `data:image/jpeg;base64,${JPEG.toString('base64')}` }, 'jpg'],
   ] as const)('accepts %s', async (_, overrides, extension) => {
     const saved = await saveUpload(input(overrides), uploadsDir);
 
@@ -58,11 +54,6 @@ describe('saveUpload', () => {
 
   it.each([
     ['a PDF photo', { mimeType: 'application/pdf', base64: PDF.toString('base64') }, 'not allowed'],
-    [
-      'a PDF certificate',
-      { kind: 'certificate', mimeType: 'application/pdf', base64: PDF.toString('base64') },
-      'not allowed',
-    ],
     ['an unknown type', { kind: 'exam', mimeType: 'image/gif' }, 'not allowed'],
     ['content that does not match the type', { mimeType: 'image/png' }, 'does not match'],
     ['invalid base64', { base64: 'not base64!' }, 'not valid base64'],

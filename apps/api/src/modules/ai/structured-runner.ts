@@ -1,12 +1,12 @@
 import type { Logger } from '@api/lib/logger';
 import { requestCompletion } from '@api/modules/ai/client';
-import { type MockSwitches, mockFixtureFor } from '@api/modules/ai/mock-fixtures';
+import { mockFixtureFor } from '@api/modules/ai/mock-fixtures';
 import type { AiFailureReason, AiPurpose, AiResult, StructuredRequest } from '@api/modules/ai/types';
 import { z } from 'zod';
 
 export type AiRunnerConfig =
   | { mode: 'live'; apiKey: string; model: string; fetch?: typeof fetch; log: Pick<Logger, 'warn'> }
-  | { mode: 'mock'; mock: MockSwitches; log: Pick<Logger, 'warn'> };
+  | { mode: 'mock'; log: Pick<Logger, 'warn'> };
 
 const MAX_ATTEMPTS = 2;
 
@@ -39,16 +39,13 @@ function parseOutput<T>(content: string, schema: z.ZodType<T>): ParseResult<T> {
 }
 
 export function createAiRunner(config: AiRunnerConfig) {
-  function fail<T>(purpose: AiPurpose, reason: AiFailureReason): AiResult<T> {
-    config.log.warn({ purpose, reason }, 'ai call failed');
+  function fail<T>(purpose: AiPurpose, reason: AiFailureReason, cause?: string): AiResult<T> {
+    config.log.warn(cause ? { purpose, reason, cause } : { purpose, reason }, 'ai call failed');
     return { ok: false, reason };
   }
 
-  function runMock<T>({ purpose, schema }: StructuredRequest<T>, mock: MockSwitches): AiResult<T> {
-    const fixture = mockFixtureFor(purpose, mock);
-    if (fixture === null) return fail(purpose, 'unavailable');
-
-    const parsed = schema.safeParse(fixture);
+  function runMock<T>({ purpose, schema }: StructuredRequest<T>): AiResult<T> {
+    const parsed = schema.safeParse(mockFixtureFor(purpose));
     return parsed.success ? { ok: true, data: parsed.data } : fail(purpose, 'invalid_output');
   }
 
@@ -58,7 +55,7 @@ export function createAiRunner(config: AiRunnerConfig) {
     // Only an unparseable or schema-invalid answer is retried; a transport failure is reported at once.
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       const completion = await requestCompletion({ apiKey, model, fetch: doFetch }, { system, user: request.user });
-      if (!completion.ok) return fail<T>(request.purpose, 'unavailable');
+      if (!completion.ok) return fail<T>(request.purpose, 'unavailable', completion.cause);
 
       const parsed = parseOutput(completion.content, request.schema);
       if (parsed.ok) return { ok: true as const, data: parsed.data };
@@ -69,7 +66,7 @@ export function createAiRunner(config: AiRunnerConfig) {
   return {
     async runStructured<T>(request: StructuredRequest<T>): Promise<AiResult<T>> {
       try {
-        if (config.mode === 'mock') return runMock(request, config.mock);
+        if (config.mode === 'mock') return runMock(request);
         return await runLive(request, config.apiKey, config.model, config.fetch);
       } catch {
         // A caller's schema refinement can throw; the contract is still a result, never an exception.

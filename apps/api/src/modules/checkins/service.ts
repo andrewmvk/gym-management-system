@@ -10,7 +10,6 @@ import {
 
 export type CheckInOutcome =
   | { kind: 'member_not_found' }
-  | { kind: 'member_not_cleared' }
   | { kind: 'member_inactive' }
   | { kind: 'recorded'; checkInId: string; turnstileStatus: 'success' | 'failed' };
 
@@ -19,7 +18,6 @@ export type CheckInOutcome =
 export async function recordCheckIn(memberId: string, options?: UnlockOptions): Promise<CheckInOutcome> {
   const member = await repository.findMemberForCheckIn(memberId);
   if (!member) return { kind: 'member_not_found' };
-  if (member.aptitudeStatus !== 'cleared') return { kind: 'member_not_cleared' };
   if (member.membershipStatus === 'inactive') return { kind: 'member_inactive' };
 
   const { status, ...details } = await unlockTurnstile({ memberId }, options);

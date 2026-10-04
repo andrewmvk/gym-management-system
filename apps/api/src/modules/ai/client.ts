@@ -12,7 +12,8 @@ export interface CompletionRequest {
   user: string;
 }
 
-export type CompletionResult = { ok: true; content: string } | { ok: false };
+// cause is a short, non-sensitive label (timeout, network_error, http_429, ...) that only reaches the logs.
+export type CompletionResult = { ok: true; content: string } | { ok: false; cause: string };
 
 interface ChatCompletionBody {
   choices?: { message?: { content?: unknown } }[];
@@ -40,13 +41,13 @@ export async function requestCompletion(
       }),
       signal: controller.signal,
     });
-    if (!response.ok) return { ok: false };
+    if (!response.ok) return { ok: false, cause: `http_${response.status}` };
 
     const body = (await response.json()) as ChatCompletionBody;
     const content = body.choices?.[0]?.message?.content;
-    return typeof content === 'string' ? { ok: true, content } : { ok: false };
+    return typeof content === 'string' ? { ok: true, content } : { ok: false, cause: 'empty_response' };
   } catch {
-    return { ok: false };
+    return { ok: false, cause: controller.signal.aborted ? 'timeout' : 'network_error' };
   } finally {
     clearTimeout(timeout);
   }

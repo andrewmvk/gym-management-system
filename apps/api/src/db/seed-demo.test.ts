@@ -2,7 +2,6 @@ import { db, pool } from '@api/db/client';
 import {
   dUsers,
   fCheckIns,
-  fMedicalCertificates,
   fOnboardingSubmissions,
   fPlanReviews,
   fProfileEvents,
@@ -12,7 +11,6 @@ import {
 } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
 import {
-  DEMO_APPLICANT_COUNT,
   DEMO_HISTORY_DAYS,
   DEMO_LAPSE_DAYS_AGO,
   DEMO_MEMBER_COUNT,
@@ -20,7 +18,6 @@ import {
   DEMO_UPCOMING_PLAN_COUNT,
   seedDemo,
 } from '@api/db/seed-demo';
-import { UNINSPECTED_CERTIFICATE_NOTES } from '@api/modules/aptitude/certificate-service';
 import { getGymInfo } from '@api/modules/gym/service';
 import { getOverview } from '@api/modules/plans/reviews-service';
 import { resetTestDatabase } from '@api/test/database';
@@ -38,7 +35,7 @@ async function rowCounts() {
     fTrainingPlans,
     fTrainingPlanExercises,
     fPlanReviews,
-    fMedicalCertificates,
+    fOnboardingSubmissions,
     fProfileEvents,
   ];
   const counts = await Promise.all(tables.map((table) => db.select({ value: count() }).from(table)));
@@ -60,15 +57,15 @@ describe('seedDemo', () => {
     expect(await rowCounts()).toEqual(first);
   });
 
-  it('creates fake cleared members in the member group, a mix of active and inactive', async () => {
+  it('creates fake registered members in the member group, a mix of active and inactive', async () => {
     await seedDemo(db, NOW);
 
     const members = await db.select().from(dUsers).where(like(dUsers.email, 'demo%@example.com'));
-    const cleared = members.filter((user) => user.aptitudeStatus === 'cleared');
-    expect(cleared).toHaveLength(DEMO_MEMBER_COUNT);
-    expect(cleared.some((user) => user.membershipStatus === 'active')).toBe(true);
-    expect(cleared.some((user) => user.membershipStatus === 'inactive')).toBe(true);
-    expect(cleared.every((user) => user.referencePhotoPath === null)).toBe(true);
+    expect(members).toHaveLength(DEMO_MEMBER_COUNT);
+    expect(members.every((user) => user.passwordHash !== null)).toBe(true);
+    expect(members.some((user) => user.membershipStatus === 'active')).toBe(true);
+    expect(members.some((user) => user.membershipStatus === 'inactive')).toBe(true);
+    expect(members.every((user) => user.referencePhotoPath === null)).toBe(true);
 
     const [memberships] = await db
       .select({ value: count() })
@@ -155,15 +152,23 @@ describe('seedDemo', () => {
     expect(plans.every((plan) => plan.planDate <= '2026-09-27')).toBe(true);
   });
 
-  it('seeds every certificate as uninspected by the AI, with one already decided by an admin', async () => {
+  it('has no applicants: every account in the system has completed registration or is staff', async () => {
     await seedDemo(db, NOW);
 
-    const certificates = await db.select().from(fMedicalCertificates);
-    expect(certificates).toHaveLength(DEMO_APPLICANT_COUNT);
-    expect(new Set(certificates.map((row) => row.aiResult))).toEqual(new Set(['pending_retry']));
-    expect(certificates.every((row) => row.aiNotes === UNINSPECTED_CERTIFICATE_NOTES)).toBe(true);
-    expect(certificates.some((row) => row.adminOverrideResult !== null)).toBe(true);
-    expect(certificates.some((row) => row.adminOverrideResult === null)).toBe(true);
+    const [withoutPassword] = await db.select({ value: count() }).from(dUsers).where(isNull(dUsers.passwordHash));
+    expect(withoutPassword!.value).toBe(0);
+  });
+
+  it('gives every demo member physical information, and exams to some', async () => {
+    await seedDemo(db, NOW);
+
+    const submissions = await db.select().from(fOnboardingSubmissions);
+    expect(submissions.every((row) => row.heightCm >= 100 && row.weightKg >= 30)).toBe(true);
+    expect(submissions.some((row) => row.exams.length > 0)).toBe(true);
+    expect(submissions.some((row) => row.exams.length === 0)).toBe(true);
+    expect(submissions.flatMap((row) => row.exams).every((exam) => exam.name !== '' && exam.findings !== '')).toBe(
+      true,
+    );
   });
 
   it('puts check-ins in the last 90 minutes, so the occupancy is not zero right after seeding', async () => {

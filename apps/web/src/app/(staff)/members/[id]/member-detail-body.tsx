@@ -7,7 +7,6 @@ import { MemberCheckInsSection } from '@/app/(staff)/members/[id]/member-check-i
 import { MemberFactsSection } from '@/app/(staff)/members/[id]/member-facts-section';
 import { MemberPlansSection } from '@/app/(staff)/members/[id]/member-plans-section';
 import { MemberProfileSection } from '@/app/(staff)/members/[id]/member-profile-section';
-import { AptitudeBadge } from '@/app/(staff)/members/aptitude-badge';
 import { MembershipControl } from '@/app/(staff)/members/membership-control';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
@@ -68,7 +67,7 @@ export function MemberDetailBody({ userId }: { userId: string }) {
             <EmptyState
               icon={UserXIcon}
               title="Member not found"
-              description="No member has this link. They may not have finished signing up, or the link is wrong."
+              description="No member has this link. The link may be wrong."
             />
           </div>
         ) : (
@@ -82,7 +81,7 @@ export function MemberDetailBody({ userId }: { userId: string }) {
     );
   }
 
-  const { profile, membership, aptitude, onboarding, facts, plans, checkInDates } = memberQuery.data;
+  const { profile, membership, onboarding, facts, plans, checkInDates } = memberQuery.data;
 
   return (
     <PageContainer>
@@ -108,12 +107,7 @@ export function MemberDetailBody({ userId }: { userId: string }) {
             </span>
           </span>
         }
-        actions={
-          <>
-            <MembershipControl userId={profile.id} name={profile.name} status={membership.status} />
-            <AptitudeBadge status={aptitude.status} />
-          </>
-        }
+        actions={<MembershipControl userId={profile.id} name={profile.name} status={membership.status} />}
       />
       <MemberProfileSection onboarding={onboarding} />
       <MemberFactsSection facts={facts} />

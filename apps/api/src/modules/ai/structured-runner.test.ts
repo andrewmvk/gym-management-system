@@ -1,15 +1,15 @@
 import { AI_REQUEST_TIMEOUT_MS } from '@api/modules/ai/client';
-import type { MockSwitches } from '@api/modules/ai/mock-fixtures';
 import { createAiRunner } from '@api/modules/ai/structured-runner';
-import { type AiPurpose, AiVerdictSchema } from '@api/modules/ai/types';
+import type { AiPurpose } from '@api/modules/ai/types';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { z } from 'zod';
 
 const API_KEY = 'sk-or-test-secret-key';
 const MODEL = 'test/free-model';
-const SYSTEM_PROMPT = 'You evaluate a health questionnaire.';
-const USER_PROMPT = 'Member Jane Doe reports a heart condition.';
+const SYSTEM_PROMPT = 'You are a gym coach.';
+const USER_PROMPT = 'Member Jane Doe reports a knee injury.';
 
+const ReplySchema = z.object({ reply: z.string(), mood: z.enum(['calm', 'urgent']) });
 const PlanSchema = z.object({
   exercises: z.array(z.object({ exerciseId: z.string(), sets: z.number(), reps: z.number() })),
 });
@@ -24,13 +24,13 @@ function setup(responses: (() => Promise<Response>)[]) {
   for (const respond of responses) fetchMock.mockImplementationOnce(respond);
   const log = { warn: vi.fn() };
   const runner = createAiRunner({ mode: 'live', apiKey: API_KEY, model: MODEL, fetch: fetchMock, log: log as never });
-  const run = (purpose: AiPurpose = 'aptitude') =>
-    runner.runStructured({ purpose, system: SYSTEM_PROMPT, user: USER_PROMPT, schema: AiVerdictSchema });
+  const run = (purpose: AiPurpose = 'chat') =>
+    runner.runStructured({ purpose, system: SYSTEM_PROMPT, user: USER_PROMPT, schema: ReplySchema });
   return { fetchMock, log, run };
 }
 
-const valid = () => Promise.resolve(completion('{"verdict":"cleared","notes":"ok"}'));
-const malformed = () => Promise.resolve(completion('{"verdict": cleared'));
+const valid = () => Promise.resolve(completion('{"reply":"ok","mood":"calm"}'));
+const malformed = () => Promise.resolve(completion('{"reply": ok'));
 
 afterEach(() => {
   vi.useRealTimers();
@@ -41,7 +41,7 @@ describe('runStructured in live mode', () => {
   it('returns the validated data on a 200 and sends the configured model and key', async () => {
     const { fetchMock, run } = setup([valid]);
 
-    await expect(run()).resolves.toEqual({ ok: true, data: { verdict: 'cleared', notes: 'ok' } });
+    await expect(run()).resolves.toEqual({ ok: true, data: { reply: 'ok', mood: 'calm' } });
 
     const [, init] = fetchMock.mock.calls[0]!;
     const body = JSON.parse(init!.body as string);
@@ -52,26 +52,27 @@ describe('runStructured in live mode', () => {
   });
 
   it('accepts JSON wrapped in a markdown fence', async () => {
-    const { run } = setup([() => Promise.resolve(completion('```json\n{"verdict":"not_cleared","notes":"x"}\n```'))]);
+    const { run } = setup([() => Promise.resolve(completion('```json\n{"reply":"x","mood":"urgent"}\n```'))]);
 
-    await expect(run()).resolves.toEqual({ ok: true, data: { verdict: 'not_cleared', notes: 'x' } });
+    await expect(run()).resolves.toEqual({ ok: true, data: { reply: 'x', mood: 'urgent' } });
   });
 
   it.each([
-    ['a 429', () => Promise.resolve(new Response('rate limited', { status: 429 }))],
-    ['a 500', () => Promise.resolve(new Response('boom', { status: 500 }))],
-    ['a network error', () => Promise.reject(new TypeError('fetch failed'))],
-    ['a malformed envelope', () => Promise.resolve(new Response('<html>', { status: 200 }))],
-  ])('returns unavailable without retrying on %s', async (_, respond) => {
-    const { fetchMock, run } = setup([respond]);
+    ['a 429', () => Promise.resolve(new Response('rate limited', { status: 429 })), 'http_429'],
+    ['a 500', () => Promise.resolve(new Response('boom', { status: 500 })), 'http_500'],
+    ['a network error', () => Promise.reject(new TypeError('fetch failed')), 'network_error'],
+    ['a malformed envelope', () => Promise.resolve(new Response('<html>', { status: 200 })), 'network_error'],
+  ])('returns unavailable without retrying on %s, logging its cause', async (_, respond, cause) => {
+    const { fetchMock, log, run } = setup([respond]);
 
     await expect(run()).resolves.toEqual({ ok: false, reason: 'unavailable' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledWith({ purpose: 'chat', reason: 'unavailable', cause }, 'ai call failed');
   });
 
   it('returns unavailable when the request times out', async () => {
     vi.useFakeTimers();
-    const { fetchMock, run } = setup([]);
+    const { fetchMock, log, run } = setup([]);
     fetchMock.mockImplementationOnce(
       (_, init) =>
         new Promise<Response>((_, reject) => {
@@ -84,6 +85,10 @@ describe('runStructured in live mode', () => {
 
     await expect(pending).resolves.toEqual({ ok: false, reason: 'unavailable' });
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(log.warn).toHaveBeenCalledWith(
+      { purpose: 'chat', reason: 'unavailable', cause: 'timeout' },
+      'ai call failed',
+    );
   });
 
   it('retries once on invalid JSON and then returns invalid_output', async () => {
@@ -94,7 +99,7 @@ describe('runStructured in live mode', () => {
   });
 
   it('retries once on output that fails the schema', async () => {
-    const wrongShape = () => Promise.resolve(completion('{"verdict":"maybe","notes":"?"}'));
+    const wrongShape = () => Promise.resolve(completion('{"reply":"?","mood":"maybe"}'));
     const { fetchMock, run } = setup([wrongShape, wrongShape]);
 
     await expect(run()).resolves.toEqual({ ok: false, reason: 'invalid_output' });
@@ -104,7 +109,7 @@ describe('runStructured in live mode', () => {
   it('succeeds when the retry returns valid output', async () => {
     const { fetchMock, run } = setup([malformed, valid]);
 
-    await expect(run()).resolves.toEqual({ ok: true, data: { verdict: 'cleared', notes: 'ok' } });
+    await expect(run()).resolves.toEqual({ ok: true, data: { reply: 'ok', mood: 'calm' } });
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
@@ -117,9 +122,9 @@ describe('runStructured in live mode', () => {
   it('logs only the purpose and reason, never the key or the prompts', async () => {
     const { log, run } = setup([malformed, malformed]);
 
-    await run('certificate');
+    await run('plan');
 
-    expect(log.warn).toHaveBeenCalledWith({ purpose: 'certificate', reason: 'invalid_output' }, 'ai call failed');
+    expect(log.warn).toHaveBeenCalledWith({ purpose: 'plan', reason: 'invalid_output' }, 'ai call failed');
     const logged = JSON.stringify(log.warn.mock.calls);
     expect(logged).not.toContain(API_KEY);
     expect(logged).not.toContain(USER_PROMPT);
@@ -128,35 +133,14 @@ describe('runStructured in live mode', () => {
 });
 
 describe('runStructured in mock mode', () => {
-  function mockRunner(switches: Partial<MockSwitches> = {}) {
+  function mockRunner() {
     const fetchSpy = vi.fn();
     vi.stubGlobal('fetch', fetchSpy);
-    const runner = createAiRunner({
-      mode: 'mock',
-      mock: { aptitude: 'cleared', certificate: 'cleared', ...switches },
-      log: { warn: vi.fn() } as never,
-    });
+    const runner = createAiRunner({ mode: 'mock', log: { warn: vi.fn() } as never });
     return { fetchSpy, runner };
   }
 
-  it.each(['aptitude', 'certificate'] as const)(
-    'honors each %s switch without touching the network',
-    async (purpose) => {
-      for (const verdict of ['cleared', 'not_cleared'] as const) {
-        const { fetchSpy, runner } = mockRunner({ [purpose]: verdict });
-        const result = await runner.runStructured({ purpose, system: '', user: '', schema: AiVerdictSchema });
-        expect(result).toMatchObject({ ok: true, data: { verdict } });
-        expect(fetchSpy).not.toHaveBeenCalled();
-      }
-
-      const { fetchSpy, runner } = mockRunner({ [purpose]: 'unavailable' });
-      const result = await runner.runStructured({ purpose, system: '', user: '', schema: AiVerdictSchema });
-      expect(result).toEqual({ ok: false, reason: 'unavailable' });
-      expect(fetchSpy).not.toHaveBeenCalled();
-    },
-  );
-
-  it('returns deterministic plan and chat fixtures', async () => {
+  it('returns deterministic plan and chat fixtures without touching the network', async () => {
     const { fetchSpy, runner } = mockRunner();
 
     const plan = await runner.runStructured({ purpose: 'plan', system: '', user: '', schema: PlanSchema });

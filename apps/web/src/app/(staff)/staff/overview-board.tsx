@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ClipboardCheckIcon, MessageSquareIcon } from 'lucide-react';
 import { useAppAbility } from '@/abilities';
-import { CertificatesWaiting } from '@/app/(staff)/staff/certificates-waiting';
 import { OverviewRow } from '@/app/(staff)/staff/overview-row';
 import { TurnstileStatus } from '@/app/(staff)/staff/turnstile-status';
 import { Deferred } from '@/components/deferred';
@@ -19,14 +18,13 @@ function OverviewBoardSkeleton() {
     <ul className={LIST_CLASS}>
       <OverviewRow.Skeleton />
       <OverviewRow.Skeleton />
-      {ability.can('manage', 'MedicalCertificate') && <OverviewRow.Skeleton />}
       {ability.can('read', 'CheckIn') && <OverviewRow.Skeleton />}
     </ul>
   );
 }
 
 // Lines that each open the page that owns them: plans that must be reviewed, plans a trainer touched
-// recently, and (admin) certificates waiting and failed turnstile check-ins.
+// recently, and (admin) failed turnstile check-ins.
 function OverviewBoardRoot() {
   const trpc = useTRPC();
   const query = useQuery(trpc.reviews.overview.queryOptions());
@@ -89,7 +87,6 @@ function OverviewBoardRoot() {
           )
         }
       />
-      <CertificatesWaiting />
       <TurnstileStatus />
     </ul>
   );

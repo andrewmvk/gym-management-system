@@ -80,6 +80,31 @@ describe('chat', () => {
       expect(rows.every((r) => (r.payload as { description: string }).description)).toBe(true);
     });
 
+    it('tells the AI today’s date so a proposed adjustment can target the right day', async () => {
+      const member = await createMember();
+      const evaluateChat = vi.fn<EvaluateChat>(async () => ({ ok: true, data: { reply: 'Ok.', facts: [] } }));
+
+      await sendMessage(member.id, 'Make today easier', { evaluateChat });
+
+      expect(evaluateChat.mock.calls[0]![0]).toContain(`Today's date: ${todayLocal()}`);
+    });
+
+    it('moves an adjustment for a past day with no plan to today, and keeps one for a day that has a plan', async () => {
+      const member = await createMember();
+      await createPastPlan(member.id, '2020-01-02', ['Push-Up']);
+      const adjustmentFor =
+        (date: string): EvaluateChat =>
+        async () => ({ ok: true, data: { reply: 'Ok.', facts: [], adjustment: { date, instruction: 'Easier' } } });
+
+      const missing = await sendMessage(member.id, 'Easier please', { evaluateChat: adjustmentFor('2020-01-01') });
+      const existing = await sendMessage(member.id, 'Easier please', { evaluateChat: adjustmentFor('2020-01-02') });
+      const future = await sendMessage(member.id, 'Easier please', { evaluateChat: adjustmentFor('2999-01-01') });
+
+      expect(missing.adjustment).toEqual({ date: todayLocal(), instruction: 'Easier' });
+      expect(existing.adjustment?.date).toBe('2020-01-02');
+      expect(future.adjustment?.date).toBe('2999-01-01');
+    });
+
     it('truncates the stored source_message to 200 characters', async () => {
       const member = await createMember();
       const longMessage = 'a'.repeat(250);
@@ -408,13 +433,17 @@ describe('chat', () => {
 
     it('includes profile, onboarding, plan, risk, catalog, and aggregate data in the prompt', () => {
       const context: ChatContext = {
+        today: '2026-10-01',
         ageYears: 30,
         gender: 'female',
         onboardingSubmissions: [
           {
+            heightCm: 165,
+            weightKg: 58.5,
             goals: 'Get stronger',
             medications: ['Ibuprofen'],
             physicalConditions: { conditions: ['asthma'], otherNotes: undefined },
+            exams: [{ name: 'Spirometry', date: '2026-07-01', findings: 'Mild reduction at rest.' }],
           } as never,
         ],
         recentEvents: [{ eventType: 'skipped_exercise', payload: { description: 'skipped leg day' } } as never],
@@ -443,9 +472,12 @@ describe('chat', () => {
 
       const prompt = buildChatUserPrompt(context, 'Should I train legs today?');
 
+      expect(prompt).toContain("Today's date: 2026-10-01");
       expect(prompt).toContain('Member age: 30');
       expect(prompt).toContain('Member gender: female');
       expect(prompt).toContain('Goals: Get stronger');
+      expect(prompt).toContain('Height: 165 cm, weight: 58.5 kg');
+      expect(prompt).toContain('Spirometry (2026-07-01): Mild reduction at rest.');
       expect(prompt).toContain('Barbell Back Squat');
       expect(prompt).toContain('skipped leg day');
       expect(prompt).toContain('sore left knee');
@@ -460,6 +492,7 @@ describe('chat', () => {
 
     it('reports no plan and no events gracefully', () => {
       const context: ChatContext = {
+        today: '2026-10-01',
         ageYears: null,
         gender: null,
         onboardingSubmissions: [],

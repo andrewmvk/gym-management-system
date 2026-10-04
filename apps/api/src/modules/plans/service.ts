@@ -1,8 +1,7 @@
 import { env } from '@api/config/env';
-import type { AptitudeQuestionnaire, ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
+import type { OnboardingSubmission, ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
 import { localDateString, startOfLocalDay, todayLocal } from '@api/lib/dates';
 import { type AiResult, runStructured } from '@api/modules/ai';
-import { findQuestionnaireByUserId } from '@api/modules/aptitude/repository';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
 import { findFocusByUserId } from '@api/modules/focus/repository';
@@ -10,7 +9,6 @@ import { findCheckInTimes } from '@api/modules/metrics/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import type { DemandRow, MemberReviewRow, PlanExerciseInput, PlanHistoryRow } from '@api/modules/plans/repository';
 import * as repository from '@api/modules/plans/repository';
-import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
 import { computeMuscleLoad, type MuscleLoad, rankMuscles } from '@cadence/shared/schemas/muscle-heat';
 import {
   type ExerciseMuscle,
@@ -163,21 +161,28 @@ export function buildTrainerNoteLines(reviews: readonly MemberReviewRow[]): stri
   return lines;
 }
 
-const questionText = new Map(QUESTIONNAIRE_V1.map((question) => [question.id, question.text]));
-
-export function buildQuestionnaireLines(
-  questionnaire: Pick<AptitudeQuestionnaire, 'answers' | 'aiNotes'> | null,
-): string[] {
-  if (!questionnaire) return [];
-  const lines = ['Health screening questionnaire answered at signup (health context):'];
-  const yes = questionnaire.answers.filter((answer) => answer.answer);
-  if (yes.length === 0) lines.push('- every question answered no');
-  for (const answer of yes) {
-    const detail = answer.detail ? ` Detail: ${answer.detail}` : '';
-    lines.push(`- Yes: ${questionText.get(answer.questionId) ?? answer.questionId}${detail}`);
+// Shared by the plan and chat prompts. The AI module carries text only, so an exam contributes its typed
+// findings; its attached file is never read (FR-12).
+export function buildOnboardingLines(submissions: readonly OnboardingSubmission[]): string[] {
+  const lines = [
+    'Onboarding submissions (most recent first; the first is the current truth, older ones only add history that it does not contradict):',
+  ];
+  for (const submission of submissions) {
+    const conditions = submission.physicalConditions.conditions.join(', ') || 'none';
+    const otherNotes = submission.physicalConditions.otherNotes ? ` (${submission.physicalConditions.otherNotes})` : '';
+    lines.push(`- Height: ${submission.heightCm} cm, weight: ${submission.weightKg} kg`);
+    lines.push(`  Goals: ${submission.goals}`);
+    lines.push(`  Medications: ${submission.medications.join(', ') || 'none'}`);
+    lines.push(`  Conditions: ${conditions}${otherNotes}`);
+    if (submission.exams.length === 0) {
+      lines.push('  Medical exams: none');
+      continue;
+    }
+    lines.push('  Medical exams:');
+    for (const exam of submission.exams) {
+      lines.push(`  - ${exam.name}${exam.date ? ` (${exam.date})` : ''}: ${exam.findings}`);
+    }
   }
-  if (yes.length > 0) lines.push('- every other question answered no');
-  if (questionnaire.aiNotes) lines.push(`Screening notes: ${questionnaire.aiNotes}`);
   return lines;
 }
 
@@ -190,7 +195,6 @@ export interface PlanContext {
   planHistory: PlanHistoryRow[];
   checkInDates: string[];
   trainerReviews: MemberReviewRow[];
-  questionnaire: AptitudeQuestionnaire | null;
   demand: PlanDemand;
   availableExercises: AvailableExercise[];
   muscleFocus: MemberMuscleFocus[];
@@ -205,7 +209,6 @@ async function assemblePlanContext(userId: string, planDate: string): Promise<Pl
     planHistory,
     checkInTimes,
     trainerReviews,
-    questionnaire,
     demandRows,
     catalog,
     muscleFocus,
@@ -216,7 +219,6 @@ async function assemblePlanContext(userId: string, planDate: string): Promise<Pl
     repository.findPlanHistory(userId, since, planDate),
     findCheckInTimes(userId, startOfLocalDay(since), startOfLocalDay(planDate)),
     repository.findRecentReviewsForMember(userId, TRAINER_NOTES_LIMIT),
-    findQuestionnaireByUserId(userId),
     repository.findDemandRowsForDate(planDate, userId),
     listExercises(),
     findFocusByUserId(userId),
@@ -232,7 +234,6 @@ async function assemblePlanContext(userId: string, planDate: string): Promise<Pl
     planHistory,
     checkInDates: [...new Set(checkInTimes.map((time) => localDateString(time)))].sort().reverse(),
     trainerReviews,
-    questionnaire,
     demand: computePlanDemand(demandRows, catalog),
     availableExercises: catalog.filter((exercise) => exercise.isAvailable),
     muscleFocus,
@@ -271,13 +272,15 @@ const PLAN_SYSTEM_PROMPT =
   'Each catalog exercise lists the muscles it trains as primary or secondary. Use the member muscle focus ' +
   'to steer the balance of the plan: give muscles with a positive focus more exercises and sets, and muscles ' +
   'with a negative focus fewer, with -2 meaning avoid training that muscle as a primary target unless needed. ' +
-  'Focus is a preference only: injuries, medical conditions and safety always override it, and a plan must ' +
-  'never be built from the focus alone. Reason from the member history you are given: the recent plans with ' +
-  'what was done and not done, the check-in dates, the remembered facts and the health screening answers. ' +
+  'Focus is a preference only: injuries, medical conditions, medications, exam findings and safety always ' +
+  'override it, and a plan must never be built from the focus alone. Size the load to the height and weight ' +
+  'you are given and read the medical exam findings for anything that limits what the member can do. Reason ' +
+  'from the member history you are given: the recent plans with what was done and not done, the check-in ' +
+  'dates and the remembered facts. ' +
   "Trainer notes and edits are guidance from the member's own trainer, so follow them. You are also told how " +
   "many other members' plans already use each piece of equipment and train each muscle on that date. When the " +
   "member's goal is broad, spread the exercises across different equipment and avoid pieces other members " +
-  'already need heavily, but safety, injuries, medication and muscle focus always win over that spreading. ' +
+  'already need heavily, but safety, injuries, medication, exams and muscle focus always win over that spreading. ' +
   'Respond only with the chosen exercises.';
 
 export function buildPlanUserPrompt(context: PlanContext, instruction?: string): string {
@@ -285,18 +288,7 @@ export function buildPlanUserPrompt(context: PlanContext, instruction?: string):
   lines.push(`Plan date: ${context.planDate}`);
   lines.push(context.ageYears !== null ? `Member age: ${context.ageYears}` : 'Member age: unknown');
 
-  lines.push(
-    'Onboarding submissions (most recent first; the first is the current truth, older ones only add history that it does not contradict):',
-  );
-  for (const submission of context.onboardingSubmissions) {
-    const conditions = submission.physicalConditions.conditions.join(', ') || 'none';
-    const otherNotes = submission.physicalConditions.otherNotes ? ` (${submission.physicalConditions.otherNotes})` : '';
-    lines.push(`- Goals: ${submission.goals}`);
-    lines.push(`  Medications: ${submission.medications.join(', ') || 'none'}`);
-    lines.push(`  Conditions: ${conditions}${otherNotes}`);
-  }
-
-  lines.push(...buildQuestionnaireLines(context.questionnaire));
+  lines.push(...buildOnboardingLines(context.onboardingSubmissions));
 
   if (context.profileEvents.length > 0) {
     lines.push('Remembered facts about the member (still unresolved, newest first):');

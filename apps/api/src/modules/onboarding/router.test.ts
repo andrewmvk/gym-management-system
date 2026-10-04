@@ -38,10 +38,12 @@ async function callerFor(token?: string) {
 
 function basicInput(overrides: Partial<OnboardingSubmitInput> = {}): OnboardingSubmitInput {
   return {
+    heightCm: 178,
+    weightKg: 82.5,
     medications: ['Ibuprofen'],
     physicalConditions: { conditions: ['Knee injury'], otherNotes: 'Prefers morning sessions' },
     goals: 'Lose weight and build endurance',
-    attachments: [],
+    exams: [],
     ...overrides,
   };
 }
@@ -53,18 +55,126 @@ describe('onboarding', () => {
   });
   afterAll(() => pool.end());
 
-  it('submits onboarding data and stores each attachment through the uploads adapter', async () => {
+  it('submits the physical information, goals and medications', async () => {
     const member = await createUser('member1@example.com', MEMBER_POLICY_IDS);
     const caller = await callerFor(signSessionToken(member.id));
 
+    const result = await caller.onboarding.submit(basicInput());
+
+    expect(result).toMatchObject({ heightCm: 178, weightKg: 82.5, medications: ['Ibuprofen'], exams: [] });
+    expect(result.goals).toBe('Lose weight and build endurance');
+  });
+
+  it('requires height and weight', async () => {
+    const member = await createUser('member-measures@example.com', MEMBER_POLICY_IDS);
+    const caller = await callerFor(signSessionToken(member.id));
+    const { heightCm: _height, ...withoutHeight } = basicInput();
+    const { weightKg: _weight, ...withoutWeight } = basicInput();
+
+    await expect(caller.onboarding.submit(withoutHeight as OnboardingSubmitInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller.onboarding.submit(withoutWeight as OnboardingSubmitInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller.onboarding.submit(basicInput({ heightCm: 17.5 }))).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    await expect(caller.onboarding.submit(basicInput({ weightKg: 70.55 }))).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+    expect(await caller.onboarding.listMine()).toEqual([]);
+  });
+
+  it('accepts none for exams and medications', async () => {
+    const member = await createUser('member-none@example.com', MEMBER_POLICY_IDS);
+    const caller = await callerFor(signSessionToken(member.id));
+
     const result = await caller.onboarding.submit(
-      basicInput({ attachments: [{ filename: 'exam.jpg', mimeType: 'image/jpeg', base64: TINY_JPEG_BASE64 }] }),
+      basicInput({ exams: [], medications: [], physicalConditions: { conditions: [] } }),
     );
 
-    expect(result.medications).toEqual(['Ibuprofen']);
-    expect(result.goals).toBe('Lose weight and build endurance');
-    expect(result.examAttachmentPaths).toHaveLength(1);
-    expect(result.examAttachmentPaths[0]).toContain(member.id);
+    expect(result).toMatchObject({ exams: [], medications: [] });
+    expect((await caller.onboarding.getStatus()).completed).toBe(true);
+  });
+
+  it('stores the typed findings of each exam and its attachment through the uploads adapter', async () => {
+    const member = await createUser('member-exams@example.com', MEMBER_POLICY_IDS);
+    const caller = await callerFor(signSessionToken(member.id));
+
+    const result = await caller.onboarding.submit(
+      basicInput({
+        exams: [
+          {
+            name: 'Knee X-ray',
+            date: '2026-08-12',
+            findings: 'Mild narrowing, no fracture.',
+            attachment: { filename: 'xray.jpg', mimeType: 'image/jpeg', base64: TINY_JPEG_BASE64 },
+          },
+          { name: 'Blood test', findings: 'All values normal.' },
+        ],
+      }),
+    );
+
+    expect(result.exams).toHaveLength(2);
+    expect(result.exams[0]).toMatchObject({
+      name: 'Knee X-ray',
+      date: '2026-08-12',
+      findings: 'Mild narrowing, no fracture.',
+    });
+    expect(result.exams[0]?.attachmentPath).toMatch(new RegExp(`^${member.id}/exam/.+\\.jpg$`));
+    expect(result.exams[1]).toEqual({ name: 'Blood test', findings: 'All values normal.' });
+  });
+
+  it('keeps the attachment an exam already had when the update form sends its path back', async () => {
+    const member = await createUser('member-keep@example.com', MEMBER_POLICY_IDS);
+    const caller = await callerFor(signSessionToken(member.id));
+    const first = await caller.onboarding.submit(
+      basicInput({
+        exams: [
+          {
+            name: 'Knee X-ray',
+            findings: 'Mild narrowing.',
+            attachment: { filename: 'xray.jpg', mimeType: 'image/jpeg', base64: TINY_JPEG_BASE64 },
+          },
+        ],
+      }),
+    );
+    const keptPath = first.exams[0]!.attachmentPath!;
+
+    const second = await caller.onboarding.submit(
+      basicInput({ exams: [{ name: 'Knee X-ray', findings: 'Unchanged.', attachmentPath: keptPath }] }),
+    );
+
+    expect(second.exams[0]?.attachmentPath).toBe(keptPath);
+  });
+
+  it('refuses an exam attachment path that is not one of the member’s own exam files', async () => {
+    const member = await createUser('member-path@example.com', MEMBER_POLICY_IDS);
+    const other = await createUser('member-other@example.com', MEMBER_POLICY_IDS);
+    const caller = await callerFor(signSessionToken(member.id));
+    const foreignPath = `${other.id}/exam/00000000-0000-0000-0000-000000000000.jpg`;
+
+    await expect(
+      caller.onboarding.submit(basicInput({ exams: [{ name: 'X-ray', findings: 'ok', attachmentPath: foreignPath }] })),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(
+      caller.onboarding.submit(
+        basicInput({ exams: [{ name: 'X-ray', findings: 'ok', attachmentPath: '../../etc/passwd' }] }),
+      ),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
+
+  it('requires a name and typed findings for every exam', async () => {
+    const member = await createUser('member-incomplete@example.com', MEMBER_POLICY_IDS);
+    const caller = await callerFor(signSessionToken(member.id));
+
+    await expect(
+      caller.onboarding.submit(basicInput({ exams: [{ name: 'X-ray', findings: '  ' }] })),
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    await expect(caller.onboarding.submit(basicInput({ exams: [{ name: '', findings: 'ok' }] }))).rejects.toMatchObject(
+      { code: 'BAD_REQUEST' },
+    );
   });
 
   it('keeps both rows when a member submits twice', async () => {
@@ -115,14 +225,23 @@ describe('onboarding', () => {
     await expect(caller.onboarding.submit(basicInput())).rejects.toMatchObject({ code: 'FORBIDDEN' });
   });
 
-  it('rejects an invalid attachment with a clear message', async () => {
+  it('rejects an invalid exam attachment with a clear message and stores nothing', async () => {
     const member = await createUser('member4@example.com', MEMBER_POLICY_IDS);
     const caller = await callerFor(signSessionToken(member.id));
 
     await expect(
       caller.onboarding.submit(
-        basicInput({ attachments: [{ filename: 'notes.txt', mimeType: 'text/plain', base64: 'not-a-real-file' }] }),
+        basicInput({
+          exams: [
+            {
+              name: 'Notes',
+              findings: 'ok',
+              attachment: { filename: 'notes.txt', mimeType: 'text/plain', base64: 'not-a-real-file' },
+            },
+          ],
+        }),
       ),
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(await caller.onboarding.listMine()).toEqual([]);
   });
 });

@@ -22,7 +22,7 @@ function at(date: string, time: string) {
 }
 
 async function createMember(email: string) {
-  const [member] = await db.insert(dUsers).values({ email, name: email, aptitudeStatus: 'cleared' }).returning();
+  const [member] = await db.insert(dUsers).values({ email, name: email }).returning();
   return member!;
 }
 

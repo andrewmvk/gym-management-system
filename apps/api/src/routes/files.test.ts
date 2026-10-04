@@ -8,7 +8,7 @@ import { createApp } from '@api/app';
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
 import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
-import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
+import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import { SESSION_COOKIE, signSessionToken } from '@api/modules/auth/session';
 import { resetTestDatabase } from '@api/test/database';
 import { MEMBER_POLICY_IDS } from '@cadence/shared/auth';
@@ -22,7 +22,7 @@ let server: Server;
 let baseUrl: string;
 
 async function createMember(email: string) {
-  const [member] = await db.insert(dUsers).values({ email, name: email, aptitudeStatus: 'cleared' }).returning();
+  const [member] = await db.insert(dUsers).values({ email, name: email }).returning();
   await db
     .insert(fUserPolicyOnUser)
     .values(MEMBER_POLICY_IDS.map((policyId) => ({ userId: member!.id, policyId, effect: 'granted' as const })));
@@ -89,14 +89,6 @@ describe('GET /files/*', () => {
     expect((await get(file, await userIdByEmail(SEED_ADMIN_EMAIL))).status).toBe(403);
   });
 
-  it('serves certificates only to a holder of review_certificates', async () => {
-    const file = await storeFile(ownerId, 'certificate');
-
-    expect((await get(file, await userIdByEmail(SEED_ADMIN_EMAIL))).status).toBe(200);
-    expect((await get(file, await userIdByEmail(SEED_TRAINER_EMAIL))).status).toBe(403);
-    expect((await get(file, ownerId)).status).toBe(403);
-  });
-
   it('never serves a reference photo, not even to its owner or an admin', async () => {
     const file = await storeFile(ownerId, 'reference_photo');
 
@@ -109,6 +101,7 @@ describe('GET /files/*', () => {
       `${ownerId}/exam`,
       `${ownerId}/exam/notes.txt`,
       `${ownerId}/unknown/${randomUUID()}.jpg`,
+      `${ownerId}/certificate/${randomUUID()}.jpg`,
       `..%2F..%2F${ownerId}/exam/${randomUUID()}.jpg`,
       `${ownerId}/exam/..%2F..%2F..%2Fsecret.jpg`,
       `${ownerId}/exam/${randomUUID()}.jpg`,
@@ -134,7 +127,7 @@ describe('tRPC body limit', () => {
   });
 
   it('does not apply the default limit to a file procedure', async () => {
-    const response = await fetch(`${baseUrl}/trpc/aptitude.submitSignup`, {
+    const response = await fetch(`${baseUrl}/trpc/auth.register`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: oversizedBody,

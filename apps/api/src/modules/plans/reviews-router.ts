@@ -28,8 +28,8 @@ const EditPlanInputSchema = z.object({
   note: z.string().trim().optional(),
 });
 
-// Registered as the top-level "reviews" router (same reasoning as P-10's "certificates"): the
-// procedure names read naturally as reviews.queue/getPlan/addNote/editPlan, not nested under plans.
+// Registered as the top-level "reviews" router: the procedure names read naturally as
+// reviews.queue/getPlan/addNote/editPlan, not nested under plans.
 export const reviewsRouter = router({
   // read_all_plans (scope all) only: see ANY_TRAINING_PLAN above for why a bare type check would
   // wrongly admit a member's self-scoped read_own_plans grant too.

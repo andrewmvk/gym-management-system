@@ -10,7 +10,6 @@ const memberColumns = {
   phone: dUsers.phone,
   birthdate: dUsers.birthdate,
   gender: dUsers.gender,
-  aptitudeStatus: dUsers.aptitudeStatus,
   membershipStatus: dUsers.membershipStatus,
   membershipPlan: dUsers.membershipPlan,
   createdAt: dUsers.createdAt,
@@ -32,7 +31,6 @@ export async function updateMembershipStatus(
     email: dUsers.email,
     membershipStatus: dUsers.membershipStatus,
     membershipPlan: dUsers.membershipPlan,
-    aptitudeStatus: dUsers.aptitudeStatus,
   });
   return member!;
 }

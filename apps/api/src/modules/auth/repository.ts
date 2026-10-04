@@ -1,5 +1,13 @@
 import { type DatabaseExecutor, db } from '@api/db/client';
-import { dUserPolicy, dUserPolicyGroupPolicy, dUsers, fUserPolicyGroupOnUser, fUserPolicyOnUser } from '@api/db/schema';
+import {
+  dUserPolicy,
+  dUserPolicyGroupPolicy,
+  dUsers,
+  fConsentEvents,
+  fUserPolicyGroupOnUser,
+  fUserPolicyOnUser,
+  type User,
+} from '@api/db/schema';
 import type { PolicyGroupId } from '@cadence/shared/auth';
 import { and, asc, eq, gt, isNotNull, isNull, or } from 'drizzle-orm';
 
@@ -13,7 +21,7 @@ export async function findUserById(id: string, executor: DatabaseExecutor = db) 
   return user ?? null;
 }
 
-// FR-40: members are the accounts that went through activation, so they alone carry a membership status. The
+// FR-40: members are the accounts created by registration, so they alone carry a membership status. The
 // columns are listed one by one so the embedding and the photo path can never reach a caller.
 export function listMembers(executor: DatabaseExecutor = db) {
   return executor
@@ -23,26 +31,47 @@ export function listMembers(executor: DatabaseExecutor = db) {
       email: dUsers.email,
       membershipStatus: dUsers.membershipStatus,
       membershipPlan: dUsers.membershipPlan,
-      aptitudeStatus: dUsers.aptitudeStatus,
     })
     .from(dUsers)
     .where(isNotNull(dUsers.membershipStatus))
     .orderBy(asc(dUsers.name), asc(dUsers.email));
 }
 
-// FR-9: turns a cleared applicant into a member. Called inside a transaction alongside assignGroup
-// so the row update and the policy grants either both land or neither does.
-export async function activateMember(
-  id: string,
-  input: { passwordHash: string; membershipPlan: string },
+// FR-9: the member row of a registration. Called inside a transaction alongside the consent event and
+// assignGroup so the account, the consent and the policy grants either all land or none does.
+export async function insertMember(
+  input: {
+    name: string;
+    phone: string;
+    email: string;
+    birthdate: string;
+    gender?: User['gender'];
+    passwordHash: string;
+    membershipPlan: string;
+  },
   executor: DatabaseExecutor = db,
 ) {
   const [user] = await executor
-    .update(dUsers)
-    .set({ passwordHash: input.passwordHash, membershipStatus: 'active', membershipPlan: input.membershipPlan })
-    .where(eq(dUsers.id, id))
+    .insert(dUsers)
+    .values({ ...input, membershipStatus: 'active' })
     .returning();
   return user!;
+}
+
+export async function insertConsentEvent(
+  input: { userId: string; consentType: string; consentVersion: string },
+  executor: DatabaseExecutor = db,
+) {
+  const [event] = await executor.insert(fConsentEvents).values(input).returning();
+  return event!;
+}
+
+export async function saveReferencePhoto(
+  id: string,
+  input: { referencePhotoPath: string; referenceFaceEmbedding: number[] },
+  executor: DatabaseExecutor = db,
+) {
+  await executor.update(dUsers).set(input).where(eq(dUsers.id, id));
 }
 
 export async function assignGroup(userId: string, groupId: PolicyGroupId, executor: DatabaseExecutor = db) {

@@ -52,7 +52,6 @@ export interface GroupOption {
 const SUBJECT_LABELS: Record<Subject, string> = {
   TrainingPlan: 'training plans',
   PlanReview: 'plan reviews',
-  MedicalCertificate: 'medical certificates',
   Catalog: 'the catalog',
   Onboarding: 'onboarding',
   ProfileEvent: 'remembered facts',

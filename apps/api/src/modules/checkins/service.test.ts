@@ -27,10 +27,10 @@ async function configureTurnstile(config: Partial<typeof dTurnstileConfig.$infer
   });
 }
 
-async function createMember(aptitudeStatus: 'cleared' | 'pending' | 'rejected' = 'cleared') {
+async function createMember() {
   const [member] = await db
     .insert(dUsers)
-    .values({ email: `${crypto.randomUUID()}@example.com`, name: 'Member', aptitudeStatus })
+    .values({ email: `${crypto.randomUUID()}@example.com`, name: 'Member' })
     .returning();
   return member!.id;
 }
@@ -176,24 +176,20 @@ describe('recordCheckIn (RN-09)', () => {
     ]);
   });
 
-  it('records nothing for an unknown or non-cleared member and never calls the turnstile', async () => {
+  it('records nothing for an unknown member and never calls the turnstile', async () => {
     await configureTurnstile({});
-    const pending = await createMember('pending');
-    const rejected = await createMember('rejected');
 
     expect(await recordCheckIn(crypto.randomUUID())).toEqual({ kind: 'member_not_found' });
-    expect(await recordCheckIn(pending)).toEqual({ kind: 'member_not_cleared' });
-    expect(await recordCheckIn(rejected)).toEqual({ kind: 'member_not_cleared' });
 
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
     expect(received).toHaveLength(0);
   });
 
-  it('refuses a cleared member whose membership is inactive: no turnstile call and no check-in row', async () => {
+  it('refuses a member whose membership is inactive: no turnstile call and no check-in row', async () => {
     await configureTurnstile({});
     const [lapsed] = await db
       .insert(dUsers)
-      .values({ email: 'lapsed@example.com', name: 'Lapsed', aptitudeStatus: 'cleared', membershipStatus: 'inactive' })
+      .values({ email: 'lapsed@example.com', name: 'Lapsed', membershipStatus: 'inactive' })
       .returning();
 
     expect(await recordCheckIn(lapsed!.id)).toEqual({ kind: 'member_inactive' });
@@ -206,7 +202,7 @@ describe('recordCheckIn (RN-09)', () => {
     await configureTurnstile({});
     const [member] = await db
       .insert(dUsers)
-      .values({ email: 'back@example.com', name: 'Back', aptitudeStatus: 'cleared', membershipStatus: 'inactive' })
+      .values({ email: 'back@example.com', name: 'Back', membershipStatus: 'inactive' })
       .returning();
     await recordCheckIn(member!.id);
     await db.update(dUsers).set({ membershipStatus: 'active' }).where(eq(dUsers.id, member!.id));

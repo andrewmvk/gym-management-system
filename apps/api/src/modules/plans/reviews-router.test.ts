@@ -3,7 +3,6 @@ import {
   dExercises,
   dGymEquipment,
   dUsers,
-  fAptitudeQuestionnaires,
   fCheckIns,
   fOnboardingSubmissions,
   fPlanReviews,
@@ -23,7 +22,6 @@ import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
 import { MEMBER_POLICY_IDS, TRAINER_POLICY_IDS, UPDATE_ALL_PLANS } from '@cadence/shared/auth';
-import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -136,27 +134,28 @@ describe('reviews router', () => {
       ]);
     });
 
-    it('adds the member context: who they are, onboarding, remembered facts and the aptitude answers', async () => {
+    it('adds the member context: who they are, onboarding with physical information and exams, and remembered facts', async () => {
       const { member, plan } = await createMemberWithPlan();
-      await db
-        .update(dUsers)
-        .set({ birthdate: '1990-01-15', aptitudeStatus: 'cleared' })
-        .where(eq(dUsers.id, member.id));
+      await db.update(dUsers).set({ birthdate: '1990-01-15' }).where(eq(dUsers.id, member.id));
       await db.insert(fOnboardingSubmissions).values([
         {
           userId: member.id,
+          heightCm: 170,
+          weightKg: 80,
           medications: ['Old pill'],
           physicalConditions: { conditions: [] },
           goals: 'Old goal',
-          examAttachmentPaths: [],
+          exams: [],
           submittedAt: new Date('2026-08-01T10:00:00Z'),
         },
         {
           userId: member.id,
+          heightCm: 171,
+          weightKg: 76.5,
           medications: ['Ibuprofen'],
           physicalConditions: { conditions: ['Asthma'], otherNotes: 'Prefers mornings' },
           goals: 'Lose weight',
-          examAttachmentPaths: [],
+          exams: [{ name: 'Spirometry', date: '2026-07-01', findings: 'Mild reduction at rest.' }],
           submittedAt: new Date('2026-09-01T10:00:00Z'),
         },
       ]);
@@ -188,16 +187,6 @@ describe('reviews router', () => {
           payload: { description: 'Muscle focus for Chest changed' },
         },
       ]);
-      await db.insert(fAptitudeQuestionnaires).values({
-        userId: member.id,
-        answers: QUESTIONNAIRE_V1.map((question) => ({
-          questionId: question.id,
-          answer: question.id === 'current_injury',
-          ...(question.id === 'current_injury' ? { detail: 'Left ankle' } : {}),
-        })),
-        aiResult: 'cleared',
-        aiNotes: 'Minor ankle injury, cleared with care.',
-      });
       const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
 
       const { memberContext } = await caller.reviews.getPlan({ planId: plan.id });
@@ -206,29 +195,23 @@ describe('reviews router', () => {
         name: 'Review Test Member',
         age: expect.any(Number),
         onboarding: {
+          heightCm: 171,
+          weightKg: 76.5,
           goals: 'Lose weight',
           medications: ['Ibuprofen'],
           conditions: ['Asthma'],
           otherNotes: 'Prefers mornings',
-        },
-        aptitude: {
-          status: 'cleared',
-          questionnaire: { aiResult: 'cleared', aiNotes: 'Minor ankle injury, cleared with care.' },
+          exams: [
+            { name: 'Spirometry', date: '2026-07-01', findings: 'Mild reduction at rest.', hasAttachment: false },
+          ],
         },
       });
+      expect(memberContext).not.toHaveProperty('aptitude');
       expect(memberContext?.facts.map((fact) => [fact.eventType, fact.description, fact.sourceMessage])).toEqual([
         ['medication_change', 'Started a beta blocker', 'new medication'],
         ['injury', 'Sore left knee', 'my knee hurts'],
       ]);
       expect(memberContext?.facts[0]?.createdAt).toBeInstanceOf(Date);
-      const injuryAnswer = memberContext?.aptitude.questionnaire?.answers.find(
-        (a) => a.questionId === 'current_injury',
-      );
-      expect(injuryAnswer).toMatchObject({
-        answer: true,
-        detail: 'Left ankle',
-        question: expect.stringContaining('injury'),
-      });
       expect(JSON.stringify(memberContext)).not.toMatch(/embedding|photo/i);
     });
 

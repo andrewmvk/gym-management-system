@@ -1,9 +1,9 @@
 import { createApp } from '@api/app';
 import { env } from '@api/config/env';
 import { logger } from '@api/lib/logger';
-import { registerOnboardingInviteSubscriber } from '@api/modules/onboarding/invite-subscriber';
+import { registerRegistrationEmailSubscriber } from '@api/modules/onboarding/invite-subscriber';
 
-registerOnboardingInviteSubscriber();
+registerRegistrationEmailSubscriber();
 
 const server = createApp(env).listen(env.API_PORT, () => {
   logger.info({ port: env.API_PORT, nodeEnv: env.NODE_ENV }, 'api listening');

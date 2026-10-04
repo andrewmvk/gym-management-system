@@ -45,11 +45,6 @@ export const NAV_ENTRIES: Record<AppArea, NavEntry[]> = {
       items: [
         { href: '/members', label: 'Members', isVisible: (ability) => ability.can('read', 'Member') },
         {
-          href: '/certificates',
-          label: 'Certificates',
-          isVisible: (ability) => ability.can('manage', 'MedicalCertificate'),
-        },
-        {
           href: '/policies',
           label: 'Policies',
           isVisible: (ability) => ability.can('manage', 'UserPolicyAssignment'),

@@ -2,7 +2,6 @@ import { db, pool } from '@api/db/client';
 import {
   dExercises,
   dUsers,
-  fAptitudeQuestionnaires,
   fCheckIns,
   fOnboardingSubmissions,
   fPlanReviews,
@@ -20,7 +19,6 @@ import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createCallerFactory } from '@api/trpc/procedures';
 import { MEMBER_GROUP } from '@cadence/shared/auth';
-import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
@@ -48,7 +46,6 @@ async function createMember(email = 'members-router@example.com', membershipStat
       gender: 'female',
       referencePhotoPath: 'secret/photo.jpg',
       referenceFaceEmbedding: [0.1, 0.2],
-      aptitudeStatus: 'cleared',
       membershipStatus,
       membershipPlan: 'Standard',
     })
@@ -149,16 +146,20 @@ describe('members router', () => {
       const trainerId = (await db.select().from(dUsers).where(eq(dUsers.email, SEED_TRAINER_EMAIL)))[0]!.id;
       await db.insert(fOnboardingSubmissions).values({
         userId: member.id,
+        heightCm: 168,
+        weightKg: 61.5,
         medications: ['Ibuprofen'],
         physicalConditions: { conditions: ['Asthma'], otherNotes: 'Mornings only' },
         goals: 'Run a 10 km',
-        examAttachmentPaths: ['secret/exam.pdf'],
-      });
-      await db.insert(fAptitudeQuestionnaires).values({
-        userId: member.id,
-        answers: QUESTIONNAIRE_V1.map((question) => ({ questionId: question.id, answer: false })),
-        aiResult: 'cleared',
-        aiNotes: 'No contraindication.',
+        exams: [
+          {
+            name: 'Spirometry',
+            date: '2026-07-01',
+            findings: 'Mild reduction at rest.',
+            attachmentPath: 'secret/exam.pdf',
+          },
+          { name: 'Blood test', findings: 'Normal.' },
+        ],
       });
       await db.insert(fProfileEvents).values([
         { userId: member.id, eventType: 'injury', payload: { description: 'Sore knee' }, sourceMessage: 'knee hurts' },
@@ -185,11 +186,17 @@ describe('members router', () => {
       expect(result.profile).toMatchObject({ id: member.id, name: 'Members Router Member', birthdate: '1990-05-20' });
       expect(result.profile.age).toEqual(expect.any(Number));
       expect(result.membership).toEqual({ status: 'active', plan: 'Standard' });
-      expect(result.aptitude).toMatchObject({ status: 'cleared', questionnaire: { aiNotes: 'No contraindication.' } });
+      expect(result).not.toHaveProperty('aptitude');
       expect(result.onboarding).toMatchObject({
+        heightCm: 168,
+        weightKg: 61.5,
         goals: 'Run a 10 km',
         conditions: ['Asthma'],
         otherNotes: 'Mornings only',
+        exams: [
+          { name: 'Spirometry', date: '2026-07-01', findings: 'Mild reduction at rest.', hasAttachment: true },
+          { name: 'Blood test', date: null, findings: 'Normal.', hasAttachment: false },
+        ],
       });
       expect(result.facts.map((fact) => [fact.description, fact.resolvedAt === null])).toEqual([
         ['Sore knee', true],

@@ -1,20 +1,24 @@
+import { PaperclipIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { MemberSection } from '@/app/(staff)/members/[id]/member-section';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatPlanDate } from '@/lib/format';
 
 interface MemberProfileSectionProps {
   onboarding: {
     submittedAt: string | Date;
+    heightCm: number;
+    weightKg: number;
     goals: string;
     medications: readonly string[];
     conditions: readonly string[];
     otherNotes: string | null;
+    exams: readonly { name: string; date: string | null; findings: string; hasAttachment: boolean }[];
   } | null;
 }
 
 const TITLE = 'Current health profile';
-const SKELETON_ROWS = 4;
+const SKELETON_ROWS = 6;
 
 function ProfileRow({ label, children }: { label: string; children: ReactNode }) {
   return (
@@ -63,6 +67,10 @@ function MemberProfileSectionRoot({ onboarding }: MemberProfileSectionProps) {
       }
     >
       <dl>
+        <ProfileRow label="Height and weight">
+          <span className="numerals text-lg font-semibold">{onboarding.heightCm}</span> cm,{' '}
+          <span className="numerals text-lg font-semibold">{onboarding.weightKg}</span> kg
+        </ProfileRow>
         <ProfileRow label="Goals">{onboarding.goals}</ProfileRow>
         <ProfileRow label="Medications">
           {onboarding.medications.length > 0 ? onboarding.medications.join(', ') : <None />}
@@ -71,6 +79,34 @@ function MemberProfileSectionRoot({ onboarding }: MemberProfileSectionProps) {
           {onboarding.conditions.length > 0 ? onboarding.conditions.join(', ') : <None />}
         </ProfileRow>
         <ProfileRow label="Other notes">{onboarding.otherNotes ?? <None />}</ProfileRow>
+        <ProfileRow label="Medical exams">
+          {onboarding.exams.length > 0 ? (
+            <ul className="flex flex-col gap-3">
+              {onboarding.exams.map((exam) => (
+                <li key={`${exam.name}:${exam.date ?? ''}:${exam.findings}`} className="flex flex-col gap-0.5">
+                  <p className="font-semibold">
+                    {exam.name}
+                    {exam.date && (
+                      <span className="numerals text-base font-semibold text-muted-foreground">
+                        {' '}
+                        ({formatPlanDate(exam.date)})
+                      </span>
+                    )}
+                  </p>
+                  <p>{exam.findings}</p>
+                  {exam.hasAttachment && (
+                    <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                      <PaperclipIcon className="size-4" aria-hidden />
+                      File attached by the member
+                    </p>
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <None />
+          )}
+        </ProfileRow>
       </dl>
     </MemberSection>
   );

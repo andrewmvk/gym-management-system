@@ -33,7 +33,7 @@ describe('checkins router', () => {
   it('gives the log and the summary to a holder of read_checkins', async () => {
     const [member] = await db
       .insert(dUsers)
-      .values({ email: 'log-member@example.com', name: 'Log Member', aptitudeStatus: 'cleared' })
+      .values({ email: 'log-member@example.com', name: 'Log Member' })
       .returning();
     await db.insert(fCheckIns).values([
       { userId: member!.id, turnstileStatus: 'success', turnstileResponse: { response: { httpStatus: 200 } } },
@@ -60,7 +60,7 @@ describe('checkins router', () => {
   it('refuses a trainer, a member and a signed-out visitor', async () => {
     const [member] = await db
       .insert(dUsers)
-      .values({ email: 'checkins-member@example.com', name: 'Member', aptitudeStatus: 'cleared' })
+      .values({ email: 'checkins-member@example.com', name: 'Member' })
       .returning();
     await db.insert(fUserPolicyGroupOnUser).values({ userId: member!.id, groupId: MEMBER_GROUP });
 

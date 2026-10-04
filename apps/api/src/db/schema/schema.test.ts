@@ -44,7 +44,6 @@ describe('users and policies schema', () => {
   it('creates the tables with the documented columns', async () => {
     expect(await columnsOf('d_users')).toEqual(
       [
-        'aptitude_status',
         'birthdate',
         'created_at',
         'email',
@@ -67,6 +66,24 @@ describe('users and policies schema', () => {
     expect(await columnsOf('d_user_policy_group')).toEqual(['created_at', 'description', 'id'].sort());
     expect(await columnsOf('d_user_policy_group_policy')).toEqual(['group_id', 'policy_id'].sort());
     expect(await columnsOf('f_user_policy_group_on_user')).toEqual(['expires_on', 'group_id', 'user_id'].sort());
+  });
+
+  it('has no aptitude or certificate tables, and onboarding carries the physical information and structured exams', async () => {
+    expect(await columnsOf('f_aptitude_questionnaires')).toEqual([]);
+    expect(await columnsOf('f_medical_certificates')).toEqual([]);
+    expect(await columnsOf('f_onboarding_submissions')).toEqual(
+      [
+        'exams',
+        'goals',
+        'height_cm',
+        'id',
+        'medications',
+        'physical_conditions',
+        'submitted_at',
+        'user_id',
+        'weight_kg',
+      ].sort(),
+    );
   });
 
   it('rejects a duplicate membership, and a membership pointing to a missing user or group', async () => {

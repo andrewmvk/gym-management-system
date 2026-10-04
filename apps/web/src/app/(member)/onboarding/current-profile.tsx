@@ -1,16 +1,17 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { PencilIcon } from 'lucide-react';
+import { PaperclipIcon, PencilIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { Deferred } from '@/components/deferred';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime } from '@/lib/format';
+import { API_URL } from '@/lib/env';
+import { formatDateTime, formatPlanDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 
-const SKELETON_ROWS = 4;
+const SKELETON_ROWS = 6;
 
 function SectionShell({
   description,
@@ -88,7 +89,6 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
   }
 
   const latest = submissionsQuery.data[0];
-  const attachmentCount = latest?.examAttachmentPaths.length ?? 0;
 
   return (
     <SectionShell
@@ -111,6 +111,10 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
     >
       {latest && (
         <dl>
+          <ProfileRow label="Height and weight">
+            <span className="numerals text-lg font-semibold">{latest.heightCm}</span> cm,{' '}
+            <span className="numerals text-lg font-semibold">{latest.weightKg}</span> kg
+          </ProfileRow>
           <ProfileRow label="Goals">{latest.goals}</ProfileRow>
           <ProfileRow label="Medications">
             {latest.medications.length > 0 ? latest.medications.join(', ') : <None />}
@@ -123,8 +127,38 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
             )}
           </ProfileRow>
           <ProfileRow label="Other notes">{latest.physicalConditions.otherNotes ?? <None />}</ProfileRow>
-          <ProfileRow label="Exam results">
-            {attachmentCount > 0 ? `${attachmentCount} ${attachmentCount === 1 ? 'file' : 'files'} on file` : <None />}
+          <ProfileRow label="Medical exams">
+            {latest.exams.length > 0 ? (
+              <ul className="flex flex-col gap-3">
+                {latest.exams.map((exam) => (
+                  <li key={`${exam.name}:${exam.date ?? ''}:${exam.findings}`} className="flex flex-col gap-0.5">
+                    <p className="font-semibold">
+                      {exam.name}
+                      {exam.date && (
+                        <span className="numerals text-base font-semibold text-muted-foreground">
+                          {' '}
+                          ({formatPlanDate(exam.date)})
+                        </span>
+                      )}
+                    </p>
+                    <p>{exam.findings}</p>
+                    {exam.attachmentPath && (
+                      <a
+                        href={`${API_URL}/files/${exam.attachmentPath}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/45"
+                      >
+                        <PaperclipIcon className="size-4" aria-hidden />
+                        View attached file
+                      </a>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <None />
+            )}
           </ProfileRow>
         </dl>
       )}

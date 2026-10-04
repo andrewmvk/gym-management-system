@@ -41,24 +41,15 @@ describe('GET /kiosk/embeddings', () => {
     expect((await getEmbeddings('')).status).toBe(401);
   });
 
-  it('returns only memberId and embedding for cleared members with a password and an embedding', async () => {
+  it('returns only memberId and embedding for registered members with a stored embedding', async () => {
     const base = { name: 'Member', passwordHash: 'hash', referencePhotoPath: 'photo.jpg' };
     const [included] = await db
       .insert(dUsers)
-      .values({ ...base, email: 'in@example.com', aptitudeStatus: 'cleared', referenceFaceEmbedding: embedding(1) })
+      .values({ ...base, email: 'in@example.com', referenceFaceEmbedding: embedding(1) })
       .returning();
     await db.insert(dUsers).values([
-      { ...base, email: 'pending@example.com', aptitudeStatus: 'pending', referenceFaceEmbedding: embedding(2) },
-      { ...base, email: 'rejected@example.com', aptitudeStatus: 'rejected', referenceFaceEmbedding: embedding(3) },
-      {
-        ...base,
-        email: 'nopass@example.com',
-        passwordHash: null,
-        aptitudeStatus: 'cleared',
-        referenceFaceEmbedding: embedding(4),
-      },
-      { ...base, email: 'noembedding@example.com', aptitudeStatus: 'cleared' },
-      { ...base, email: 'staff@example.com', aptitudeStatus: null, referenceFaceEmbedding: embedding(5) },
+      { ...base, email: 'nopass@example.com', passwordHash: null, referenceFaceEmbedding: embedding(4) },
+      { ...base, email: 'noembedding@example.com' },
     ]);
 
     const response = await getEmbeddings(env.KIOSK_API_KEY);
@@ -82,21 +73,9 @@ describe('GET /kiosk/dev/members', () => {
 
   it('needs the kiosk key and lists the eligible members by name', async () => {
     await db.insert(dUsers).values([
-      {
-        email: 'b@example.com',
-        name: 'Bruno',
-        passwordHash: 'hash',
-        aptitudeStatus: 'cleared',
-        referenceFaceEmbedding: embedding(1),
-      },
-      {
-        email: 'a@example.com',
-        name: 'Ana',
-        passwordHash: 'hash',
-        aptitudeStatus: 'cleared',
-        referenceFaceEmbedding: embedding(2),
-      },
-      { email: 'p@example.com', name: 'Pending', passwordHash: 'hash', aptitudeStatus: 'pending' },
+      { email: 'b@example.com', name: 'Bruno', passwordHash: 'hash', referenceFaceEmbedding: embedding(1) },
+      { email: 'a@example.com', name: 'Ana', passwordHash: 'hash', referenceFaceEmbedding: embedding(2) },
+      { email: 'p@example.com', name: 'No Embedding', passwordHash: 'hash' },
     ]);
 
     expect((await fetch(`${baseUrl}/kiosk/dev/members`)).status).toBe(401);
@@ -130,11 +109,8 @@ describe('POST /kiosk/checkins', () => {
     return fetch(`${baseUrl}/kiosk/checkins`, { method: 'POST', headers, body: JSON.stringify(body) });
   }
 
-  async function createMember(aptitudeStatus: 'cleared' | 'pending') {
-    const [member] = await db
-      .insert(dUsers)
-      .values({ email: `${aptitudeStatus}@example.com`, name: 'Member', aptitudeStatus })
-      .returning();
+  async function createMember() {
+    const [member] = await db.insert(dUsers).values({ email: 'member@example.com', name: 'Member' }).returning();
     return member!.id;
   }
 
@@ -143,36 +119,24 @@ describe('POST /kiosk/checkins', () => {
   });
 
   it('answers 401 without the right key and records nothing', async () => {
-    const memberId = await createMember('cleared');
+    const memberId = await createMember();
 
     expect((await postCheckIn({ memberId })).status).toBe(401);
     expect((await postCheckIn({ memberId }, 'wrong-key')).status).toBe(401);
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
   });
 
-  it('answers 400 for a malformed body, 404 for an unknown member, and 403 for a member who is not cleared', async () => {
-    const pending = await createMember('pending');
-
+  it('answers 400 for a malformed body and 404 for an unknown member, recording nothing', async () => {
     expect((await postCheckIn({ memberId: 'nope' }, env.KIOSK_API_KEY)).status).toBe(400);
     expect((await postCheckIn({}, env.KIOSK_API_KEY)).status).toBe(400);
     expect((await postCheckIn({ memberId: crypto.randomUUID() }, env.KIOSK_API_KEY)).status).toBe(404);
-    expect((await postCheckIn({ memberId: pending }, env.KIOSK_API_KEY)).status).toBe(403);
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
-  });
-
-  it('says why a member who is not cleared is refused', async () => {
-    const pending = await createMember('pending');
-
-    const response = await postCheckIn({ memberId: pending }, env.KIOSK_API_KEY);
-
-    expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ reason: 'not_cleared' });
   });
 
   it('answers 403 with reason membership_inactive for an inactive member and records nothing', async () => {
     const [lapsed] = await db
       .insert(dUsers)
-      .values({ email: 'lapsed@example.com', name: 'Lapsed', aptitudeStatus: 'cleared', membershipStatus: 'inactive' })
+      .values({ email: 'lapsed@example.com', name: 'Lapsed', membershipStatus: 'inactive' })
       .returning();
 
     const response = await postCheckIn({ memberId: lapsed!.id }, env.KIOSK_API_KEY);
@@ -183,7 +147,7 @@ describe('POST /kiosk/checkins', () => {
   });
 
   it('records the check-in as failed and still answers 200 when the turnstile is not configured', async () => {
-    const memberId = await createMember('cleared');
+    const memberId = await createMember();
 
     const response = await postCheckIn({ memberId }, env.KIOSK_API_KEY);
 

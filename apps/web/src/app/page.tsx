@@ -39,8 +39,8 @@ export default function HomePage() {
               history, not a single interview at the front desk.
             </p>
             <p className="max-w-xl text-pretty text-muted-foreground">
-              Joining includes a short health questionnaire, and we may ask for a medical certificate before you can
-              train.
+              Joining happens in person at the gym: a staff member checks your workout restrictions first, then you
+              register on site and fill in your health profile.
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button asChild size="lg">

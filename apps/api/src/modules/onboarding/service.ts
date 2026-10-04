@@ -3,7 +3,8 @@ import { logger } from '@api/lib/logger';
 import { saveUpload } from '@api/lib/uploads';
 import * as repository from '@api/modules/onboarding/repository';
 import { generateForDate } from '@api/modules/plans/service';
-import type { OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
+import type { ExamEntry, ExamInput, OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
+import { TRPCError } from '@trpc/server';
 
 const log = logger.child({ module: 'onboarding' });
 
@@ -12,28 +13,43 @@ export interface OnboardingStatus {
   lastSubmittedAt: Date | null;
 }
 
-// FR-12 / FR-13: every attachment is stored through the shared uploads adapter (kind exam) so its
-// access control - owner-only reads - matches every other file kind (rules in apps/api/src/routes/files.ts).
+const examAttachmentPattern = (userId: string) => new RegExp(`^${userId}/exam/[0-9a-f-]{36}\\.(jpg|png|pdf)$`);
+
+// FR-12: a new file is stored through the shared uploads adapter (kind exam) so its access control -
+// owner-only reads - matches every other file kind (rules in apps/api/src/routes/files.ts). A path kept
+// from the current profile is only accepted when it is one of this member's own exam files.
+async function toStoredExam(userId: string, exam: ExamInput): Promise<ExamEntry> {
+  const { attachment, attachmentPath, ...entry } = exam;
+  if (attachment) {
+    const saved = await saveUpload({
+      ownerId: userId,
+      kind: 'exam',
+      filename: attachment.filename,
+      mimeType: attachment.mimeType,
+      base64: attachment.base64,
+    });
+    return { ...entry, attachmentPath: saved.path };
+  }
+  if (attachmentPath) {
+    if (!examAttachmentPattern(userId).test(attachmentPath)) {
+      throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid exam attachment' });
+    }
+    return { ...entry, attachmentPath };
+  }
+  return entry;
+}
+
 export async function submit(userId: string, input: OnboardingSubmitInput) {
-  const attachments = input.attachments ?? [];
-  const saved = await Promise.all(
-    attachments.map((attachment) =>
-      saveUpload({
-        ownerId: userId,
-        kind: 'exam',
-        filename: attachment.filename,
-        mimeType: attachment.mimeType,
-        base64: attachment.base64,
-      }),
-    ),
-  );
+  const exams = await Promise.all((input.exams ?? []).map((exam) => toStoredExam(userId, exam)));
 
   const submission = await repository.insertSubmission({
     userId,
+    heightCm: input.heightCm,
+    weightKg: input.weightKg,
     medications: input.medications ?? [],
     physicalConditions: { ...input.physicalConditions, conditions: input.physicalConditions.conditions ?? [] },
     goals: input.goals,
-    examAttachmentPaths: saved.map((file) => file.path),
+    exams,
   });
 
   // FR-13: best effort only - a failure here never fails the onboarding submission itself. The member

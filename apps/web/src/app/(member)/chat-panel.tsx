@@ -222,14 +222,14 @@ export function ChatPanel() {
                       <Button
                         type="button"
                         variant="tape"
-                        className="min-h-11 self-start"
+                        className="h-auto min-h-11 w-full justify-start py-2 text-left text-sm whitespace-normal"
                         disabled={adjustPlan.isPending}
                         onClick={() => adjustPlan.mutate(message.adjustment!)}
                       >
                         <CalendarCheckIcon data-icon="inline-start" />
                         {adjustPlan.isPending
                           ? 'Applying...'
-                          : `Apply to plan for ${formatPlanDate(message.adjustment.date)}`}
+                          : `Apply to plan for ${formatPlanDate(message.adjustment.date, { day: 'numeric', month: 'short' })}`}
                       </Button>
                     )}
                   </div>

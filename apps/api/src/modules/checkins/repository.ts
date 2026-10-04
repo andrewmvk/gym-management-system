@@ -2,11 +2,7 @@ import { type DatabaseExecutor, db } from '@api/db/client';
 import { dUsers, fCheckIns } from '@api/db/schema';
 import { and, count, desc, eq, gte, isNotNull, lt, sql } from 'drizzle-orm';
 
-const kioskEligible = and(
-  eq(dUsers.aptitudeStatus, 'cleared'),
-  isNotNull(dUsers.passwordHash),
-  isNotNull(dUsers.referenceFaceEmbedding),
-);
+const kioskEligible = and(isNotNull(dUsers.passwordHash), isNotNull(dUsers.referenceFaceEmbedding));
 
 export async function listKioskEmbeddings() {
   const rows = await db
@@ -22,7 +18,7 @@ export async function listKioskDevMembers() {
 
 export async function findMemberForCheckIn(userId: string) {
   const [user] = await db
-    .select({ aptitudeStatus: dUsers.aptitudeStatus, membershipStatus: dUsers.membershipStatus })
+    .select({ membershipStatus: dUsers.membershipStatus })
     .from(dUsers)
     .where(eq(dUsers.id, userId));
   return user ?? null;

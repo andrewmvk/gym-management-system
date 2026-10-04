@@ -1,15 +1,17 @@
 import { type DatabaseExecutor, db } from '@api/db/client';
 import { fOnboardingSubmissions, type OnboardingSubmission } from '@api/db/schema';
-import type { ExamAttachmentPaths, Medications, PhysicalConditions } from '@cadence/shared/schemas/onboarding';
+import type { Exams, Medications, PhysicalConditions } from '@cadence/shared/schemas/onboarding';
 import { desc, eq } from 'drizzle-orm';
 
 export async function insertSubmission(
   input: {
     userId: string;
+    heightCm: number;
+    weightKg: number;
     medications: Medications;
     physicalConditions: PhysicalConditions;
     goals: string;
-    examAttachmentPaths: ExamAttachmentPaths;
+    exams: Exams;
   },
   executor: DatabaseExecutor = db,
 ): Promise<OnboardingSubmission> {

@@ -38,7 +38,7 @@ describe('gym router', () => {
     async function memberToken() {
       const [member] = await db
         .insert(dUsers)
-        .values({ email: 'hours-member@example.com', name: 'Member', aptitudeStatus: 'cleared' })
+        .values({ email: 'hours-member@example.com', name: 'Member' })
         .returning();
       await db.insert(fUserPolicyGroupOnUser).values({ userId: member!.id, groupId: MEMBER_GROUP });
       return signSessionToken(member!.id);
@@ -88,10 +88,7 @@ describe('gym router', () => {
     const detail = await (await callerFor(signSessionToken(admin!.id))).gym.adminDetail();
     expect(detail.checkInsPerHour).toHaveLength(24);
 
-    const [member] = await db
-      .insert(dUsers)
-      .values({ email: 'gym-member@example.com', name: 'Member', aptitudeStatus: 'cleared' })
-      .returning();
+    const [member] = await db.insert(dUsers).values({ email: 'gym-member@example.com', name: 'Member' }).returning();
     await db.insert(fUserPolicyGroupOnUser).values({ userId: member!.id, groupId: MEMBER_GROUP });
 
     await expect((await callerFor(signSessionToken(member!.id))).gym.adminDetail()).rejects.toMatchObject({

@@ -169,10 +169,13 @@ function OnboardingViewRoot() {
   const latest = submissions.data[0];
   const initialValues: OnboardingInitialValues | undefined = latest
     ? {
+        heightCm: latest.heightCm,
+        weightKg: latest.weightKg,
         goals: latest.goals,
         medications: latest.medications,
         conditions: latest.physicalConditions.conditions,
         otherNotes: latest.physicalConditions.otherNotes,
+        exams: latest.exams,
       }
     : undefined;
 

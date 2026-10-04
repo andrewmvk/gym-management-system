@@ -10,6 +10,7 @@ import * as plansRepository from '@api/modules/plans/repository';
 import {
   type AvailableExercise,
   buildMuscleFocusLines,
+  buildOnboardingLines,
   checkOverwriteGuard,
   formatCatalogLine,
   type GenerateForDateOverrides,
@@ -58,6 +59,7 @@ export function summarizeOlderEvents(events: readonly ProfileEvent[]): string | 
 }
 
 export interface ChatContext {
+  today: string;
   ageYears: number | null;
   gender: string | null;
   onboardingSubmissions: Awaited<ReturnType<typeof findSubmissionsByUserId>>;
@@ -85,6 +87,7 @@ async function assembleChatContext(userId: string): Promise<ChatContext> {
   const recentEvents = allEvents.slice(0, RECENT_EVENTS_LIMIT);
 
   return {
+    today: todayLocal(),
     ageYears: computeAge(user?.birthdate ?? null),
     gender: user?.gender ?? null,
     onboardingSubmissions,
@@ -120,19 +123,11 @@ function buildAggregateLines(aggregate: PlanAggregate): string[] {
 // AI reasons from these accumulated facts, never a raw transcript.
 export function buildChatUserPrompt(context: ChatContext, message: string): string {
   const lines: string[] = [];
+  lines.push(`Today's date: ${context.today}`);
   lines.push(context.ageYears !== null ? `Member age: ${context.ageYears}` : 'Member age: unknown');
   lines.push(`Member gender: ${context.gender ?? 'unknown'}`);
 
-  lines.push(
-    'Onboarding submissions (most recent first; the first is the current truth, older ones only add history that it does not contradict):',
-  );
-  for (const submission of context.onboardingSubmissions) {
-    const conditions = submission.physicalConditions.conditions.join(', ') || 'none';
-    const otherNotes = submission.physicalConditions.otherNotes ? ` (${submission.physicalConditions.otherNotes})` : '';
-    lines.push(`- Goals: ${submission.goals}`);
-    lines.push(`  Medications: ${submission.medications.join(', ') || 'none'}`);
-    lines.push(`  Conditions: ${conditions}${otherNotes}`);
-  }
+  lines.push(...buildOnboardingLines(context.onboardingSubmissions));
 
   if (context.todayPlan) {
     lines.push(`Today's plan (${context.todayPlan.status}):`);
@@ -177,12 +172,14 @@ const CHAT_SYSTEM_PROMPT =
   "onboarding data, today's plan, and profile history to reply helpfully and safely. Extract any new, " +
   'durable facts the message reveals (injury, skipped exercise, medication change, life event, updated ' +
   'physical state, or a request to adjust their plan) as structured facts - never invent facts the ' +
-  "message does not support. Weigh the member's active injuries and medication changes against today's " +
-  'exercises: if one conflicts, warn about it and propose a safer alternative from the available ' +
-  'catalog. Catalog exercises list the muscles they train as primary or secondary, and the member muscle ' +
-  'focus (-2 much less to +2 much more) says which muscles they want emphasized; respect it when proposing ' +
-  'alternatives, but never above safety. Only mention the cross-member aggregate if the member asks about ' +
-  'what others are doing.';
+  "message does not support. Weigh the member's active injuries, medication changes, medications and " +
+  "medical exam findings against today's exercises: if one conflicts, warn about it and propose a safer " +
+  'alternative from the available catalog. Catalog exercises list the muscles they train as primary or ' +
+  'secondary, and the member muscle focus (-2 much less to +2 much more) says which muscles they want ' +
+  'emphasized; respect it when proposing alternatives, but never above safety. When you propose a plan ' +
+  "adjustment, its date is the member's plan date as YYYY-MM-DD: use today's date given above unless the " +
+  'member names another day, and never a date in the past unless they are correcting a day that already ' +
+  'happened. Only mention the cross-member aggregate if the member asks about what others are doing.';
 
 export type EvaluateChat = (contextPrompt: string) => Promise<AiResult<ChatResponse>>;
 
@@ -233,8 +230,20 @@ export async function sendMessage(
       eventType: fact.eventType,
       summary: describeProfileEvent(fact.eventType, fact.payload),
     })),
-    adjustment: result.data.adjustment,
+    adjustment: await resolveAdjustmentDate(userId, result.data.adjustment, context.today),
   };
+}
+
+// A past day can only be corrected when a plan exists for it; otherwise the button would end in a
+// not-found error, so the adjustment targets today instead.
+async function resolveAdjustmentDate(
+  userId: string,
+  adjustment: ChatResponse['adjustment'],
+  today: string,
+): Promise<ChatResponse['adjustment']> {
+  if (!adjustment || adjustment.date >= today) return adjustment;
+  const existing = await plansRepository.findPlanByUserAndDate(userId, adjustment.date);
+  return existing ? adjustment : { ...adjustment, date: today };
 }
 
 const PlanCorrectionExerciseSchema = z.object({

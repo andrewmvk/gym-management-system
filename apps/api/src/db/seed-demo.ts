@@ -1,14 +1,10 @@
-import { mkdir, writeFile } from 'node:fs/promises';
-import path from 'node:path';
 import { env } from '@api/config/env';
 import { type Database, db as defaultDb, type Transaction } from '@api/db/client';
 import {
   dExercises,
   dUsers,
-  fAptitudeQuestionnaires,
   fCheckIns,
   fConsentEvents,
-  fMedicalCertificates,
   fOnboardingSubmissions,
   fPlanReviews,
   fProfileEvents,
@@ -16,20 +12,16 @@ import {
   fTrainingPlans,
   fUserPolicyGroupOnUser,
 } from '@api/db/schema';
-import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL } from '@api/db/seed';
+import { SEED_TRAINER_EMAIL } from '@api/db/seed';
 import { localDateString } from '@api/lib/dates';
 import { createFaceEmbedder } from '@api/lib/face-embedding';
-import { resolveUploadPath } from '@api/lib/uploads';
-import { UNINSPECTED_CERTIFICATE_NOTES } from '@api/modules/aptitude/certificate-service';
 import { DEFAULT_MEMBERSHIP_PLAN } from '@api/modules/auth/service';
 import { MEMBER_GROUP } from '@cadence/shared/auth';
-import { QUESTIONNAIRE_V1, type QuestionnaireAnswer } from '@cadence/shared/schemas/aptitude';
 import { OCCUPANCY_WINDOW_MINUTES } from '@cadence/shared/schemas/gym';
 import bcrypt from 'bcryptjs';
 import { eq, inArray, sql } from 'drizzle-orm';
 
 export const DEMO_MEMBER_COUNT = 25;
-export const DEMO_APPLICANT_COUNT = 4;
 export const DEMO_HISTORY_DAYS = 21;
 // Inactive demo members were last seen this many days ago, when their membership lapsed.
 export const DEMO_LAPSE_DAYS_AGO = 10;
@@ -42,12 +34,7 @@ const EXERCISES_PER_PLAN = 4;
 const TRAINER_EDITED_PLAN_COUNT = 3;
 const INSERT_CHUNK_SIZE = 1000;
 // Every demo address matches this, so the cleanup can never reach a real account.
-const DEMO_EMAIL_PATTERN = '^demo(-applicant)?[0-9]+@example\\.com$';
-// 1x1 transparent PNG: enough for the admin queue to have a real, viewable file behind each row.
-const PLACEHOLDER_CERTIFICATE = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
-  'base64',
-);
+const DEMO_EMAIL_PATTERN = '^demo[0-9]+@example\\.com$';
 
 const GENDERS = ['female', 'male', 'prefer_not_to_say'] as const;
 const GOALS = [
@@ -134,14 +121,6 @@ const DEMO_FACTS = [
   isResolved?: boolean;
 }[];
 
-// The AI never sees the uploaded file, so every real certificate sits at pending_retry until an admin decides.
-const CERTIFICATE_APPLICANTS = [
-  { review: null },
-  { review: null },
-  { review: null },
-  { review: 'not_cleared' },
-] as const satisfies readonly { review: 'cleared' | 'not_cleared' | null }[];
-
 const stubEmbedder = createFaceEmbedder('stub');
 
 // Fixed seed: two runs generate the same history, so the row counts are stable.
@@ -157,7 +136,6 @@ function createRandom(seed: number) {
 type Random = ReturnType<typeof createRandom>;
 
 const memberEmail = (index: number) => `demo${index}@example.com`;
-const applicantEmail = (index: number) => `demo-applicant${index}@example.com`;
 const isActiveMember = (index: number) => index % 5 !== 0;
 
 function atLocalTime(now: Date, daysAgo: number, hour: number, minute: number) {
@@ -220,8 +198,6 @@ async function clearDemoHistory(tx: Transaction, demoUserIds: string[]) {
   await tx.delete(fOnboardingSubmissions).where(inArray(fOnboardingSubmissions.userId, demoUserIds));
   await tx.delete(fProfileEvents).where(inArray(fProfileEvents.userId, demoUserIds));
   await tx.delete(fConsentEvents).where(inArray(fConsentEvents.userId, demoUserIds));
-  await tx.delete(fAptitudeQuestionnaires).where(inArray(fAptitudeQuestionnaires.userId, demoUserIds));
-  await tx.delete(fMedicalCertificates).where(inArray(fMedicalCertificates.userId, demoUserIds));
 }
 
 async function upsertMembers(tx: Transaction) {
@@ -239,7 +215,6 @@ async function upsertMembers(tx: Transaction) {
         birthdate: `${1975 + ((index * 7) % 30)}-${String(1 + (index % 12)).padStart(2, '0')}-${String(1 + (index % 28)).padStart(2, '0')}`,
         gender: GENDERS[index % GENDERS.length]!,
         referenceFaceEmbedding: embedding.embedding,
-        aptitudeStatus: 'cleared' as const,
         membershipStatus: isActiveMember(index) ? ('active' as const) : ('inactive' as const),
         membershipPlan: DEFAULT_MEMBERSHIP_PLAN,
       };
@@ -257,7 +232,6 @@ async function upsertMembers(tx: Transaction) {
         birthdate: sql`excluded.birthdate`,
         gender: sql`excluded.gender`,
         referenceFaceEmbedding: sql`excluded.reference_face_embedding`,
-        aptitudeStatus: sql`excluded.aptitude_status`,
         membershipStatus: sql`excluded.membership_status`,
         membershipPlan: sql`excluded.membership_plan`,
       },
@@ -277,88 +251,37 @@ async function upsertMembers(tx: Transaction) {
   }));
 }
 
-async function upsertApplicants(tx: Transaction) {
-  const rows = CERTIFICATE_APPLICANTS.map((applicant, offset) => ({
-    email: applicantEmail(offset + 1),
-    name: `Demo Applicant ${offset + 1}`,
-    phone: `+55 11 91000-${String(1000 + offset)}`,
-    birthdate: `199${offset}-06-15`,
-    gender: GENDERS[offset % GENDERS.length]!,
-    aptitudeStatus: applicant.review === 'not_cleared' ? ('rejected' as const) : ('pending' as const),
-  }));
-
-  const saved = await tx
-    .insert(dUsers)
-    .values(rows)
-    .onConflictDoUpdate({
-      target: dUsers.email,
-      set: {
-        name: sql`excluded.name`,
-        phone: sql`excluded.phone`,
-        birthdate: sql`excluded.birthdate`,
-        gender: sql`excluded.gender`,
-        aptitudeStatus: sql`excluded.aptitude_status`,
-      },
-    })
-    .returning({ id: dUsers.id, email: dUsers.email });
-  const idByEmail = new Map(saved.map((user) => [user.email, user.id]));
-  return CERTIFICATE_APPLICANTS.map((applicant, offset) => ({
-    ...applicant,
-    id: idByEmail.get(applicantEmail(offset + 1))!,
-  }));
-}
-
-// Every applicant answered "yes" to one question, which is what sends them to the certificate step.
-function applicantAnswers(): QuestionnaireAnswer[] {
-  return QUESTIONNAIRE_V1.map((question, position) =>
-    position === 0
-      ? { questionId: question.id, answer: true, detail: 'Demo answer' }
-      : { questionId: question.id, answer: false },
-  );
-}
-
-async function seedCertificates(
-  tx: Transaction,
-  applicants: Awaited<ReturnType<typeof upsertApplicants>>,
-  adminId: string,
-  now: Date,
-) {
-  for (const [offset, applicant] of applicants.entries()) {
-    const relativePath = [applicant.id, 'certificate', 'demo-certificate.png'].join('/');
-    const absolutePath = resolveUploadPath(relativePath);
-    await mkdir(path.dirname(absolutePath), { recursive: true });
-    await writeFile(absolutePath, PLACEHOLDER_CERTIFICATE);
-
-    const uploadedAt = new Date(now.getTime() - (offset + 1) * 3 * 60 * MS_PER_MINUTE);
-    await tx.insert(fAptitudeQuestionnaires).values({
-      userId: applicant.id,
-      answers: applicantAnswers(),
-      aiResult: 'not_cleared',
-      aiNotes: 'Demo applicant: a certificate is required.',
-      submittedAt: uploadedAt,
-    });
-    await tx.insert(fMedicalCertificates).values({
-      userId: applicant.id,
-      filePath: relativePath,
-      aiResult: 'pending_retry',
-      aiNotes: UNINSPECTED_CERTIFICATE_NOTES,
-      uploadedAt,
-      ...(applicant.review
-        ? { reviewedByUserId: adminId, adminReviewedAt: now, adminOverrideResult: applicant.review }
-        : {}),
+function demoExams(index: number, now: Date) {
+  const exams: { name: string; date: string; findings: string }[] = [];
+  const dateOf = (daysAgo: number) => localDateString(atLocalTime(now, daysAgo, 9, 0));
+  if (index % 3 === 0) {
+    exams.push({
+      name: 'Knee X-ray',
+      date: dateOf(90 + index),
+      findings: 'Mild joint space narrowing in the left knee, no fracture.',
     });
   }
+  if (index % 4 === 0) {
+    exams.push({
+      name: 'Resting electrocardiogram',
+      date: dateOf(120 + index),
+      findings: 'Normal sinus rhythm, no abnormalities.',
+    });
+  }
+  return exams;
 }
 
 async function seedOnboarding(tx: Transaction, members: Awaited<ReturnType<typeof upsertMembers>>, now: Date) {
   await tx.insert(fOnboardingSubmissions).values(
     members.map((member) => ({
       userId: member.id,
+      heightCm: 155 + ((member.index * 7) % 40),
+      weightKg: 55 + ((member.index * 11) % 35) + (member.index % 10) / 10,
       medications: member.index % 4 === 0 ? ['Ibuprofen as needed'] : [],
       physicalConditions:
         member.index % 3 === 0 ? { conditions: ['Mild knee pain'], otherNotes: 'Demo data' } : { conditions: [] },
       goals: GOALS[member.index % GOALS.length]!,
-      examAttachmentPaths: [],
+      exams: demoExams(member.index, now),
       submittedAt: atLocalTime(now, DEMO_HISTORY_DAYS + 1, 10, member.index),
     })),
   );
@@ -537,11 +460,10 @@ async function seedCheckIns(tx: Transaction, members: Awaited<ReturnType<typeof 
 }
 
 // Needs the base seed first (staff accounts, catalog). Rebuilds only the rows of the demo accounts
-// (demo<N>@example.com and demo-applicant<N>@example.com), so running it twice leaves the same counts.
+// (demo<N>@example.com), so running it twice leaves the same counts.
 export async function seedDemo(database: Database = defaultDb, now: Date = new Date()) {
   await database.transaction(async (tx) => {
     const trainerId = await findAccountId(tx, SEED_TRAINER_EMAIL);
-    const adminId = await findAccountId(tx, SEED_ADMIN_EMAIL);
 
     const existing = await tx
       .select({ id: dUsers.id })
@@ -553,12 +475,10 @@ export async function seedDemo(database: Database = defaultDb, now: Date = new D
     );
 
     const members = await upsertMembers(tx);
-    const applicants = await upsertApplicants(tx);
 
     await seedOnboarding(tx, members, now);
     await seedProfileEvents(tx, members, now);
     await seedPlans(tx, members, trainerId, now);
     await seedCheckIns(tx, members, now);
-    await seedCertificates(tx, applicants, adminId, now);
   });
 }

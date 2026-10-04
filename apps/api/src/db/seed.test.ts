@@ -124,19 +124,17 @@ describe('seedBase', () => {
         birthdate: null,
         referencePhotoPath: null,
         referenceFaceEmbedding: null,
-        aptitudeStatus: null,
         membershipStatus: null,
         membershipPlan: null,
       });
     }
   });
 
-  it('seeds an activated demo member with a photo and an embedding, in the member group only', async () => {
+  it('seeds a registered demo member with a photo and an embedding, in the member group only', async () => {
     await seedBase();
 
     const [student] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_STUDENT_EMAIL));
     expect(student).toMatchObject({
-      aptitudeStatus: 'cleared',
       membershipStatus: 'active',
       membershipPlan: DEFAULT_MEMBERSHIP_PLAN,
     });
@@ -185,5 +183,27 @@ describe('seedBase', () => {
     await seedBase();
 
     expect(await policyIdsOfGroup(ADMIN_GROUP)).toEqual([...ADMIN_POLICY_IDS].sort());
+  });
+
+  it('retires the removed review_certificates policy along with its group links and grants', async () => {
+    await seedBase();
+    const [admin] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_ADMIN_EMAIL));
+    await db.insert(dUserPolicy).values({
+      id: 'review_certificates',
+      description: 'Review medical certificates in the admin queue',
+      operation: 'manage',
+      resource: 'MedicalCertificate',
+      scope: 'all',
+    });
+    await db.insert(dUserPolicyGroupPolicy).values({ groupId: ADMIN_GROUP, policyId: 'review_certificates' });
+    await db
+      .insert(fUserPolicyOnUser)
+      .values({ userId: admin!.id, policyId: 'review_certificates', effect: 'granted' });
+
+    await seedBase();
+
+    expect(await db.select().from(dUserPolicy).where(eq(dUserPolicy.id, 'review_certificates'))).toHaveLength(0);
+    expect(await policyIdsOfGroup(ADMIN_GROUP)).not.toContain('review_certificates');
+    expect(POLICY_CATALOG.some((policy) => policy.id === ('review_certificates' as string))).toBe(false);
   });
 });

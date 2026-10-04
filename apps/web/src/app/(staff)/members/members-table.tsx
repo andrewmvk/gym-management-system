@@ -5,7 +5,6 @@ import { LockIcon, SearchXIcon, UsersIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useAppAbility } from '@/abilities';
-import { AptitudeBadge } from '@/app/(staff)/members/aptitude-badge';
 import { MembershipControl } from '@/app/(staff)/members/membership-control';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
@@ -31,7 +30,6 @@ function MembersHead() {
         <TableHead>Member</TableHead>
         <TableHead className="hidden sm:table-cell">Plan</TableHead>
         <TableHead>Membership</TableHead>
-        <TableHead className="hidden md:table-cell">Aptitude</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -67,9 +65,6 @@ function MembersTableSkeleton() {
               </TableCell>
               <TableCell>
                 <Skeleton className="h-6 w-28" />
-              </TableCell>
-              <TableCell className="hidden md:table-cell">
-                <Skeleton className="h-6 w-20" />
               </TableCell>
             </TableRow>
           ))}
@@ -188,9 +183,6 @@ function MembersTableRoot() {
                   <TableCell className="hidden sm:table-cell">{member.membershipPlan ?? 'None'}</TableCell>
                   <TableCell>
                     <MembershipControl userId={member.id} name={member.name} status={member.membershipStatus} />
-                  </TableCell>
-                  <TableCell className="hidden md:table-cell">
-                    <AptitudeBadge status={member.aptitudeStatus} />
                   </TableCell>
                 </TableRow>
               ))}

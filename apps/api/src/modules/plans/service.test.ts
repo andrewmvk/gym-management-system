@@ -2,8 +2,8 @@ import { db, pool } from '@api/db/client';
 import {
   dExercises,
   dUsers,
-  fAptitudeQuestionnaires,
   fCheckIns,
+  fOnboardingSubmissions,
   fPlanReviews,
   fProfileEvents,
   fTrainingPlanExercises,
@@ -23,7 +23,6 @@ import {
   listUpcomingPlans,
 } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
-import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
 import { and, eq } from 'drizzle-orm';
 import { afterAll, beforeEach, describe, expect, it } from 'vitest';
 
@@ -402,7 +401,49 @@ describe('plans', () => {
       expect(prompt).not.toContain('old shoulder strain');
     });
 
-    it('carries the recent plans with done and not done, the check-in dates, trainer notes, questionnaire and demand', async () => {
+    it('carries the physical information and the typed findings of each exam, never an attachment', async () => {
+      const member = await createMember();
+      await db.insert(fOnboardingSubmissions).values({
+        userId: member.id,
+        heightCm: 178,
+        weightKg: 82.5,
+        medications: ['Metoprolol'],
+        physicalConditions: { conditions: [] },
+        goals: 'Build endurance',
+        exams: [
+          {
+            name: 'Resting ECG',
+            date: '2026-07-01',
+            findings: 'Mild bradycardia, no arrhythmia.',
+            attachmentPath: `${member.id}/exam/00000000-0000-0000-0000-000000000000.pdf`,
+          },
+          { name: 'Blood test', findings: 'Normal.' },
+        ],
+      });
+      const noExams = await createMember('no-exams@example.com');
+      await db.insert(fOnboardingSubmissions).values({
+        userId: noExams.id,
+        heightCm: 160,
+        weightKg: 55,
+        medications: [],
+        physicalConditions: { conditions: [] },
+        goals: 'Tone up',
+        exams: [],
+      });
+
+      const prompt = await captureAiPrompt(member.id);
+      const promptWithoutExams = await captureAiPrompt(noExams.id);
+
+      expect(prompt).toContain('Height: 178 cm, weight: 82.5 kg');
+      expect(prompt).toContain('Medical exams:');
+      expect(prompt).toContain('Resting ECG (2026-07-01): Mild bradycardia, no arrhythmia.');
+      expect(prompt).toContain('Blood test: Normal.');
+      expect(prompt).not.toContain('00000000-0000-0000-0000-000000000000.pdf');
+      expect(promptWithoutExams).toContain('Height: 160 cm, weight: 55 kg');
+      expect(promptWithoutExams).toContain('Medical exams: none');
+    });
+
+    it('carries the recent plans with done and not done, the check-in dates, trainer notes and demand', async () => {
       const member = await createMember();
       const other = await createMember('demand-other@example.com');
       const [trainer] = await db.select().from(dUsers).where(eq(dUsers.email, SEED_TRAINER_EMAIL));
@@ -429,16 +470,6 @@ describe('plans', () => {
         note: 'Keep squats shallow for now',
         isEdit: false,
       });
-      await db.insert(fAptitudeQuestionnaires).values({
-        userId: member.id,
-        answers: QUESTIONNAIRE_V1.map((question) => ({
-          questionId: question.id,
-          answer: question.id === 'current_injury',
-          ...(question.id === 'current_injury' ? { detail: 'recovering from a torn meniscus' } : {}),
-        })),
-        aiResult: 'cleared',
-        aiNotes: 'Cleared with a note about the knee.',
-      });
       await createPlanWithExercises(member.id, planDate, ['Plank']);
       await createPlanWithExercises(other.id, planDate, ['Barbell Back Squat', 'Push-Up']);
 
@@ -450,9 +481,6 @@ describe('plans', () => {
       expect(prompt).toContain(`Gym check-in dates in the same period: ${doneDate}`);
       expect(prompt).toContain('note by');
       expect(prompt).toContain(`on the plan for ${doneDate}: Keep squats shallow for now`);
-      expect(prompt).toContain('Yes: Do you have any current injury');
-      expect(prompt).toContain('Detail: recovering from a torn meniscus');
-      expect(prompt).toContain('Screening notes: Cleared with a note about the knee.');
       expect(prompt).toContain(`Other members' plans for ${planDate}`);
       expect(prompt).toMatch(/counted in plans, not exercises\): 1\n/);
       expect(prompt).toContain('Equipment in demand (plans that use each piece):');

@@ -10,7 +10,6 @@ if (process.env.TEST_DATABASE_URL) {
 }
 process.env.NODE_ENV = 'test';
 // Deterministic and network-free regardless of the shared .env's own AI_MODE (which may be "live" for
-// real local development): every test uses the AI mock switches instead. A test that specifically wants
-// to exercise the real AI call path injects its own evaluator/generator per call (aptitude and plans
-// services both support this) rather than relying on this default.
+// real local development). A test that specifically wants to exercise the real AI call path injects its
+// own generator per call (the plans service supports this) rather than relying on this default.
 process.env.AI_MODE = 'mock';

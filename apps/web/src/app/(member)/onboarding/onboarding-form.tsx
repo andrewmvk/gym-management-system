@@ -1,12 +1,12 @@
 'use client';
 
-import { OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding';
+import { type ExamEntry, OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import type { z } from 'zod';
-import { ExamAttachmentsField } from '@/app/(member)/onboarding/exam-attachments-field';
+import { ExamEntriesField } from '@/app/(member)/onboarding/exam-entries-field';
+import type { OnboardingFormInput, OnboardingFormOutput } from '@/app/(member)/onboarding/onboarding-form-types';
 import { StringListField } from '@/app/(member)/onboarding/string-list-field';
 import { Button } from '@/components/ui/button';
 import {
@@ -18,17 +18,18 @@ import {
   FieldLegend,
   FieldSet,
 } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useTRPC } from '@/lib/trpc';
 
-type OnboardingFormInput = z.input<typeof OnboardingSubmitInputSchema>;
-type OnboardingFormOutput = z.output<typeof OnboardingSubmitInputSchema>;
-
 export interface OnboardingInitialValues {
+  heightCm: number;
+  weightKg: number;
   goals: string;
   medications: string[];
   conditions: string[];
   otherNotes?: string;
+  exams: ExamEntry[];
 }
 
 interface OnboardingFormProps {
@@ -38,6 +39,10 @@ interface OnboardingFormProps {
   onCancel?: () => void;
 }
 
+function toNumber(value: string) {
+  return value === '' ? undefined : Number(value);
+}
+
 export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel }: OnboardingFormProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -45,10 +50,12 @@ export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel 
   const form = useForm<OnboardingFormInput, unknown, OnboardingFormOutput>({
     resolver: zodResolver(OnboardingSubmitInputSchema),
     defaultValues: {
+      heightCm: initialValues?.heightCm,
+      weightKg: initialValues?.weightKg,
       goals: initialValues?.goals ?? '',
       medications: initialValues?.medications ?? [],
       physicalConditions: { conditions: initialValues?.conditions ?? [], otherNotes: initialValues?.otherNotes },
-      attachments: [],
+      exams: initialValues?.exams ?? [],
     },
   });
 
@@ -72,30 +79,89 @@ export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel 
       className="overflow-hidden rounded-lg border bg-card"
     >
       <div className="grid gap-10 p-5 sm:p-8 lg:grid-cols-5 lg:gap-12">
-        <FieldSet className="min-w-0 lg:col-span-2">
-          <FieldLegend>Goals</FieldLegend>
-          {isUpdate && <FieldDescription>Filled in from your last update. Change what is different.</FieldDescription>}
-          <Controller
-            name="goals"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="onboarding-goals">What do you want to achieve?</FieldLabel>
-                <Textarea
-                  {...field}
-                  id="onboarding-goals"
-                  aria-invalid={fieldState.invalid}
-                  placeholder="e.g. Run a 10k by March, get stronger without hurting my back"
-                />
-                {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-              </Field>
-            )}
-          />
-        </FieldSet>
+        <div className="flex min-w-0 flex-col gap-10 lg:col-span-2">
+          <FieldSet>
+            <FieldLegend>About you</FieldLegend>
+            <FieldDescription>
+              {isUpdate
+                ? 'Filled in from your last update. Change what is different.'
+                : 'Your coach sizes the load of your plan to these.'}
+            </FieldDescription>
+            <FieldGroup className="grid grid-cols-2 gap-4">
+              <Controller
+                name="heightCm"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="onboarding-height">Height (cm)</FieldLabel>
+                    <Input
+                      id="onboarding-height"
+                      ref={field.ref}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      type="number"
+                      inputMode="numeric"
+                      aria-invalid={fieldState.invalid}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(toNumber(event.target.value))}
+                      placeholder="e.g. 175"
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="weightKg"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="onboarding-weight">Weight (kg)</FieldLabel>
+                    <Input
+                      id="onboarding-weight"
+                      ref={field.ref}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      aria-invalid={fieldState.invalid}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(toNumber(event.target.value))}
+                      placeholder="e.g. 72.5"
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </FieldGroup>
+          </FieldSet>
+
+          <FieldSet>
+            <FieldLegend>Goals</FieldLegend>
+            <Controller
+              name="goals"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="onboarding-goals">What do you want to achieve?</FieldLabel>
+                  <Textarea
+                    {...field}
+                    id="onboarding-goals"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="e.g. Run a 10k by March, get stronger without hurting my back"
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
+            />
+          </FieldSet>
+        </div>
 
         <FieldSet className="min-w-0 lg:col-span-3">
           <FieldLegend>Health</FieldLegend>
-          <FieldDescription>Only what applies to you. You can add more later by telling your coach.</FieldDescription>
+          <FieldDescription>
+            Only what applies to you. Leave a list empty if you have none. You can add more later by telling your coach.
+          </FieldDescription>
           <FieldGroup>
             <Controller
               name="medications"
@@ -123,6 +189,7 @@ export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel 
                 />
               )}
             />
+            <ExamEntriesField form={form} />
             <Controller
               name="physicalConditions.otherNotes"
               control={form.control}
@@ -139,11 +206,6 @@ export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel 
                   />
                 </Field>
               )}
-            />
-            <Controller
-              name="attachments"
-              control={form.control}
-              render={({ field }) => <ExamAttachmentsField values={field.value ?? []} onChange={field.onChange} />}
             />
           </FieldGroup>
         </FieldSet>

@@ -1,12 +1,10 @@
 import type { ProfileEvent } from '@api/db/schema';
 import { localDateString, shiftLocalDate, todayLocal } from '@api/lib/dates';
-import { findQuestionnaireByUserId } from '@api/modules/aptitude/repository';
 import { findCheckInTimesForMember } from '@api/modules/checkins/repository';
 import * as repository from '@api/modules/members/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import { findPlanSummariesForMember } from '@api/modules/plans/repository';
 import { findRememberedEvents } from '@api/modules/profile/repository';
-import { QUESTIONNAIRE_V1 } from '@cadence/shared/schemas/aptitude';
 import { PROFILE_EVENT_LABELS } from '@cadence/shared/schemas/profile-events';
 import { TRPCError } from '@trpc/server';
 
@@ -45,27 +43,17 @@ async function loadOnboarding(userId: string) {
   if (!latest) return null;
   return {
     submittedAt: latest.submittedAt,
+    heightCm: latest.heightCm,
+    weightKg: latest.weightKg,
     goals: latest.goals,
     medications: latest.medications,
     conditions: latest.physicalConditions.conditions,
     otherNotes: latest.physicalConditions.otherNotes ?? null,
-  };
-}
-
-// The questionnaire answers keep their question text so a trainer reads them without the questionnaire at hand.
-async function loadQuestionnaire(userId: string) {
-  const questionnaire = await findQuestionnaireByUserId(userId);
-  if (!questionnaire) return null;
-  const questionText = new Map(QUESTIONNAIRE_V1.map((question) => [question.id, question.text]));
-  return {
-    aiResult: questionnaire.aiResult,
-    aiNotes: questionnaire.aiNotes,
-    submittedAt: questionnaire.submittedAt,
-    answers: questionnaire.answers.map((answer) => ({
-      questionId: answer.questionId,
-      question: questionText.get(answer.questionId) ?? answer.questionId,
-      answer: answer.answer,
-      detail: answer.detail ?? null,
+    exams: latest.exams.map((exam) => ({
+      name: exam.name,
+      date: exam.date ?? null,
+      findings: exam.findings,
+      hasAttachment: Boolean(exam.attachmentPath),
     })),
   };
 }
@@ -73,10 +61,9 @@ async function loadQuestionnaire(userId: string) {
 // What a trainer needs beside a plan to judge it: who the member is, what they said at onboarding and which
 // remembered facts still apply. Injuries and medication changes are never dropped: every unresolved fact is kept.
 export async function getMemberContext(userId: string, now: Date = new Date()) {
-  const [member, onboarding, questionnaire, events] = await Promise.all([
+  const [member, onboarding, events] = await Promise.all([
     repository.findMemberById(userId),
     loadOnboarding(userId),
-    loadQuestionnaire(userId),
     findRememberedEvents(userId),
   ]);
   if (!member) return null;
@@ -85,7 +72,6 @@ export async function getMemberContext(userId: string, now: Date = new Date()) {
     age: ageOn(member.birthdate, now),
     onboarding,
     facts: events.filter((event) => event.resolvedAt === null).map(toFact),
-    aptitude: { status: member.aptitudeStatus, questionnaire },
   };
 }
 
@@ -95,9 +81,8 @@ export async function getMember(userId: string, now: Date = new Date()) {
   if (!member?.membershipStatus) throw new TRPCError({ code: 'NOT_FOUND', message: 'Member not found' });
 
   const today = todayLocal(now);
-  const [onboarding, questionnaire, events, plans, checkInTimes] = await Promise.all([
+  const [onboarding, events, plans, checkInTimes] = await Promise.all([
     loadOnboarding(userId),
-    loadQuestionnaire(userId),
     findRememberedEvents(userId),
     findPlanSummariesForMember(userId, shiftLocalDate(today, -PLAN_HISTORY_DAYS)),
     findCheckInTimesForMember(userId, CHECK_IN_INSTANTS_READ),
@@ -116,7 +101,6 @@ export async function getMember(userId: string, now: Date = new Date()) {
       memberSince: member.createdAt,
     },
     membership: { status: member.membershipStatus, plan: member.membershipPlan },
-    aptitude: { status: member.aptitudeStatus, questionnaire },
     onboarding,
     facts: events.map(toFact),
     plans,

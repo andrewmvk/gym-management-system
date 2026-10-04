@@ -14,7 +14,6 @@ export const READ_ALL_PLANS = 'read_all_plans';
 export const UPDATE_ALL_PLANS = 'update_all_plans';
 export const MANAGE_PLAN_REVIEWS = 'manage_plan_reviews';
 export const MANAGE_CATALOG = 'manage_catalog';
-export const REVIEW_CERTIFICATES = 'review_certificates';
 export const MANAGE_TURNSTILE_CONFIG = 'manage_turnstile_config';
 export const MANAGE_POLICY_ASSIGNMENTS = 'manage_policy_assignments';
 export const READ_MEMBERS = 'read_members';
@@ -37,7 +36,6 @@ export type PolicyId =
   | typeof UPDATE_ALL_PLANS
   | typeof MANAGE_PLAN_REVIEWS
   | typeof MANAGE_CATALOG
-  | typeof REVIEW_CERTIFICATES
   | typeof MANAGE_TURNSTILE_CONFIG
   | typeof MANAGE_POLICY_ASSIGNMENTS
   | typeof READ_MEMBERS
@@ -141,13 +139,6 @@ export const POLICY_CATALOG: readonly PolicyDefinition[] = [
     scope: 'all',
   },
   {
-    id: REVIEW_CERTIFICATES,
-    description: 'Review medical certificates in the admin queue',
-    operation: 'manage',
-    resource: 'MedicalCertificate',
-    scope: 'all',
-  },
-  {
     id: MANAGE_TURNSTILE_CONFIG,
     description: 'Configure the external turnstile API',
     operation: 'manage',
@@ -207,7 +198,6 @@ export const TRAINER_POLICY_IDS = [
 export const ADMIN_POLICY_IDS = [
   READ_STAFF_APP,
   MANAGE_CATALOG,
-  REVIEW_CERTIFICATES,
   MANAGE_TURNSTILE_CONFIG,
   MANAGE_POLICY_ASSIGNMENTS,
   READ_MEMBERS,
@@ -236,7 +226,7 @@ export const POLICY_GROUP_CATALOG: readonly PolicyGroupDefinition[] = [
   { id: TRAINER_GROUP, description: 'Personal trainers: review and edit every plan', policyIds: TRAINER_POLICY_IDS },
   {
     id: ADMIN_GROUP,
-    description: 'Gym admins: catalog, turnstile, certificates and access',
+    description: 'Gym admins: catalog, turnstile and access',
     policyIds: ADMIN_POLICY_IDS,
   },
 ];

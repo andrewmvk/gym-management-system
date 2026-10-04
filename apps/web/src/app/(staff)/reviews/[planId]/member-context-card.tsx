@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import { useAppAbility } from '@/abilities';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime } from '@/lib/format';
+import { formatDateTime, formatPlanDate } from '@/lib/format';
 import { isSafetyEvent, PROFILE_EVENT_ORDER } from '@/lib/profile-event-order';
 
 interface MemberContextFact {
@@ -21,18 +21,15 @@ interface MemberContext {
   age: number | null;
   onboarding: {
     submittedAt: string | Date;
+    heightCm: number;
+    weightKg: number;
     goals: string;
     medications: readonly string[];
     conditions: readonly string[];
     otherNotes: string | null;
+    exams: readonly { name: string; date: string | null; findings: string; hasAttachment: boolean }[];
   } | null;
   facts: readonly MemberContextFact[];
-  aptitude: {
-    questionnaire: {
-      aiNotes: string | null;
-      answers: readonly { questionId: string; question: string; answer: boolean; detail: string | null }[];
-    } | null;
-  };
 }
 
 interface MemberContextCardProps {
@@ -91,8 +88,7 @@ function MemberContextCardSkeleton() {
 
 function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
   const ability = useAppAbility();
-  const { onboarding, facts, aptitude } = context;
-  const yesAnswers = aptitude.questionnaire?.answers.filter((answer) => answer.answer) ?? [];
+  const { onboarding, facts } = context;
   const orderedFacts = [...facts].sort(
     (a, b) => PROFILE_EVENT_ORDER.indexOf(a.eventType) - PROFILE_EVENT_ORDER.indexOf(b.eventType),
   );
@@ -115,6 +111,13 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
             <div className="flex flex-col gap-2 text-sm">
               <dl className="flex flex-col gap-2">
                 <div>
+                  <dt className="font-semibold">Height and weight</dt>
+                  <dd>
+                    <span className="numerals text-base font-semibold">{onboarding.heightCm}</span> cm,{' '}
+                    <span className="numerals text-base font-semibold">{onboarding.weightKg}</span> kg
+                  </dd>
+                </div>
+                <div>
                   <dt className="font-semibold">Goals</dt>
                   <dd className="text-pretty break-words whitespace-pre-line">{onboarding.goals}</dd>
                 </div>
@@ -132,6 +135,32 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
                     <dd className="text-pretty break-words whitespace-pre-line">{onboarding.otherNotes}</dd>
                   </div>
                 )}
+                <div>
+                  <dt className="font-semibold">Medical exams</dt>
+                  <dd>
+                    {onboarding.exams.length > 0 ? (
+                      <ul className="flex flex-col gap-1.5">
+                        {onboarding.exams.map((exam) => (
+                          <li
+                            key={`${exam.name}:${exam.date ?? ''}:${exam.findings}`}
+                            className="text-pretty break-words"
+                          >
+                            <span className="font-medium">{exam.name}</span>
+                            {exam.date && (
+                              <span className="numerals text-base font-semibold text-muted-foreground">
+                                {' '}
+                                ({formatPlanDate(exam.date)})
+                              </span>
+                            )}
+                            : {exam.findings}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : (
+                      'None listed'
+                    )}
+                  </dd>
+                </div>
               </dl>
               <p className="text-muted-foreground">
                 Submitted{' '}
@@ -168,34 +197,6 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
                 </li>
               ))}
             </ul>
-          )}
-        </Block>
-
-        <Block label="Aptitude questionnaire">
-          {aptitude.questionnaire === null ? (
-            <None>No questionnaire on file.</None>
-          ) : (
-            <div className="flex flex-col gap-2 text-sm">
-              {yesAnswers.length === 0 ? (
-                <None>No question was answered yes.</None>
-              ) : (
-                <ul className="flex flex-col gap-2">
-                  {yesAnswers.map((answer) => (
-                    <li key={answer.questionId} className="text-pretty">
-                      <span className="font-semibold">Yes: </span>
-                      {answer.question}
-                      {answer.detail && <span className="block text-muted-foreground">{answer.detail}</span>}
-                    </li>
-                  ))}
-                </ul>
-              )}
-              {aptitude.questionnaire.aiNotes && (
-                <p className="text-pretty">
-                  <span className="font-semibold">AI note: </span>
-                  {aptitude.questionnaire.aiNotes}
-                </p>
-              )}
-            </div>
           )}
         </Block>
 

@@ -5,7 +5,7 @@ import { env } from '@api/config/env';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
-export const UPLOAD_KINDS = ['reference_photo', 'exam', 'certificate'] as const;
+export const UPLOAD_KINDS = ['reference_photo', 'exam'] as const;
 export type UploadKind = (typeof UPLOAD_KINDS)[number];
 
 const MB = 1024 * 1024;
@@ -19,7 +19,6 @@ type MimeType = keyof typeof FILE_TYPES;
 
 const UPLOAD_RULES: Record<UploadKind, { mimeTypes: readonly MimeType[]; maxBytes: number }> = {
   reference_photo: { mimeTypes: ['image/jpeg', 'image/png'], maxBytes: 2 * MB },
-  certificate: { mimeTypes: ['image/jpeg', 'image/png'], maxBytes: 5 * MB },
   exam: { mimeTypes: ['image/jpeg', 'image/png', 'application/pdf'], maxBytes: 5 * MB },
 };
 
@@ -28,11 +27,7 @@ export const MIME_TYPE_BY_EXTENSION: Record<string, MimeType> = Object.fromEntri
 );
 
 // Files travel as base64 inside tRPC inputs, so only these procedures get the larger body limit (see app.ts).
-export const FILE_UPLOAD_PROCEDURES: readonly string[] = [
-  'aptitude.submitSignup',
-  'certificates.upload',
-  'onboarding.submit',
-];
+export const FILE_UPLOAD_PROCEDURES: readonly string[] = ['auth.register', 'onboarding.submit'];
 // Room for several 5 MB exam attachments in one onboarding submission after the ~4/3 base64 overhead.
 export const FILE_REQUEST_MAX_BYTES = 32 * MB;
 export const DEFAULT_REQUEST_MAX_BYTES = 1 * MB;

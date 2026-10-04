@@ -1,5 +1,3 @@
-import { certificateRouter } from '@api/modules/aptitude/certificate-router';
-import { aptitudeRouter } from '@api/modules/aptitude/router';
 import { authRouter } from '@api/modules/auth/router';
 import { catalogRouter } from '@api/modules/catalog/router';
 import { chatRouter } from '@api/modules/chat/router';
@@ -18,10 +16,8 @@ import { turnstileRouter } from '@api/modules/turnstile/router';
 import { router } from '@api/trpc/procedures';
 
 export const appRouter = router({
-  aptitude: aptitudeRouter,
   auth: authRouter,
   catalog: catalogRouter,
-  certificates: certificateRouter,
   chat: chatRouter,
   checkins: checkinsRouter,
   focus: focusRouter,

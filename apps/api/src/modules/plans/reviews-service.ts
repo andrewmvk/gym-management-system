@@ -43,13 +43,15 @@ async function findBlockedByPlan(planIds: readonly string[], catalog: readonly C
 export async function listQueue(now: Date = new Date()) {
   const [queue, catalog] = await Promise.all([repository.findPlansQueue(), listExercises()]);
   const today = todayLocal(now);
-  const blocked = await findBlockedByPlan(
-    queue.filter((entry) => entry.planDate >= today).map((entry) => entry.id),
-    catalog,
-  );
+  const upcomingIds = queue.filter((entry) => entry.planDate >= today).map((entry) => entry.id);
+  const [blocked, risks] = await Promise.all([
+    findBlockedByPlan(upcomingIds, catalog),
+    repository.findPlanIdsWithAcknowledgedRisk(upcomingIds),
+  ]);
   return queue.map((entry) => {
     const unavailableCount = blocked.get(entry.id)?.length ?? 0;
-    return { ...entry, needsReview: unavailableCount > 0, unavailableCount };
+    const riskCount = risks.get(entry.id)?.length ?? 0;
+    return { ...entry, needsReview: unavailableCount > 0 || riskCount > 0, unavailableCount, riskCount };
   });
 }
 
@@ -89,18 +91,22 @@ export async function getOverview(now: Date = new Date()) {
   ]);
 
   const upcoming = queue.filter((entry) => entry.planDate >= today);
-  const blocked = await findBlockedByPlan(
-    upcoming.map((entry) => entry.id),
-    catalog,
-  );
+  const [blocked, risks] = await Promise.all([
+    findBlockedByPlan(
+      upcoming.map((entry) => entry.id),
+      catalog,
+    ),
+    repository.findPlanIdsWithAcknowledgedRisk(upcoming.map((entry) => entry.id)),
+  ]);
   const needsReview = upcoming
-    .filter((entry) => blocked.has(entry.id))
+    .filter((entry) => blocked.has(entry.id) || risks.has(entry.id))
     .map((entry) => ({
       planId: entry.id,
       memberName: entry.memberName,
       planDate: entry.planDate,
       status: entry.status,
-      blocked: blocked.get(entry.id)!,
+      blocked: blocked.get(entry.id) ?? [],
+      risks: risks.get(entry.id) ?? [],
     }))
     .sort((a, b) => a.planDate.localeCompare(b.planDate) || a.memberName.localeCompare(b.memberName));
 
@@ -179,9 +185,10 @@ export async function getPlan(planId: string) {
   const plan = await repository.findPlanWithMember(planId);
   if (!plan) return null;
 
-  const [exercises, reviews, catalog, recentExercises, muscleFocus, memberContext] = await Promise.all([
+  const [exercises, reviews, changes, catalog, recentExercises, muscleFocus, memberContext] = await Promise.all([
     repository.findExercisesForPlanWithDetails(planId),
     repository.findReviewsForPlan(planId),
+    repository.findPlanChangesForPlan(planId),
     listExercises(),
     findPlanExercisesInRange(
       plan.userId,
@@ -193,8 +200,29 @@ export async function getPlan(planId: string) {
   ]);
 
   const recentMuscleLoad = computeMuscleLoad(recentExercises.filter((exercise) => exercise.completed));
-  const blocked = plan.planDate >= todayLocal() ? ((await findBlockedByPlan([planId], catalog)).get(planId) ?? []) : [];
-  return { plan, exercises, reviews, catalog, recentMuscleLoad, muscleFocus, blocked, memberContext };
+  const isOpen = plan.planDate >= todayLocal();
+  const blocked = isOpen ? ((await findBlockedByPlan([planId], catalog)).get(planId) ?? []) : [];
+  const risks = isOpen ? ((await repository.findPlanIdsWithAcknowledgedRisk([planId])).get(planId) ?? []) : [];
+  return {
+    plan,
+    exercises,
+    reviews,
+    changes: changes.map((change) => ({
+      id: change.id,
+      kind: change.kind,
+      request: change.request,
+      before: change.before as repository.PlanChangeExercise[],
+      after: change.after as repository.PlanChangeExercise[],
+      acknowledgedWarnings: change.acknowledgedWarnings as repository.AcknowledgedWarning[],
+      createdAt: change.createdAt,
+    })),
+    catalog,
+    recentMuscleLoad,
+    muscleFocus,
+    blocked,
+    risks,
+    memberContext,
+  };
 }
 
 // FR-19: every note is its own row, in order - never overwrites an earlier trainer's note.

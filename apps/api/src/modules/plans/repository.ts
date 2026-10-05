@@ -2,10 +2,12 @@ import { type DatabaseExecutor, db, type Transaction } from '@api/db/client';
 import {
   dExercises,
   dUsers,
+  fPlanChanges,
   fPlanReviews,
   fProfileEvents,
   fTrainingPlanExercises,
   fTrainingPlans,
+  type PlanChange,
   type PlanReview,
   type ProfileEvent,
   type TrainingPlan,
@@ -13,7 +15,7 @@ import {
 } from '@api/db/schema';
 import { findMusclesByExerciseIds } from '@api/modules/catalog/repository';
 import type { ExerciseMuscle } from '@cadence/shared/schemas/muscles';
-import { and, asc, count, desc, eq, gte, inArray, isNull, lt, lte, ne, sql } from 'drizzle-orm';
+import { and, asc, count, desc, eq, gte, inArray, isNotNull, isNull, lt, lte, ne, sql } from 'drizzle-orm';
 import { alias } from 'drizzle-orm/pg-core';
 
 export async function findPlanByUserAndDate(
@@ -33,7 +35,7 @@ export interface PlanHistoryRow {
   exerciseName: string;
   sets: number;
   reps: number;
-  load: string | null;
+  load: number | null;
   completed: boolean;
 }
 
@@ -67,12 +69,15 @@ export function findPlanHistory(
     .orderBy(desc(fTrainingPlans.planDate), asc(fTrainingPlanExercises.orderIndex));
 }
 
-// Resolved events are the member's way of saying a fact no longer applies, so no prompt may see them.
+// Resolved events are the member's way of saying a fact no longer applies, and a pending one is a fact the
+// member has not confirmed yet, so no prompt may see either.
 export function findUnresolvedProfileEvents(userId: string, executor: DatabaseExecutor = db): Promise<ProfileEvent[]> {
   return executor
     .select()
     .from(fProfileEvents)
-    .where(and(eq(fProfileEvents.userId, userId), isNull(fProfileEvents.resolvedAt)))
+    .where(
+      and(eq(fProfileEvents.userId, userId), isNull(fProfileEvents.resolvedAt), isNotNull(fProfileEvents.confirmedAt)),
+    )
     .orderBy(desc(fProfileEvents.createdAt));
 }
 
@@ -219,7 +224,7 @@ export interface PlanExerciseInput {
   exerciseId: string;
   sets: number;
   reps: number;
-  load?: string;
+  load?: number | null;
   notes?: string;
   // Left out, the tick of the same exercise in the plan being replaced is kept.
   completed?: boolean;
@@ -569,6 +574,135 @@ export async function findExercisesForDate(
     sets,
     muscles: muscles.get(exerciseId) ?? [],
   }));
+}
+
+export async function insertProfileEvent(
+  input: { userId: string; eventType: ProfileEvent['eventType']; payload: unknown; sourceMessage: string | null },
+  executor: DatabaseExecutor = db,
+): Promise<ProfileEvent> {
+  const [row] = await executor.insert(fProfileEvents).values(input).returning();
+  return row!;
+}
+
+export interface PlanChangeExercise {
+  exerciseId: string;
+  name: string;
+  sets: number;
+  reps: number;
+  // Kilograms. Entries saved before weights became numbers may still hold the text that was typed.
+  load: number | string | null;
+}
+
+export interface AcknowledgedWarning {
+  exerciseId: string;
+  name: string;
+  reason: string;
+}
+
+export interface PlanChangeInput {
+  trainingPlanId: string;
+  userId: string;
+  kind: PlanChange['kind'];
+  request: string | null;
+  before: PlanChangeExercise[];
+  after: PlanChangeExercise[];
+  acknowledgedWarnings: AcknowledgedWarning[];
+}
+
+export async function insertPlanChange(input: PlanChangeInput, executor: DatabaseExecutor = db): Promise<PlanChange> {
+  const [row] = await executor.insert(fPlanChanges).values(input).returning();
+  return row!;
+}
+
+export function findPlanChangesForPlan(planId: string, executor: DatabaseExecutor = db): Promise<PlanChange[]> {
+  return executor
+    .select()
+    .from(fPlanChanges)
+    .where(eq(fPlanChanges.trainingPlanId, planId))
+    .orderBy(asc(fPlanChanges.createdAt));
+}
+
+// The plans among the given ones where the member accepted a safety warning before applying a change, and no
+// trainer has looked at the plan since: a note or an edit after the change counts as the review.
+export async function findPlanIdsWithAcknowledgedRisk(
+  planIds: readonly string[],
+  executor: DatabaseExecutor = db,
+): Promise<Map<string, AcknowledgedWarning[]>> {
+  const risks = new Map<string, AcknowledgedWarning[]>();
+  if (planIds.length === 0) return risks;
+  const rows = await executor
+    .select({
+      trainingPlanId: fPlanChanges.trainingPlanId,
+      acknowledgedWarnings: fPlanChanges.acknowledgedWarnings,
+    })
+    .from(fPlanChanges)
+    .where(
+      and(
+        inArray(fPlanChanges.trainingPlanId, [...planIds]),
+        sql`jsonb_array_length(${fPlanChanges.acknowledgedWarnings}) > 0`,
+        sql`not exists (
+          select 1 from ${fPlanReviews}
+          where ${fPlanReviews.trainingPlanId} = ${fPlanChanges.trainingPlanId}
+            and ${fPlanReviews.createdAt} > ${fPlanChanges.createdAt}
+        )`,
+      ),
+    )
+    .orderBy(asc(fPlanChanges.createdAt));
+  for (const row of rows) {
+    risks.set(row.trainingPlanId, [
+      ...(risks.get(row.trainingPlanId) ?? []),
+      ...(row.acknowledgedWarnings as AcknowledgedWarning[]),
+    ]);
+  }
+  return risks;
+}
+
+export interface ExerciseForEdit {
+  id: string;
+  userId: string;
+  trainingPlanId: string;
+  planDate: string;
+  exerciseId: string;
+  exerciseName: string;
+  sets: number;
+  reps: number;
+  load: number | null;
+}
+
+export async function findExerciseForEdit(
+  planExerciseId: string,
+  executor: DatabaseExecutor = db,
+): Promise<ExerciseForEdit | null> {
+  const [row] = await executor
+    .select({
+      id: fTrainingPlanExercises.id,
+      userId: fTrainingPlans.userId,
+      trainingPlanId: fTrainingPlans.id,
+      planDate: fTrainingPlans.planDate,
+      exerciseId: fTrainingPlanExercises.exerciseId,
+      exerciseName: dExercises.name,
+      sets: fTrainingPlanExercises.sets,
+      reps: fTrainingPlanExercises.reps,
+      load: fTrainingPlanExercises.load,
+    })
+    .from(fTrainingPlanExercises)
+    .innerJoin(fTrainingPlans, eq(fTrainingPlans.id, fTrainingPlanExercises.trainingPlanId))
+    .innerJoin(dExercises, eq(dExercises.id, fTrainingPlanExercises.exerciseId))
+    .where(eq(fTrainingPlanExercises.id, planExerciseId));
+  return row ?? null;
+}
+
+export async function updateExerciseNumbers(
+  planExerciseId: string,
+  numbers: { sets: number; reps: number; load: number | null },
+  executor: DatabaseExecutor = db,
+): Promise<TrainingPlanExercise> {
+  const [row] = await executor
+    .update(fTrainingPlanExercises)
+    .set(numbers)
+    .where(eq(fTrainingPlanExercises.id, planExerciseId))
+    .returning();
+  return row!;
 }
 
 // A direct trainer edit (FR-19): replaces the exercise list, flips status to trainer_edited, and

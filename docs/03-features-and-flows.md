@@ -54,7 +54,10 @@ Notes:
      file (JPEG, PNG or PDF). With no exams, the member says so: "none" is
      valid.
 3. Onboarding data is saved to the member's profile.
-4. AI generates the member's first training plan from this data.
+4. The save is confirmed at once, then the AI generates the member's first
+   training plan from this data, streamed: the member watches the plan
+   being built, exercise by exercise (FR-70). A build that fails saves no
+   plan and the profile stays saved, with a retry.
 5. Plan is published immediately (visible to member right away).
 6. Plan appears in the trainer's shared review queue for asynchronous oversight.
 ```
@@ -69,15 +72,20 @@ Onboarding is not a one-time gate - members can add or revise this information l
 1. The member's Health profile page shows two things side by side:
    - The current profile: the latest onboarding submission, with an action
      to update it.
-   - "What your coach remembers": every fact stored in the member's history
-     (injuries, medication changes, skipped exercises, life events, muscle
-     focus changes), grouped by type, each with its date and the member's
-     own words.
-2. The member can mark a fact "No longer true". It moves to a "No longer
+   - "What your coach remembers": every confirmed fact stored in the
+     member's history (injuries, medication changes, skipped exercises,
+     life events, muscle focus changes, the member's own manual edits of
+     sets, reps and weight), grouped by type, each with its date and the
+     member's own words.
+2. Facts the coach picked up in the chat and the member has not saved yet
+   come first, under "Waiting for your confirmation" (FR-72): Confirm,
+   Edit (then confirm) or Dismiss. They shape no plan until confirmed and
+   staff do not see them. A dismissed fact is discarded.
+3. The member can mark a fact "No longer true". It moves to a "No longer
    true" list, struck through, and the AI stops using it on every future
    plan and chat turn. "Applies again" brings it back.
-3. Nothing is deleted: a resolved fact stays in the history and stays
-   visible to staff, muted.
+4. Nothing confirmed is deleted: a resolved fact stays in the history and
+   stays visible to staff, muted.
 ```
 
 ## 3. Member: Facial Recognition Check-in (kiosk panel)
@@ -132,6 +140,16 @@ Notes:
    names those exercises and the equipment, and offers "rebuild without
    them", which asks for confirmation first.
    Any trainer notes on the plan are shown with it (see below).
+   An injury the member reported is outlined on the muscle map in Pace Tape
+   (FR-69), and the selected muscle's panel quotes it.
+   The numbers of an exercise that can still be done are the member's to
+   change (FR-68): tapping sets x reps or the weight swaps them for an
+   inline editor; saving records it as a confirmed fact the AI reads later
+   and as an entry in the trainers' change log.
+   Tapping an exercise's name selects it (FR-64) and a single "Ask coach"
+   bar appears, with no buttons on the rows; asking opens the chat with the
+   exercise attached as a chip. Selecting a muscle offers "Find exercises
+   for this muscle", which opens the chat and asks at once.
 2. The plan page's "Other days" tab lets the member browse plan history by
    date and see upcoming plans: the days from today onwards that already hold
    a plan appear as date chips with their exercise count. Each day shows its
@@ -141,35 +159,71 @@ Notes:
    - Report a physical state change (injury, soreness, medication change).
    - Report a life event affecting training (e.g. "I played soccer yesterday").
    - Ask the AI to adapt today's or a future day's plan.
+   - Point at an exercise (from the plan, or a row of a proposal) or a
+     muscle (on the muscle map): the exercise or muscle goes with the
+     message as a chip, so "4 reps is too much, reduce to 3" or "how do I
+     do that exercise?" or "what are the benefits?" is about exactly that
+     one (FR-64).
    - Ask the AI how their plan compares to what other members are doing
      today (AI can pull aggregate info from other members' published plans).
-4. Every message is parsed by the AI to extract structured facts, which are
-   saved permanently to the member's history - this is what the AI reads
-   back on every future plan generation/chat turn, not the raw chat log.
-   After each reply the chat shows which facts it just remembered, with a
-   link to the Health profile page (flow 2) where the member can see and
-   correct them.
-5. A plan is never silently overwritten. When regenerating or adjusting a
-   plan would replace something worth keeping, the member is first asked to
-   confirm, and the reason is named:
+   The reply streams as text, then each component the coach chose settles
+   into the thread (FR-63, FR-70): a plan proposal card, an exercise
+   picker, an exercise explainer, a safety warning, facts to remember and
+   suggested replies. While it works the button and the status line show
+   the animated Coach Mark.
+4. Every message is parsed by the AI to extract structured facts. They are
+   offered in the thread as "Remember this?" (an injury also names the
+   muscles it affects): the member saves, edits or dismisses each one.
+   Only a saved fact is stored as part of the member's history and read
+   back on future plans and chat turns, not the raw chat log; an unsaved
+   one waits on the Health profile page (flow 2).
+5. A plan change is proposed, never made, by the coach (FR-65). The
+   proposal card summarizes it and opens the editable proposal beside the
+   chat on a wide screen (over it on a phone):
+   - Each row shows what is new or changed (the old numbers struck beside
+     the new), the coach's one-line reason and a remove control; sets,
+     reps and weight can be edited by hand, an exercise can be put back,
+     and a row can be pointed at to ask for a revision. The draft goes
+     back to the coach with every message and a revision replaces it.
+   - From the exercise picker (after pointing at a muscle) the member adds
+     an option to the current or proposed plan; from a safety warning the
+     member swaps in a safer alternative.
+   - A proposed change of muscle focus is listed with the old and new level
+     and can be dropped (FR-66).
+   - An exercise that conflicts with a reported injury carries a safety
+     warning that must be accepted before Apply is enabled, or the member
+     asks for a safer swap (FR-67).
+   - Apply sends the final draft; nothing is saved before it. Applying does
+     not call the AI again.
+   A plan is never silently overwritten. When applying or rebuilding would
+   replace something worth keeping, the member is first asked to confirm,
+   and the reason is named:
    - A trainer edited the plan ("A trainer already adjusted this plan" -
      confirming replaces their edits).
    - The member already ticked off exercises ("You've already started this
      plan" - confirming keeps the ticks on exercises that stay in the plan).
    If both apply, the trainer edit is named first. A plan with neither is
    rebuilt straight away.
-6. A chat adjustment for today or a later day passes the member's own
-   instruction into the regeneration, so the AI follows what was asked
-   (unless it conflicts with safety, injuries or medication).
-7. If the adjusted plan is published, it surfaces in the trainer review
-   queue like any other plan.
-8. A retroactive correction to a past day directly overwrites that day's
-   historical record - this is intentional; metrics (flow 5) reflect the
-   corrected version, not the original.
+6. A proposal for today or a later day follows the member's request unless
+   it conflicts with safety, injuries or medication; the coach can look up
+   exercise details, the catalog by muscle, workout history, trainer notes
+   and equipment status while it answers (read-only, FR-25).
+7. An applied change surfaces in the trainer review queue like any other
+   plan. Trainers see it in the plan's change log with the member's
+   request and the diff (flow 6); if the member accepted a safety warning,
+   the plan is flagged must-review until a trainer leaves a note or an
+   edit (FR-71).
+8. A retroactive correction to a past day is a proposal with the completed
+   tick of every exercise stated; applying it directly overwrites that
+   day's historical record - this is intentional; metrics (flow 5) reflect
+   the corrected version, not the original.
 9. If the AI is unavailable when a plan or a chat reply is needed, the
    member sees "AI is temporarily unavailable" and nothing is saved: an AI
-   failure never produces a plan. The deterministic placeholder plan exists
-   only in the mock/demo mode, never as a fallback for a failed live AI.
+   failure never produces a plan. A reply or plan build that breaks off
+   midway keeps nothing and offers a retry; a proposal already shown is
+   only a draft and changes nothing. The deterministic placeholder plan
+   exists only in the mock/demo mode, never as a fallback for a failed
+   live AI.
 ```
 
 What the AI balances when it builds or rebuilds a plan (FR-15): the member's goals, physical information, physical conditions, medications, exams, the accumulated facts that still apply, the muscle focus, the last 14 days of plans with what was done and when the member checked in, the latest trainer notes and edits, and the demand other members' plans for that date already place on each piece of equipment (counted in plans) and on each muscle. Broad goals are spread across different equipment and overloaded equipment is avoided, but safety, injuries, medications, exams and muscle focus always win over that spreading.
@@ -238,7 +292,16 @@ Trainer notes (FR-19): each note and each edit a trainer leaves is its own entry
      plan does not train. The preview only shows facts: whether the plan
      lacks something useful for the member is the trainer's own judgement.
    - If the plan is a must-review plan, a banner at the top names the
-     exercises that cannot be done and the equipment that is down.
+     exercises that cannot be done and the equipment that is down. A plan
+     where the member accepted a safety warning in the coach and applied
+     the change anyway carries a "Safety warning accepted" badge in the
+     queue and a banner naming the exercise and the warning (FR-71); a
+     note or an edit from a trainer afterwards clears it, and it never
+     blocks publication.
+   - "Changed through the coach" (FR-71): the member's coach changes and
+     their own edits of sets, reps and weight on this plan, oldest first,
+     each with the member's request, what was added, changed or removed,
+     and any warning they accepted.
    - Previous and Next buttons that walk the queue in the same order and
      with the same filters the trainer came from.
 3. The trainer has one note field and two actions:

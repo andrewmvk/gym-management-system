@@ -1,16 +1,16 @@
 'use client';
 
 import type { MuscleLoad } from '@cadence/shared/schemas/muscle-heat';
-import type { MuscleId } from '@cadence/shared/schemas/muscles';
+import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { SparklesIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { useCoach } from '@/app/(member)/coach/coach-context';
 import { MuscleDetail, type PanelExercise } from '@/app/(member)/plan/muscle-detail';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
+import { AiButton } from '@/components/ai-button';
 import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
 import { focusToMap } from '@/components/muscle-map/muscle-marks';
-import { Button } from '@/components/ui/button';
 import { useTRPC } from '@/lib/trpc';
 
 function PanelShell({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
@@ -74,6 +74,17 @@ function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange
   );
 
   const rebuild = useRebuildPlan({ successMessage: 'Your plan was rebuilt with your muscle focus.' });
+  const coach = useCoach();
+
+  // An enhancement only: without the injuries (still loading or failed) the map simply draws without them.
+  const injuriesQuery = useQuery(trpc.profile.listActiveInjuries.queryOptions());
+  const injured = new Map<MuscleId, string>();
+  for (const injury of injuriesQuery.data ?? []) {
+    for (const muscle of injury.muscles) {
+      const known = injured.get(muscle);
+      injured.set(muscle, known ? `${known}; ${injury.description}` : injury.description);
+    }
+  }
 
   const focus = focusToMap(focusQuery.data ?? []);
   const canEditFocus = focusQuery.isSuccess;
@@ -83,10 +94,14 @@ function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange
       <PanelShell
         footer={
           <div className="flex flex-col gap-2 border-t bg-muted/60 px-5 py-4 sm:px-6">
-            <Button variant="outline" disabled={rebuild.isPending} onClick={rebuild.requestRebuild}>
-              <SparklesIcon data-icon="inline-start" />
-              {rebuild.isPending ? 'Rebuilding...' : 'Rebuild today with my focus'}
-            </Button>
+            <AiButton
+              variant="outline"
+              isPending={rebuild.isPending}
+              pendingLabel="Rebuilding..."
+              onClick={rebuild.requestRebuild}
+            >
+              Rebuild today with my focus
+            </AiButton>
             {focusQuery.isError && (
               <p role="alert" className="text-sm text-destructive">
                 We couldn&apos;t load your muscle focus, so it can&apos;t be changed right now.
@@ -103,6 +118,7 @@ function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange
           isSingleView
           selected={selected}
           onSelectedChange={onSelectedChange}
+          injured={injured}
           emptyNote="Nothing in today's plan can be done right now."
           detail={(muscle) => (
             <MuscleDetail
@@ -111,6 +127,13 @@ function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange
               bias={focus[muscle]}
               onBias={(bias) => setFocus.mutate({ muscle, bias })}
               isBiasDisabled={!canEditFocus}
+              injury={injured.get(muscle)}
+              onAsk={() =>
+                coach.ask({
+                  mentions: [{ type: 'muscle', muscle }],
+                  message: `Which exercises could I add for my ${muscleLabel(muscle).toLowerCase()}?`,
+                })
+              }
             />
           )}
         />

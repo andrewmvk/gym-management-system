@@ -22,6 +22,8 @@ export interface MuscleMark {
   isGap?: boolean;
   // The member's own emphasis: drawn as a cobalt outline, dashed when it is less.
   bias?: number;
+  // An injury the member reported: a Pace Tape outline and a tape hatch, because it asks to be looked at.
+  isInjured?: boolean;
 }
 
 export type MuscleMarks = Partial<Record<MuscleId, MuscleMark>>;
@@ -55,8 +57,9 @@ interface BodyViewProps extends Omit<MuscleMapProps, 'className'> {
 }
 
 function emphasisOf(muscle: MuscleId, { marks, selected, highlighted }: BodyViewProps) {
-  if (muscle === selected) return 3;
-  if (muscle === highlighted) return 2;
+  if (muscle === selected) return 4;
+  if (muscle === highlighted) return 3;
+  if (marks[muscle]?.isInjured) return 2;
   return marks[muscle]?.bias ? 1 : 0;
 }
 
@@ -90,6 +93,16 @@ function BodyView(props: BodyViewProps) {
         >
           <line x1="0" y1="0" x2="0" y2="7" strokeWidth="3" className="stroke-card/80" />
         </pattern>
+        {/* Leans the other way from the equipment hatch, so an injury never reads as lost equipment. */}
+        <pattern
+          id={`${hatchId}-tape`}
+          width="7"
+          height="7"
+          patternUnits="userSpaceOnUse"
+          patternTransform="rotate(-45)"
+        >
+          <line x1="0" y1="0" x2="0" y2="7" strokeWidth="3" className="stroke-tape/80" />
+        </pattern>
       </defs>
       {muscles.map((muscle) => {
         const mark = marks[muscle];
@@ -97,10 +110,11 @@ function BodyView(props: BodyViewProps) {
         const isSelected = muscle === selected;
         const isHighlighted = muscle === highlighted;
         const hasBias = Boolean(mark?.bias);
-        const isOutlined = isSelected || isHighlighted || hasBias;
+        const isInjured = Boolean(mark?.isInjured) && !isSkeleton;
+        const isOutlined = isSelected || isHighlighted || hasBias || isInjured;
         const isDashed = !isOutlined && mark?.isGap && !isSkeleton;
-        const outlineWidth = isSelected ? 3 : 2;
-        const hasHalo = isSelected || isHighlighted;
+        const outlineWidth = isSelected || (isInjured && !isHighlighted) ? 3 : 2;
+        const hasHalo = isSelected || isHighlighted || isInjured;
         const hatchFill = `url(#${hatchId}-${step >= 3 ? 'card' : 'ink'})`;
 
         return (
@@ -112,7 +126,7 @@ function BodyView(props: BodyViewProps) {
             onPointerEnter={isInteractive ? () => onHover?.(muscle) : undefined}
             onPointerLeave={isInteractive ? () => onHover?.(null) : undefined}
           >
-            {isInteractive && <title>{muscleLabel(muscle)}</title>}
+            {isInteractive && <title>{isInjured ? `${muscleLabel(muscle)}, injured` : muscleLabel(muscle)}</title>}
             {hasHalo &&
               paths[muscle]?.map((shape, index) => (
                 <path
@@ -133,12 +147,14 @@ function BodyView(props: BodyViewProps) {
                 transform={shape.transform}
                 vectorEffect="non-scaling-stroke"
                 strokeWidth={isOutlined ? outlineWidth : 1.5}
-                strokeDasharray={isDashed || (hasBias && (mark?.bias ?? 0) < 0) ? '4 3' : undefined}
+                strokeDasharray={isDashed || (hasBias && !isInjured && (mark?.bias ?? 0) < 0) ? '4 3' : undefined}
                 className={cn(
                   'transition-[fill,stroke] duration-300 ease-out-expo',
                   isSkeleton ? 'fill-foreground/7' : HEAT_FILL[step],
                   isOutlined
-                    ? 'stroke-primary'
+                    ? isInjured && !isSelected && !isHighlighted
+                      ? 'stroke-tape'
+                      : 'stroke-primary'
                     : isDashed
                       ? 'stroke-foreground/45'
                       : step === 0 && !isSkeleton
@@ -147,6 +163,17 @@ function BodyView(props: BodyViewProps) {
                 )}
               />
             ))}
+            {isInjured &&
+              paths[muscle]?.map((shape, index) => (
+                <path
+                  // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
+                  key={index}
+                  d={shape.d}
+                  transform={shape.transform}
+                  fill={`url(#${hatchId}-tape)`}
+                  className="pointer-events-none"
+                />
+              ))}
             {mark?.isLost &&
               !isSkeleton &&
               paths[muscle]?.map((shape, index) => (

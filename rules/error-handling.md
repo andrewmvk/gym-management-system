@@ -19,6 +19,9 @@ Use zod for every tRPC procedure input; a validation failure is handled automati
 Every OpenRouter call (plan generation, chat) goes through the shared AI module (`rules/backend.md`). On a request-level failure (timeout, rate-limit, network error) or a structured-output parse failure after one retry:
 
 - **Plan generation/chat** → throw `TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' })`; the frontend shows this as a retryable toast, not a crash.
+- **A stream that breaks** (a coach reply, a plan being built, the Health profile save) leaves nothing applied: the failure surfaces as the same error after any events already sent, the service saves only after the whole answer has validated, and the UI shows a retry state (a dashed strip with "Try again", never a settled negative). A proposal shown before the break is only a draft and changes no plan. The Health profile save is the one exception to "fail the request": the profile is already saved, so a failed plan build is reported as `failed` in the `done` event with a retry, and the submission itself never fails.
+- **An AI lookup (tool) that fails** is never thrown: the runner returns a short error line to the model as the tool's result and the model answers without it. An unknown tool or invalid arguments are reported the same way.
+- A fact waiting for the member's confirmation and an acknowledgement still owed are explicit states (`pending`, `needs_acknowledgement`, `needs_confirmation`) returned as data, never coalesced into a saved fact or an applied plan.
 
 ## Frontend
 

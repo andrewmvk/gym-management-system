@@ -1,4 +1,5 @@
 import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+import { TriangleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { HATCH_STYLE } from '@/components/muscle-map/muscle-legend';
 import { cn } from '@/lib/utils';
@@ -12,6 +13,7 @@ export interface MuscleRankItem {
   isLost?: boolean;
   isGap?: boolean;
   bias?: number;
+  isInjured?: boolean;
 }
 
 interface MuscleRankListProps {
@@ -69,7 +71,17 @@ export function MuscleRankList({ label, items, selected, onSelect, onHover, clas
               />
               <span className={cn('min-w-0 flex-1 truncate text-sm', isSelected ? 'font-bold' : 'font-semibold')}>
                 {muscleLabel(item.muscle)}
+                {item.isInjured && <span className="sr-only">, injured</span>}
               </span>
+              {item.isInjured && (
+                <span
+                  aria-hidden
+                  title="Injury you reported"
+                  className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-tape text-tape-foreground"
+                >
+                  <TriangleAlertIcon className="size-3.5" />
+                </span>
+              )}
               {item.bias ? <BiasTag bias={item.bias} /> : null}
               <span className="numerals shrink-0 text-xl leading-none font-bold">{item.value}</span>
             </button>

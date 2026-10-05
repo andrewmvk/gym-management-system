@@ -1,7 +1,7 @@
 'use client';
 
 import type { MuscleLoad } from '@cadence/shared/schemas/muscle-heat';
-import { type MemberMuscleFocus, MUSCLE_IDS, muscleLabel } from '@cadence/shared/schemas/muscles';
+import { type MemberMuscleFocus, MUSCLE_IDS, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { useState } from 'react';
 import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
 import { focusToMap } from '@/components/muscle-map/muscle-marks';
@@ -18,6 +18,8 @@ interface PlanMusclePreviewProps {
   planLoad: MuscleLoad;
   recentLoad: MuscleLoad;
   focus: readonly MemberMuscleFocus[];
+  // Muscles the member reported as injured, so a trainer judges the exercises against the body, not a list.
+  injured?: ReadonlyMap<MuscleId, string>;
 }
 
 function PlanMusclePreviewSkeleton() {
@@ -34,7 +36,7 @@ function PlanMusclePreviewSkeleton() {
 }
 
 // Reads from the exercises as the trainer edits them, so a change shows up on the body before it is saved.
-function PlanMusclePreviewRoot({ planLoad, recentLoad, focus }: PlanMusclePreviewProps) {
+function PlanMusclePreviewRoot({ planLoad, recentLoad, focus, injured }: PlanMusclePreviewProps) {
   const [view, setView] = useState<PreviewView>('plan');
 
   // Muscles the member asked for more of that this plan does not train at all.
@@ -63,6 +65,7 @@ function PlanMusclePreviewRoot({ planLoad, recentLoad, focus }: PlanMusclePrevie
           includeUntrained
           load={view === 'plan' ? planLoad : recentLoad}
           focus={focusToMap(focus)}
+          injured={injured}
           label={view === 'plan' ? 'Muscles worked in this plan' : 'Muscles this member completed recently'}
           emptyNote={
             view === 'plan' ? 'Nothing in this plan trains a muscle yet.' : 'Nothing completed in the last 14 days.'

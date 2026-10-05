@@ -96,4 +96,83 @@ describe('profile router', () => {
     const [row] = await db.select().from(fProfileEvents).where(eq(fProfileEvents.id, event.id));
     expect(row?.resolvedAt).toBeNull();
   });
+
+  describe('pending facts', () => {
+    async function addPending(userId: string, description: string) {
+      const [row] = await db
+        .insert(fProfileEvents)
+        .values({ userId, eventType: 'injury', payload: { description, muscles: ['quads'] }, confirmedAt: null })
+        .returning();
+      return row!;
+    }
+
+    it('lists a pending fact so the member can confirm it, and hides a dismissed one', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+      const pending = await addPending(member.id, 'sore knee');
+      const dismissed = await addPending(member.id, 'not really');
+      await caller.profile.dismissFact({ id: dismissed.id });
+
+      const rows = await caller.profile.listMine();
+
+      expect(rows.map((row) => row.id)).toEqual([pending.id]);
+      expect(rows[0]?.confirmedAt).toBeNull();
+    });
+
+    it('confirms a fact, optionally with a corrected description, and keeps the muscles', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+      const first = await addPending(member.id, 'sore knee');
+      const second = await addPending(member.id, 'sore hip');
+
+      await caller.profile.confirmFacts({ facts: [{ id: first.id }, { id: second.id, description: 'tight hip' }] });
+
+      const rows = await caller.profile.listMine();
+      expect(rows.every((row) => row.confirmedAt instanceof Date)).toBe(true);
+      expect(rows.find((row) => row.id === second.id)?.payload).toEqual({
+        description: 'tight hip',
+        muscles: ['quads'],
+      });
+      await expect(caller.profile.confirmFacts({ facts: [{ id: first.id }] })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+    });
+
+    it('does not let a member confirm or dismiss another member fact', async () => {
+      const member = await createMember();
+      const other = await createMember('profile-other@example.com');
+      const pending = await addPending(other.id, 'not yours');
+      const caller = await callerFor(signSessionToken(member.id));
+
+      await expect(caller.profile.confirmFacts({ facts: [{ id: pending.id }] })).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+      });
+      await expect(caller.profile.dismissFact({ id: pending.id })).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    });
+
+    it('lists only confirmed, unresolved injuries that name a muscle as active injuries', async () => {
+      const member = await createMember();
+      const caller = await callerFor(signSessionToken(member.id));
+      await db.insert(fProfileEvents).values([
+        { userId: member.id, eventType: 'injury', payload: { description: 'sore knee', muscles: ['quads'] } },
+        { userId: member.id, eventType: 'injury', payload: { description: 'old, untagged' } },
+        {
+          userId: member.id,
+          eventType: 'injury',
+          payload: { description: 'healed', muscles: ['calves'] },
+          resolvedAt: new Date(),
+        },
+        {
+          userId: member.id,
+          eventType: 'injury',
+          payload: { description: 'pending', muscles: ['abs'] },
+          confirmedAt: null,
+        },
+      ]);
+
+      const injuries = await caller.profile.listActiveInjuries();
+
+      expect(injuries.map((injury) => [injury.description, injury.muscles])).toEqual([['sore knee', ['quads']]]);
+    });
+  });
 });

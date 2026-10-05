@@ -3,6 +3,8 @@ import { dUsers, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
 import { signSessionToken } from '@api/modules/auth/session';
+import type { OnboardingStreamEvent } from '@api/modules/onboarding/service';
+import * as planService from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
@@ -11,7 +13,7 @@ import { MEMBER_POLICY_IDS } from '@cadence/shared/auth';
 import type { OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
 import bcrypt from 'bcryptjs';
 import { eq } from 'drizzle-orm';
-import { afterAll, beforeEach, describe, expect, it } from 'vitest';
+import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const TINY_JPEG_BASE64 =
   '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAMCAgICAgMCAgIDAwMDBAYEBAQEBAgGBgUGCQgKCgkICQkKDA8MCgsOCwkJDRENDg8QEBEQCgwSExIQEw8QEBD/2wBDAQMDAwQDBAgEBAgQCwkLEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBD/wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAj/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/8QAFQEBAQAAAAAAAAAAAAAAAAAAAAX/xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIRAxEAPwCdABmX/9k=';
@@ -29,11 +31,34 @@ async function createUser(email: string, policyIds: readonly string[]) {
   return user!;
 }
 
-async function callerFor(token?: string) {
+async function rawCallerFor(token?: string) {
   const req = { cookies: token ? { cadence_session: token } : {}, log: logger };
   const res = { cookie: () => {}, clearCookie: () => {} };
   const ctx = await createContext({ req, res } as never);
   return createCallerFactory(appRouter)(ctx);
+}
+
+type RawCaller = Awaited<ReturnType<typeof rawCallerFor>>;
+
+async function submitEvents(caller: RawCaller, input: OnboardingSubmitInput) {
+  const events: OnboardingStreamEvent[] = [];
+  for await (const event of await caller.onboarding.submit(input)) events.push(event);
+  return events;
+}
+
+// Most tests only care about the saved submission, so submit drains the stream and returns it.
+async function callerFor(token?: string) {
+  const caller = await rawCallerFor(token);
+  return {
+    onboarding: {
+      submit: async (input: OnboardingSubmitInput) => {
+        const saved = (await submitEvents(caller, input)).find((event) => event.type === 'saved');
+        return saved!.submission;
+      },
+      listMine: () => caller.onboarding.listMine(),
+      getStatus: () => caller.onboarding.getStatus(),
+    },
+  };
 }
 
 function basicInput(overrides: Partial<OnboardingSubmitInput> = {}): OnboardingSubmitInput {
@@ -63,6 +88,51 @@ describe('onboarding', () => {
 
     expect(result).toMatchObject({ heightCm: 178, weightKg: 82.5, medications: ['Ibuprofen'], exams: [] });
     expect(result.goals).toBe('Lose weight and build endurance');
+  });
+
+  it('saves first, then streams the exercises of the plan it builds, then reports done', async () => {
+    const member = await createUser('member-stream@example.com', MEMBER_POLICY_IDS);
+    const caller = await rawCallerFor(signSessionToken(member.id));
+
+    const events = await submitEvents(caller, basicInput());
+
+    expect(events[0]?.type).toBe('saved');
+    expect(events.at(-1)).toEqual({ type: 'done', plan: 'built' });
+    const middle = events.slice(1, -1);
+    expect(middle.length).toBeGreaterThan(0);
+    expect(middle.every((event) => event.type === 'exercise')).toBe(true);
+    expect((await caller.plans.getToday())?.exercises.map((exercise) => exercise.exerciseId)).toEqual(
+      middle.flatMap((event) => (event.type === 'exercise' ? [event.exercise.exerciseId] : [])),
+    );
+  });
+
+  it('keeps an existing plan with ticked exercises and still saves the submission', async () => {
+    const member = await createUser('member-kept@example.com', MEMBER_POLICY_IDS);
+    const caller = await rawCallerFor(signSessionToken(member.id));
+    await submitEvents(caller, basicInput());
+    const [first] = (await caller.plans.getToday())!.exercises;
+    await caller.plans.markExerciseCompleted({ planExerciseId: first!.id, completed: true });
+
+    const events = await submitEvents(caller, basicInput({ goals: 'Second goal' }));
+
+    expect(events.map((event) => event.type)).toEqual(['saved', 'done']);
+    expect(events.at(-1)).toEqual({ type: 'done', plan: 'kept' });
+    expect(await caller.onboarding.listMine()).toHaveLength(2);
+  });
+
+  it('still saves the submission when the plan cannot be built', async () => {
+    const member = await createUser('member-failed@example.com', MEMBER_POLICY_IDS);
+    const caller = await rawCallerFor(signSessionToken(member.id));
+    const spy = vi.spyOn(planService, 'streamGenerateForDate').mockImplementation(() => {
+      throw new Error('AI is temporarily unavailable');
+    });
+
+    const events = await submitEvents(caller, basicInput());
+    spy.mockRestore();
+
+    expect(events.map((event) => event.type)).toEqual(['saved', 'done']);
+    expect(events.at(-1)).toEqual({ type: 'done', plan: 'failed' });
+    expect(await caller.onboarding.listMine()).toHaveLength(1);
   });
 
   it('requires height and weight', async () => {

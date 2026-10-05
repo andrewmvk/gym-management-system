@@ -1,8 +1,8 @@
 'use client';
 
-import { SparklesIcon, TriangleAlertIcon } from 'lucide-react';
+import { TriangleAlertIcon } from 'lucide-react';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
-import { Button } from '@/components/ui/button';
+import { AiButton } from '@/components/ai-button';
 import { cn } from '@/lib/utils';
 
 interface NoticeExercise {
@@ -50,10 +50,15 @@ export function NeedsReviewNotice({ exercises, className }: NeedsReviewNoticePro
           </ul>
         </div>
       </div>
-      <Button variant="outline" className="shrink-0" disabled={rebuild.isPending} onClick={rebuild.requestRebuild}>
-        <SparklesIcon data-icon="inline-start" />
-        {rebuild.isPending ? 'Rebuilding...' : 'Rebuild today without them'}
-      </Button>
+      <AiButton
+        variant="outline"
+        className="shrink-0"
+        isPending={rebuild.isPending}
+        pendingLabel="Rebuilding..."
+        onClick={rebuild.requestRebuild}
+      >
+        Rebuild today without them
+      </AiButton>
       {rebuild.dialog}
     </section>
   );

@@ -28,6 +28,8 @@ interface MuscleLoadViewProps {
   legend?: { lowLabel: string; highLabel: string; gapLabel?: string };
   selected?: MuscleId | null;
   onSelectedChange?: (muscle: MuscleId | null) => void;
+  // Injuries the member reported: the muscle and what they said, drawn on the body and flagged in the list.
+  injured?: ReadonlyMap<MuscleId, string>;
   className?: string;
 }
 
@@ -46,6 +48,7 @@ function MuscleLoadViewRoot({
   legend,
   selected: controlledSelected,
   onSelectedChange,
+  injured,
   className,
 }: MuscleLoadViewProps) {
   const [localSelected, setLocalSelected] = useState<MuscleId | null>(null);
@@ -62,15 +65,21 @@ function MuscleLoadViewRoot({
     step: heatStep(value, peak),
     value: formatSets(value),
     bias: focus?.[muscle],
+    isInjured: injured?.has(muscle),
   }));
   const untrainedItems = MUSCLE_IDS.filter((muscle) => !load[muscle]).map((muscle) => ({
     muscle,
     step: 0,
     value: '0',
     bias: focus?.[muscle],
+    isInjured: injured?.has(muscle),
   }));
 
   const marks = marksFromLoad(load, focus);
+  for (const muscle of injured?.keys() ?? []) {
+    const mark = marks[muscle];
+    if (mark) mark.isInjured = true;
+  }
   if (legend?.gapLabel) {
     for (const muscle of MUSCLE_IDS) {
       const mark = marks[muscle];
@@ -102,6 +111,7 @@ function MuscleLoadViewRoot({
           lowLabel={legend?.lowLabel}
           highLabel={legend?.highLabel}
           hasGap={Boolean(legend?.gapLabel)}
+          hasInjury={Boolean(injured?.size)}
           gapLabel={legend?.gapLabel}
         />
         {note && <p className="text-xs text-muted-foreground">{note}</p>}

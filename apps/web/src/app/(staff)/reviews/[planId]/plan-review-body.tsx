@@ -2,21 +2,25 @@
 
 import { subject } from '@cadence/shared/auth';
 import { computeMuscleLoad } from '@cadence/shared/schemas/muscle-heat';
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, ClipboardXIcon, Trash2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 import { useAppAbility } from '@/abilities';
 import { BlockedBanner } from '@/app/(staff)/reviews/[planId]/blocked-banner';
+import { CoachChanges } from '@/app/(staff)/reviews/[planId]/coach-changes';
 import { DetailLayout } from '@/app/(staff)/reviews/[planId]/detail-layout';
 import { ExercisePicker } from '@/app/(staff)/reviews/[planId]/exercise-picker';
 import { MemberContextCard } from '@/app/(staff)/reviews/[planId]/member-context-card';
 import { PlanMusclePreview } from '@/app/(staff)/reviews/[planId]/plan-muscle-preview';
 import { PlanNeighbors } from '@/app/(staff)/reviews/[planId]/plan-neighbors';
 import { ReviewHistory } from '@/app/(staff)/reviews/[planId]/review-history';
+import { RiskBanner } from '@/app/(staff)/reviews/[planId]/risk-banner';
 import { useQueueFilters } from '@/app/(staff)/reviews/use-queue-filters';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { KgInput } from '@/components/kg-input';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 import { PlanStatusBadge } from '@/components/plan-status-badge';
@@ -58,7 +62,7 @@ function toEditable(exercise: {
   exerciseId: string;
   sets: number;
   reps: number;
-  load: string | null;
+  load: number | null;
   completed: boolean;
 }): EditableExercise {
   return {
@@ -66,7 +70,7 @@ function toEditable(exercise: {
     exerciseId: exercise.exerciseId,
     sets: exercise.sets,
     reps: exercise.reps,
-    load: exercise.load ?? '',
+    load: exercise.load === null ? '' : String(exercise.load),
     isCompleted: exercise.completed,
   };
 }
@@ -181,6 +185,8 @@ export function PlanReviewBody({ planId }: { planId: string }) {
     recentMuscleLoad,
     muscleFocus,
     blocked,
+    risks,
+    changes,
     memberContext,
     exercises: saved,
   } = planQuery.data;
@@ -190,7 +196,9 @@ export function PlanReviewBody({ planId }: { planId: string }) {
   const canEditPlan = canNote && ability.can('update', ANY_TRAINING_PLAN);
   const canEdit = canEditPlan && !isPast;
   const isChanged =
-    exercises !== null && signature(exercises) !== signature(saved.map((row) => ({ ...row, load: row.load ?? '' })));
+    exercises !== null &&
+    signature(exercises) !==
+      signature(saved.map((row) => ({ ...row, load: row.load === null ? '' : String(row.load) })));
   const isSaving = editPlan.isPending;
 
   let readOnlyMessage: string | null = null;
@@ -205,6 +213,14 @@ export function PlanReviewBody({ planId }: { planId: string }) {
       return details?.isAvailable ? [{ sets: exercise.sets, muscles: details.muscles }] : [];
     }),
   );
+
+  const injured = new Map<MuscleId, string>();
+  for (const fact of memberContext?.facts ?? []) {
+    if (fact.eventType !== 'injury' || fact.resolvedAt !== null) continue;
+    for (const muscle of fact.muscles) {
+      injured.set(muscle, [injured.get(muscle), fact.description].filter(Boolean).join('; '));
+    }
+  }
 
   return (
     <DetailLayout
@@ -231,6 +247,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
       editor={
         <div className="flex flex-col gap-6">
           {blocked.length > 0 && <BlockedBanner blocked={blocked} />}
+          {risks.length > 0 && <RiskBanner risks={risks} />}
           <Card className="gap-0 pb-0">
             <CardHeader className="border-b">
               <CardTitle>Exercises</CardTitle>
@@ -298,12 +315,11 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                           onChange={(e) => updateExercise(index, { reps: Number(e.target.value) })}
                           aria-label={`Reps for ${name}`}
                         />
-                        <Input
+                        <KgInput
                           className={CELL.load}
-                          placeholder="Load"
                           value={exercise.load}
-                          onChange={(e) => updateExercise(index, { load: e.target.value })}
-                          aria-label={`Load for ${name}`}
+                          onValueChange={(load) => updateExercise(index, { load })}
+                          aria-label={`Weight in kilograms for ${name}`}
                         />
                         <Button
                           type="button"
@@ -320,7 +336,9 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                       <>
                         <span className={`${CELL.count} numerals text-lg`}>{exercise.sets}</span>
                         <span className={`${CELL.count} numerals text-lg`}>{exercise.reps}</span>
-                        <span className={`${CELL.load} text-sm text-muted-foreground`}>{exercise.load || 'None'}</span>
+                        <span className={`${CELL.load} text-sm text-muted-foreground`}>
+                          {exercise.load ? `${exercise.load} kg` : 'None'}
+                        </span>
                         <span className={CELL.action} />
                       </>
                     )}
@@ -372,7 +390,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                             exerciseId,
                             sets,
                             reps,
-                            load: load.trim() || undefined,
+                            load: Number(load.replace(',', '.')) || undefined,
                           })),
                           note: note.trim() || undefined,
                         })
@@ -387,8 +405,15 @@ export function PlanReviewBody({ planId }: { planId: string }) {
           </Card>
         </div>
       }
-      preview={<PlanMusclePreview planLoad={planLoad} recentLoad={recentMuscleLoad} focus={muscleFocus} />}
-      history={<ReviewHistory reviews={reviews} />}
+      preview={
+        <PlanMusclePreview planLoad={planLoad} recentLoad={recentMuscleLoad} focus={muscleFocus} injured={injured} />
+      }
+      history={
+        <div className="flex flex-col gap-6">
+          {changes.length > 0 && <CoachChanges changes={changes} />}
+          <ReviewHistory reviews={reviews} />
+        </div>
+      }
     />
   );
 }

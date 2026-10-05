@@ -200,7 +200,7 @@ function ReviewsQueueRoot() {
               search.trim()
                 ? `No plan${scopeSuffix} matches that name and status. Try another name, status or date range.`
                 : status === 'must_review'
-                  ? `No plan${scopeSuffix} holds an exercise that cannot be done right now.`
+                  ? `No plan${scopeSuffix} holds an exercise that cannot be done right now or a safety warning the member accepted.`
                   : status === 'trainer_edited'
                     ? `No trainer has edited or left a note on a plan${scopeSuffix}.`
                     : `No plan${scopeSuffix} is in the queue for this status.`
@@ -227,11 +227,12 @@ function ReviewsQueueRoot() {
                   <TableCell>
                     <span className="flex flex-wrap items-center gap-1.5">
                       <PlanStatusBadge status={entry.status} hasNote={entry.noteCount > 0} />
-                      {entry.needsReview && (
+                      {entry.unavailableCount > 0 && (
                         <Badge variant="tape">
                           Must review <span className="numerals text-sm">{entry.unavailableCount}</span>
                         </Badge>
                       )}
+                      {entry.riskCount > 0 && <Badge variant="tape">Safety warning accepted</Badge>}
                     </span>
                   </TableCell>
                   <TableCell className="hidden max-w-80 truncate text-muted-foreground lg:table-cell">

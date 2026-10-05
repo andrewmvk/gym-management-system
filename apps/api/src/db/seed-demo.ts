@@ -6,6 +6,7 @@ import {
   fCheckIns,
   fConsentEvents,
   fOnboardingSubmissions,
+  fPlanChanges,
   fPlanReviews,
   fProfileEvents,
   fTrainingPlanExercises,
@@ -18,6 +19,7 @@ import { createFaceEmbedder } from '@api/lib/face-embedding';
 import { DEFAULT_MEMBERSHIP_PLAN } from '@api/modules/auth/service';
 import { MEMBER_GROUP } from '@cadence/shared/auth';
 import { OCCUPANCY_WINDOW_MINUTES } from '@cadence/shared/schemas/gym';
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import bcrypt from 'bcryptjs';
 import { eq, inArray, sql } from 'drizzle-orm';
 
@@ -54,6 +56,8 @@ const COMMENT_NOTES = ['Good progression, keep the current structure.', 'Watch t
 // Members who also get a plan for tomorrow, so the upcoming plans list has something to show.
 const UPCOMING_PLAN_MEMBER_INDEXES = [3, 4];
 export const DEMO_UPCOMING_PLAN_COUNT = UPCOMING_PLAN_MEMBER_INDEXES.length;
+// The member whose today plan carries a coach change with an acknowledged knee warning.
+const COACH_RISK_MEMBER_INDEX = 3;
 // Trainer notes on today's plan, which the AI reads when it rebuilds that member's plan.
 const TODAY_TRAINER_NOTES = [
   { memberIndex: 3, note: 'Left knee is still sore: keep squats shallow and skip lunges until it settles.' },
@@ -68,6 +72,7 @@ const DEMO_FACTS = [
     description: 'Sore left knee when going down stairs',
     sourceMessage: 'My left knee hurts a lot going down stairs since the weekend run.',
     daysAgo: 6,
+    muscles: ['quads'],
   },
   {
     memberIndex: 3,
@@ -97,6 +102,7 @@ const DEMO_FACTS = [
     sourceMessage: 'I strained my right shoulder carrying boxes, it is mild.',
     daysAgo: 18,
     isResolved: true,
+    muscles: ['rotator-cuff'],
   },
   {
     memberIndex: 8,
@@ -119,6 +125,7 @@ const DEMO_FACTS = [
   sourceMessage: string;
   daysAgo: number;
   isResolved?: boolean;
+  muscles?: readonly MuscleId[];
 }[];
 
 const stubEmbedder = createFaceEmbedder('stub');
@@ -192,6 +199,7 @@ async function clearDemoHistory(tx: Transaction, demoUserIds: string[]) {
     .from(fTrainingPlans)
     .where(inArray(fTrainingPlans.userId, demoUserIds));
   await tx.delete(fPlanReviews).where(inArray(fPlanReviews.trainingPlanId, planIds));
+  await tx.delete(fPlanChanges).where(inArray(fPlanChanges.trainingPlanId, planIds));
   await tx.delete(fTrainingPlanExercises).where(inArray(fTrainingPlanExercises.trainingPlanId, planIds));
   await tx.delete(fTrainingPlans).where(inArray(fTrainingPlans.userId, demoUserIds));
   await tx.delete(fCheckIns).where(inArray(fCheckIns.userId, demoUserIds));
@@ -296,7 +304,10 @@ async function seedProfileEvents(tx: Transaction, members: Awaited<ReturnType<ty
       return {
         userId: idByIndex.get(fact.memberIndex)!,
         eventType: fact.eventType,
-        payload: { description: fact.description },
+        payload: {
+          description: fact.description,
+          ...('muscles' in fact ? { muscles: fact.muscles } : {}),
+        },
         sourceMessage: fact.sourceMessage,
         createdAt,
         resolvedAt: isResolved ? atLocalTime(now, fact.daysAgo - 8, 9, 0) : null,
@@ -311,7 +322,10 @@ async function seedPlans(
   trainerId: string,
   now: Date,
 ) {
-  const exercises = await tx.select({ id: dExercises.id }).from(dExercises).orderBy(dExercises.name);
+  const exercises = await tx
+    .select({ id: dExercises.id, name: dExercises.name })
+    .from(dExercises)
+    .orderBy(dExercises.name);
   if (exercises.length < EXERCISES_PER_PLAN * 2) {
     throw new Error('The demo seed needs the exercise catalog: run the base seed (pnpm db:seed) first');
   }
@@ -370,7 +384,7 @@ async function seedPlans(
       exerciseId: exercises[(start + position * stride) % exercises.length]!.id,
       sets: 3 + (position % 2),
       reps: 8 + position * 2,
-      load: position === 0 ? 'moderate' : null,
+      load: position === 0 ? 20 : null,
       orderIndex: position,
       // Past days were mostly done; today only the first exercises; tomorrow nothing yet.
       completed: plan.daysAgo < 0 ? false : plan.daysAgo === 0 ? position === 0 : random() < 0.8,
@@ -416,6 +430,41 @@ async function seedPlans(
     });
   }
   await tx.insert(fPlanReviews).values(reviews);
+
+  // One plan the member changed through the coach and went ahead with despite the knee warning, so the
+  // trainer review shows a change log entry and a risk flag.
+  const riskyPlan = insertedPlans.find(
+    (entry) => entry.daysAgo === 0 && memberIndexById.get(entry.userId) === COACH_RISK_MEMBER_INDEX,
+  );
+  if (riskyPlan) {
+    const nameById = new Map(exercises.map((exercise) => [exercise.id, exercise.name]));
+    const snapshot = exerciseRows
+      .filter((row) => row.trainingPlanId === riskyPlan.id)
+      .map((row) => ({
+        exerciseId: row.exerciseId,
+        name: nameById.get(row.exerciseId)!,
+        sets: row.sets,
+        reps: row.reps,
+        load: row.load,
+      }));
+    const [first, ...rest] = snapshot;
+    await tx.insert(fPlanChanges).values({
+      trainingPlanId: riskyPlan.id,
+      userId: riskyPlan.userId,
+      kind: 'coach',
+      request: 'Add more leg work, my knee feels better today',
+      before: snapshot,
+      after: [{ ...first!, reps: first!.reps + 2 }, ...rest],
+      acknowledgedWarnings: [
+        {
+          exerciseId: first!.exerciseId,
+          name: first!.name,
+          reason: 'Trains your quads, and you reported: Sore left knee when going down stairs',
+        },
+      ],
+      createdAt: atLocalTime(now, 0, 8, 15),
+    });
+  }
 }
 
 async function seedCheckIns(tx: Transaction, members: Awaited<ReturnType<typeof upsertMembers>>, now: Date) {

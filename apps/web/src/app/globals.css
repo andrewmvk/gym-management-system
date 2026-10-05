@@ -64,6 +64,43 @@
   --shadow-showcase: 0 24px 48px -24px oklch(0.2 0.05 266 / 0.4);
   --shadow-fab: 0 12px 32px -8px oklch(0.3 0.2 266 / 0.55);
   --inset-shadow-baseline: inset 0 -1px 0 var(--border);
+
+  /* The coach at work: tempo bars rise in turn like reps, and the spark above them breathes. */
+  --animate-ai-bar: ai-bar 1100ms var(--ease-out-expo) infinite;
+  --animate-ai-spark: ai-spark 1100ms ease-in-out infinite;
+  /* A block of coach content settling into the thread. */
+  --animate-block-in: block-in 420ms var(--ease-out-expo) both;
+
+  @keyframes ai-bar {
+    0%,
+    100% {
+      transform: scaleY(0.4);
+    }
+    45% {
+      transform: scaleY(1);
+    }
+  }
+  @keyframes ai-spark {
+    0%,
+    100% {
+      opacity: 0.45;
+      transform: scale(0.7) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1) rotate(45deg);
+    }
+  }
+  @keyframes block-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 /* Club Kit: cobalt is the kit color, ink and chalk are the panels, pace yellow is the tape. */
@@ -268,8 +305,22 @@
   }
 }
 
+/* The coach mark animates parts of its own shape, so each part scales from its own base and center. */
+.ai-mark path {
+  transform-box: fill-box;
+}
+.ai-mark [data-part="bar"] {
+  transform-origin: bottom center;
+}
+.ai-mark [data-part="spark"] {
+  transform-origin: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .strike-wipe::after {
     transition: none;
+  }
+  .ai-mark [data-part] {
+    animation: none;
   }
 }

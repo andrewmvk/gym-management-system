@@ -12,6 +12,27 @@ import { useTRPC } from '@/lib/trpc';
 
 const LIST_CLASS = 'divide-y overflow-hidden rounded-lg border bg-card';
 
+interface ReviewReasons {
+  blocked: readonly { name: string; equipmentDown: readonly string[] }[];
+  risks: readonly { name: string }[];
+}
+
+// Why a plan is listed: the equipment that is down, the safety warning the member accepted, or both.
+function describeReasons({ blocked, risks }: ReviewReasons) {
+  const reasons: string[] = [];
+  if (blocked.length > 0) {
+    reasons.push(
+      blocked
+        .map((exercise) =>
+          exercise.equipmentDown.length > 0 ? `${exercise.name} (${exercise.equipmentDown.join(', ')})` : exercise.name,
+        )
+        .join(', '),
+    );
+  }
+  if (risks.length > 0) reasons.push(`safety warning accepted on ${risks.map((risk) => risk.name).join(', ')}`);
+  return reasons.join('; ');
+}
+
 function OverviewBoardSkeleton() {
   const ability = useAppAbility();
   return (
@@ -60,14 +81,8 @@ function OverviewBoardRoot() {
         count={needsReview.length}
         detail={
           first
-            ? `Next: ${first.memberName}, ${formatPlanDate(first.planDate)}, ${first.blocked
-                .map((exercise) =>
-                  exercise.equipmentDown.length > 0
-                    ? `${exercise.name} (${exercise.equipmentDown.join(', ')})`
-                    : exercise.name,
-                )
-                .join(', ')}.${needsReview.length > 1 ? ` ${needsReview.length - 1} more.` : ''}`
-            : 'Every upcoming plan can be done with the equipment that is running.'
+            ? `Next: ${first.memberName}, ${formatPlanDate(first.planDate)}, ${describeReasons(first)}.${needsReview.length > 1 ? ` ${needsReview.length - 1} more.` : ''}`
+            : 'Every upcoming plan can be done with the equipment that is running, and no accepted safety warning is waiting for a trainer.'
         }
       />
       <OverviewRow

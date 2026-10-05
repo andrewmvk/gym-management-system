@@ -7,11 +7,17 @@ export const HATCH_STYLE = {
     'repeating-linear-gradient(135deg, transparent 0 2px, color-mix(in oklch, var(--foreground) 60%, transparent) 2px 4px)',
 } as const;
 
+export const INJURY_HATCH_STYLE = {
+  backgroundImage:
+    'repeating-linear-gradient(45deg, transparent 0 2px, color-mix(in oklch, var(--tape) 80%, transparent) 2px 4px)',
+} as const;
+
 interface MuscleLegendProps {
   lowLabel?: string;
   highLabel?: string;
   hasLost?: boolean;
   hasGap?: boolean;
+  hasInjury?: boolean;
   gapLabel?: string;
   className?: string;
 }
@@ -21,6 +27,7 @@ export function MuscleLegend({
   highLabel = 'More',
   hasLost,
   hasGap,
+  hasInjury,
   gapLabel = 'No exercise trains it',
   className,
 }: MuscleLegendProps) {
@@ -39,6 +46,12 @@ export function MuscleLegend({
         <div className="flex items-center gap-2">
           <span className="size-4 rounded-xs bg-heat-3" style={HATCH_STYLE} aria-hidden />
           <span>Lost to equipment out of service</span>
+        </div>
+      )}
+      {hasInjury && (
+        <div className="flex items-center gap-2">
+          <span className="size-4 rounded-xs border-2 border-tape bg-heat-1" style={INJURY_HATCH_STYLE} aria-hidden />
+          <span>Injury you reported</span>
         </div>
       )}
       {hasGap && (

@@ -2,12 +2,11 @@
 
 import { type ExamEntry, OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
-import { toast } from 'sonner';
 import { ExamEntriesField } from '@/app/(member)/onboarding/exam-entries-field';
 import type { OnboardingFormInput, OnboardingFormOutput } from '@/app/(member)/onboarding/onboarding-form-types';
 import { StringListField } from '@/app/(member)/onboarding/string-list-field';
+import { AiButton } from '@/components/ai-button';
 import { Button } from '@/components/ui/button';
 import {
   Field,
@@ -20,7 +19,6 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useTRPC } from '@/lib/trpc';
 
 export interface OnboardingInitialValues {
   heightCm: number;
@@ -35,7 +33,8 @@ export interface OnboardingInitialValues {
 interface OnboardingFormProps {
   isUpdate: boolean;
   initialValues?: OnboardingInitialValues;
-  onSubmitted: () => void;
+  isSubmitting: boolean;
+  onSubmit: (values: OnboardingFormOutput) => void;
   onCancel?: () => void;
 }
 
@@ -43,10 +42,7 @@ function toNumber(value: string) {
   return value === '' ? undefined : Number(value);
 }
 
-export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel }: OnboardingFormProps) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-
+export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit, onCancel }: OnboardingFormProps) {
   const form = useForm<OnboardingFormInput, unknown, OnboardingFormOutput>({
     resolver: zodResolver(OnboardingSubmitInputSchema),
     defaultValues: {
@@ -59,25 +55,8 @@ export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel 
     },
   });
 
-  const submit = useMutation(
-    trpc.onboarding.submit.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.onboarding.getStatus.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.onboarding.listMine.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
-        onSubmitted();
-      },
-      onError: () => toast.error("We couldn't save your information. Nothing was changed. Try again."),
-    }),
-  );
-
   return (
-    <form
-      noValidate
-      onSubmit={form.handleSubmit((values) => submit.mutate(values))}
-      className="overflow-hidden rounded-lg border bg-card"
-    >
+    <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="overflow-hidden rounded-lg border bg-card">
       <div className="grid gap-10 p-5 sm:p-8 lg:grid-cols-5 lg:gap-12">
         <div className="flex min-w-0 flex-col gap-10 lg:col-span-2">
           <FieldSet>
@@ -212,13 +191,13 @@ export function OnboardingForm({ isUpdate, initialValues, onSubmitted, onCancel 
       </div>
       <div className="flex flex-col-reverse gap-2 border-t bg-muted/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-8">
         {onCancel && (
-          <Button type="button" variant="ghost" disabled={submit.isPending} onClick={onCancel}>
+          <Button type="button" variant="ghost" disabled={isSubmitting} onClick={onCancel}>
             Cancel
           </Button>
         )}
-        <Button type="submit" disabled={submit.isPending}>
-          {submit.isPending ? 'Saving...' : isUpdate ? 'Save and update my plan' : 'Save and build my plan'}
-        </Button>
+        <AiButton type="submit" isPending={isSubmitting} pendingLabel="Saving and building your plan...">
+          {isUpdate ? 'Save and update my plan' : 'Save and build my plan'}
+        </AiButton>
       </div>
     </form>
   );

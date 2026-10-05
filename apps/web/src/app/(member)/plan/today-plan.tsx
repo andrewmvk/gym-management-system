@@ -2,19 +2,23 @@
 
 import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
-import { DumbbellIcon, SparklesIcon } from 'lucide-react';
-import { type ReactNode, useState } from 'react';
+import { DumbbellIcon } from 'lucide-react';
+import { type ReactNode, useEffect, useState } from 'react';
+import { useCoach } from '@/app/(member)/coach/coach-context';
+import { CoachBar } from '@/app/(member)/plan/coach-bar';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
 import { NeedsReviewNotice } from '@/app/(member)/plan/needs-review-notice';
+import { PlanBuildProgress } from '@/app/(member)/plan/plan-build-progress';
 import { PlanMusclePanel } from '@/app/(member)/plan/plan-muscle-panel';
 import { TrainerNotes } from '@/app/(member)/plan/trainer-notes';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
 import { useToggleExercise } from '@/app/(member)/plan/use-toggle-exercise';
+import { useUpdateExerciseNumbers } from '@/app/(member)/plan/use-update-exercise-numbers';
+import { AiButton } from '@/components/ai-button';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -89,6 +93,16 @@ function TodayPlanRoot() {
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
   const generate = useRebuildPlan({ isErrorInline: true });
   const toggle = useToggleExercise();
+  const { selection, setSelection } = useCoach();
+
+  const updateNumbers = useUpdateExerciseNumbers();
+
+  // The coach bar belongs to this screen: leaving it, or the exercise leaving the plan, drops the pick.
+  useEffect(() => () => setSelection(null), [setSelection]);
+  const planExerciseIds = todayQuery.data?.exercises.map((exercise) => exercise.exerciseId);
+  useEffect(() => {
+    if (selection && planExerciseIds && !planExerciseIds.includes(selection.exerciseId)) setSelection(null);
+  }, [selection, planExerciseIds, setSelection]);
 
   if (todayQuery.isPending) {
     return (
@@ -126,12 +140,19 @@ function TodayPlanRoot() {
             title="No plan yet for today"
             description="Your plan is built from your health profile and everything you've told your coach."
             action={
-              <Button size="lg" disabled={generate.isPending} onClick={generate.requestRebuild}>
-                <SparklesIcon data-icon="inline-start" />
-                {generate.isPending ? 'Building your plan...' : 'Build my plan'}
-              </Button>
+              <AiButton
+                size="lg"
+                isPending={generate.isPending}
+                pendingLabel="Building your plan..."
+                onClick={generate.requestRebuild}
+              >
+                Build my plan
+              </AiButton>
             }
           />
+        )}
+        {generate.isPending && generate.streamed.length > 0 && (
+          <PlanBuildProgress exercises={generate.streamed} className="border-t" />
         )}
         {generate.dialog}
       </PlanShell>
@@ -187,17 +208,30 @@ function TodayPlanRoot() {
               equipmentDown={exercise.equipmentDown}
               disabled={toggle.isPending}
               onToggle={(completed) => toggle.mutate({ planExerciseId: exercise.id, completed })}
+              isSelected={selection?.exerciseId === exercise.exerciseId}
+              onSelect={() =>
+                setSelection(
+                  selection?.exerciseId === exercise.exerciseId
+                    ? null
+                    : { exerciseId: exercise.exerciseId, name: exercise.exerciseName },
+                )
+              }
+              onEditNumbers={(numbers) => updateNumbers.mutateAsync({ planExerciseId: exercise.id, ...numbers })}
+              isEditPending={updateNumbers.isPending && updateNumbers.variables?.planExerciseId === exercise.id}
             />
           ))}
         </PlanShell>
       }
       aside={
-        <PlanMusclePanel
-          muscleLoad={plan.muscleLoad}
-          exercises={plan.exercises}
-          selected={selectedMuscle}
-          onSelectedChange={setSelectedMuscle}
-        />
+        <>
+          <PlanMusclePanel
+            muscleLoad={plan.muscleLoad}
+            exercises={plan.exercises}
+            selected={selectedMuscle}
+            onSelectedChange={setSelectedMuscle}
+          />
+          <CoachBar />
+        </>
       }
     />
   );

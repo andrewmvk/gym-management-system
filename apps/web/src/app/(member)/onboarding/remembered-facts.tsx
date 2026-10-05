@@ -1,6 +1,8 @@
 'use client';
 
+import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import {
+  injuryMuscles,
   PROFILE_EVENT_LABELS,
   PROFILE_EVENT_TYPES,
   type ProfileEventType,
@@ -9,6 +11,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BrainIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { toast } from 'sonner';
+import { PendingFactRow } from '@/app/(member)/onboarding/pending-fact-row';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
@@ -26,6 +29,7 @@ interface RememberedEvent {
   payload?: unknown;
   sourceMessage: string | null;
   createdAt: string | Date;
+  confirmedAt: string | Date | null;
   resolvedAt: string | Date | null;
 }
 
@@ -44,8 +48,8 @@ function SectionShell({ children }: { children: ReactNode }) {
       <div className="border-b px-5 py-4 sm:px-6">
         <h2 className="font-display text-xl font-bold tracking-wide uppercase">What your coach remembers</h2>
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-          Your coach uses these facts when it builds your plans. If one is wrong or no longer true, say so and the coach
-          stops using it.
+          Your coach asks before it keeps something from a chat, and uses these facts when it builds your plans. If one
+          is wrong or no longer true, say so and the coach stops using it.
         </p>
       </div>
       {children}
@@ -87,6 +91,7 @@ interface FactRowProps {
 
 function FactRow({ event, isPending, onToggle, isTypeShown }: FactRowProps) {
   const isResolved = event.resolvedAt !== null;
+  const muscles = injuryMuscles(event.payload).map(muscleLabel);
 
   return (
     <li className="flex flex-col gap-2 border-b px-5 py-4 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:gap-4 sm:px-6">
@@ -100,6 +105,7 @@ function FactRow({ event, isPending, onToggle, isTypeShown }: FactRowProps) {
           {isTypeShown && <span className="font-normal">{PROFILE_EVENT_LABELS[event.eventType]}: </span>}
           {describeFact(event)}
         </p>
+        {muscles.length > 0 && <p className="text-sm text-muted-foreground">Affects: {muscles.join(', ')}</p>}
         <p className="numerals text-base font-semibold text-muted-foreground">{formatDateTime(event.createdAt)}</p>
         {event.sourceMessage && (
           <p className="line-clamp-2 text-sm break-words text-muted-foreground">
@@ -158,6 +164,26 @@ function RememberedFactsRoot() {
     }),
   );
 
+  function invalidateFacts() {
+    queryClient.invalidateQueries({ queryKey: listKey });
+    queryClient.invalidateQueries({ queryKey: trpc.profile.listActiveInjuries.queryKey() });
+  }
+
+  const confirmFact = useMutation(
+    trpc.profile.confirmFacts.mutationOptions({
+      onSuccess: () => toast.message('Saved. Your coach uses it from now on.'),
+      onError: () => toast.error("We couldn't save that. Nothing was changed. Try again."),
+      onSettled: invalidateFacts,
+    }),
+  );
+  const dismissFact = useMutation(
+    trpc.profile.dismissFact.mutationOptions({
+      onSuccess: () => toast.message('Dismissed.'),
+      onError: () => toast.error("We couldn't dismiss that. Nothing was changed. Try again."),
+      onSettled: invalidateFacts,
+    }),
+  );
+
   if (eventsQuery.isPending) {
     return (
       <Deferred>
@@ -180,8 +206,10 @@ function RememberedFactsRoot() {
   }
 
   const events: RememberedEvent[] = eventsQuery.data;
-  const active = events.filter((event) => event.resolvedAt === null);
-  const resolved = events.filter((event) => event.resolvedAt !== null);
+  const waiting = events.filter((event) => event.confirmedAt === null && event.resolvedAt === null);
+  const remembered = events.filter((event) => event.confirmedAt !== null);
+  const active = remembered.filter((event) => event.resolvedAt === null);
+  const resolved = remembered.filter((event) => event.resolvedAt !== null);
 
   if (events.length === 0) {
     return (
@@ -200,9 +228,38 @@ function RememberedFactsRoot() {
     events: active.filter((event) => event.eventType === type),
   })).filter((group) => group.events.length > 0);
 
+  const isFactBusy = (id: string) =>
+    (confirmFact.isPending && confirmFact.variables?.facts.some((fact) => fact.id === id)) ||
+    (dismissFact.isPending && dismissFact.variables?.id === id);
+
   return (
     <SectionShell>
-      {groups.length === 0 && (
+      {waiting.length > 0 && (
+        <div>
+          <h3 className="border-b bg-muted/60 px-5 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase sm:px-6">
+            Waiting for your confirmation ({waiting.length})
+          </h3>
+          <ul>
+            {waiting.map((event) => (
+              <PendingFactRow
+                key={event.id}
+                fact={{
+                  id: event.id,
+                  eventType: event.eventType,
+                  description: describeFact(event),
+                  payload: event.payload,
+                  sourceMessage: event.sourceMessage,
+                  createdAt: event.createdAt,
+                }}
+                isPending={Boolean(isFactBusy(event.id))}
+                onConfirm={(description) => confirmFact.mutate({ facts: [{ id: event.id, description }] })}
+                onDismiss={() => dismissFact.mutate({ id: event.id })}
+              />
+            ))}
+          </ul>
+        </div>
+      )}
+      {groups.length === 0 && waiting.length === 0 && (
         <p className="border-b px-5 py-4 text-sm text-muted-foreground sm:px-6">
           Everything your coach remembered is marked as no longer true, so nothing is used for your plans right now.
         </p>

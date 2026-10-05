@@ -1,6 +1,7 @@
 import * as service from '@api/modules/plans/reviews-service';
 import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 import { subject } from '@cadence/shared/auth';
+import { WeightKgSchema } from '@cadence/shared/schemas/coach';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -19,7 +20,7 @@ const PlanExerciseInputSchema = z.object({
   exerciseId: z.uuid(),
   sets: z.number().int().positive(),
   reps: z.number().int().positive(),
-  load: z.string().trim().optional(),
+  load: WeightKgSchema.optional(),
   notes: z.string().trim().optional(),
 });
 const EditPlanInputSchema = z.object({

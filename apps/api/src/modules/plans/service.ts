@@ -1,7 +1,7 @@
 import { env } from '@api/config/env';
 import type { OnboardingSubmission, ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
 import { localDateString, startOfLocalDay, todayLocal } from '@api/lib/dates';
-import { type AiResult, runStructured } from '@api/modules/ai';
+import { type AiResult, type AiStreamItem, streamStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
 import { findFocusByUserId } from '@api/modules/focus/repository';
@@ -9,6 +9,7 @@ import { findCheckInTimes } from '@api/modules/metrics/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import type { DemandRow, MemberReviewRow, PlanExerciseInput, PlanHistoryRow } from '@api/modules/plans/repository';
 import * as repository from '@api/modules/plans/repository';
+import { WEIGHT_KG_MAX } from '@cadence/shared/schemas/coach';
 import { computeMuscleLoad, type MuscleLoad, rankMuscles } from '@cadence/shared/schemas/muscle-heat';
 import {
   type ExerciseMuscle,
@@ -115,7 +116,7 @@ export function buildDemandLines(demand: PlanDemand, planDate: string): string[]
 }
 
 function formatExercise(row: PlanHistoryRow, state: string): string {
-  const load = row.load ? ` ${row.load}` : '';
+  const load = row.load ? ` ${row.load} kg` : '';
   return `${row.exerciseName} ${row.sets}x${row.reps}${load} (${state})`;
 }
 
@@ -273,7 +274,9 @@ const PLAN_SYSTEM_PROMPT =
   'to steer the balance of the plan: give muscles with a positive focus more exercises and sets, and muscles ' +
   'with a negative focus fewer, with -2 meaning avoid training that muscle as a primary target unless needed. ' +
   'Focus is a preference only: injuries, medical conditions, medications, exam findings and safety always ' +
-  'override it, and a plan must never be built from the focus alone. Size the load to the height and weight ' +
+  'override it, and a plan must never be built from the focus alone. Give an exercise that uses added weight ' +
+  'a load in kilograms as a plain number, sized to what the member did recently (their history shows the weights ' +
+  'used) and to their height, weight and goals; leave load out for bodyweight exercises. Size the load to the height and weight ' +
   'you are given and read the medical exam findings for anything that limits what the member can do. Reason ' +
   'from the member history you are given: the recent plans with what was done and not done, the check-in ' +
   'dates and the remembered facts. ' +
@@ -319,7 +322,8 @@ const PlanGenerationSchema = z.object({
       exerciseId: z.uuid(),
       sets: z.number().int().positive(),
       reps: z.number().int().positive(),
-      load: z.string().optional(),
+      // Kilograms, left out for an exercise done without added weight.
+      load: z.number().min(0).max(WEIGHT_KG_MAX).nullish(),
       notes: z.string().optional(),
     }),
   ),
@@ -328,13 +332,23 @@ type PlanGeneration = z.infer<typeof PlanGenerationSchema>;
 
 export type EvaluatePlan = (contextPrompt: string) => Promise<AiResult<PlanGeneration>>;
 
-async function defaultEvaluatePlan(contextPrompt: string): Promise<AiResult<PlanGeneration>> {
-  return runStructured({
+function defaultStreamPlan(contextPrompt: string): AsyncGenerator<AiStreamItem<PlanGeneration>> {
+  return streamStructured({
     purpose: 'plan',
     system: PLAN_SYSTEM_PROMPT,
     user: contextPrompt,
     schema: PlanGenerationSchema,
   });
+}
+
+export interface StreamedPlanExercise {
+  exerciseId: string;
+  name: string;
+  muscles: ExerciseMuscle[];
+  sets: number;
+  reps: number;
+  load: number | null;
+  notes: string | null;
 }
 
 export type PlanGeneratorMode = 'ai' | 'placeholder';
@@ -431,6 +445,10 @@ export type GenerateForDateResult =
   | { status: 'ok'; plan: TrainingPlan & { exercises: TrainingPlanExercise[] } }
   | NeedsConfirmation;
 
+export type PlanStreamEvent =
+  | { type: 'exercise'; exercise: StreamedPlanExercise }
+  | { type: 'done'; result: GenerateForDateResult };
+
 // RN-06/FR-22: replacing a trainer-edited plan, or one with ticked exercises, needs the member's explicit
 // confirmation. This is a normal, expected outcome, so it is returned as data rather than thrown.
 // A trainer edit takes precedence as the reason when both apply.
@@ -458,38 +476,92 @@ export async function checkOverwriteGuard(
 // FR-15/FR-18: publishes immediately, no trainer approval step. A failed AI call, or an AI answer with no
 // usable catalog exercise, is an error and never a plan: only the placeholder generator mode may build one
 // from the deterministic fallback.
+//
+// Exercises are streamed as the model finishes each one, but nothing is saved until the whole answer has
+// validated: a stream that breaks halfway leaves no partial plan.
+export async function* streamGenerateForDate(
+  userId: string,
+  planDate: string,
+  confirmOverwrite = false,
+  overrides: GenerateForDateOverrides = {},
+): AsyncGenerator<PlanStreamEvent> {
+  const existing = await repository.findPlanByUserAndDate(userId, planDate);
+  if (existing && !confirmOverwrite) {
+    const guard = await checkOverwriteGuard(existing, { countCompleted: true });
+    if (guard) {
+      yield { type: 'done', result: guard };
+      return;
+    }
+  }
+
+  const context = await assemblePlanContext(userId, planDate);
+  const catalogById = new Map(context.availableExercises.map((exercise) => [exercise.id, exercise]));
+  const generator = overrides.generator ?? effectivePlanGenerator();
+  const toStreamed = (exercise: PlanExerciseInput): StreamedPlanExercise | null => {
+    const entry = catalogById.get(exercise.exerciseId);
+    if (!entry) return null;
+    return {
+      exerciseId: entry.id,
+      name: entry.name,
+      muscles: [...entry.muscles],
+      sets: exercise.sets,
+      reps: exercise.reps,
+      load: exercise.load ?? null,
+      notes: exercise.notes ?? null,
+    };
+  };
+
+  let exercises: PlanExerciseInput[] = [];
+  if (generator === 'ai') {
+    const prompt = buildPlanUserPrompt(context, overrides.instruction);
+    let result: AiResult<PlanGeneration> | undefined;
+
+    if (overrides.evaluatePlan) {
+      result = await overrides.evaluatePlan(prompt);
+    } else {
+      const seen = new Set<string>();
+      for await (const item of defaultStreamPlan(prompt)) {
+        if (item.type === 'result') {
+          result = item.result;
+          break;
+        }
+        if (item.event.type !== 'item' || item.event.key !== 'exercises') continue;
+        const parsed = PlanGenerationSchema.shape.exercises.element.safeParse(item.event.value);
+        const streamed = parsed.success ? toStreamed(parsed.data) : null;
+        if (!parsed.success || !streamed || seen.has(streamed.exerciseId)) continue;
+        seen.add(streamed.exerciseId);
+        yield { type: 'exercise', exercise: streamed };
+      }
+    }
+    if (!result?.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
+
+    exercises = result.data.exercises.filter((exercise) => catalogById.has(exercise.exerciseId));
+    if (exercises.length === 0) {
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
+    }
+  } else {
+    exercises = generatePlaceholderExercises(context.availableExercises, context.muscleFocus);
+    for (const exercise of exercises) {
+      const streamed = toStreamed(exercise);
+      if (streamed) yield { type: 'exercise', exercise: streamed };
+    }
+  }
+
+  const plan = await repository.replacePlan({ userId, planDate, exercises });
+  yield { type: 'done', result: { status: 'ok', plan } };
+}
+
 export async function generateForDate(
   userId: string,
   planDate: string,
   confirmOverwrite = false,
   overrides: GenerateForDateOverrides = {},
 ): Promise<GenerateForDateResult> {
-  const existing = await repository.findPlanByUserAndDate(userId, planDate);
-  if (existing && !confirmOverwrite) {
-    const guard = await checkOverwriteGuard(existing, { countCompleted: true });
-    if (guard) return guard;
+  let result: GenerateForDateResult | undefined;
+  for await (const event of streamGenerateForDate(userId, planDate, confirmOverwrite, overrides)) {
+    if (event.type === 'done') result = event.result;
   }
-
-  const context = await assemblePlanContext(userId, planDate);
-  const availableIds = new Set(context.availableExercises.map((exercise) => exercise.id));
-  const generator = overrides.generator ?? effectivePlanGenerator();
-
-  let exercises: PlanExerciseInput[];
-  if (generator === 'ai') {
-    const evaluatePlan = overrides.evaluatePlan ?? defaultEvaluatePlan;
-    const result = await evaluatePlan(buildPlanUserPrompt(context, overrides.instruction));
-    if (!result.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
-
-    exercises = result.data.exercises.filter((exercise) => availableIds.has(exercise.exerciseId));
-    if (exercises.length === 0) {
-      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
-    }
-  } else {
-    exercises = generatePlaceholderExercises(context.availableExercises, context.muscleFocus);
-  }
-
-  const plan = await repository.replacePlan({ userId, planDate, exercises });
-  return { status: 'ok', plan };
+  return result!;
 }
 
 export interface PlanExerciseView {
@@ -500,7 +572,7 @@ export interface PlanExerciseView {
   instructions: string;
   sets: number;
   reps: number;
-  load: string | null;
+  load: number | null;
   notes: string | null;
   completed: boolean;
   orderIndex: number;
@@ -603,6 +675,87 @@ export function getExerciseOwner(planExerciseId: string) {
 
 export function markExerciseCompleted(planExerciseId: string, completed: boolean) {
   return repository.setExerciseCompleted(planExerciseId, completed);
+}
+
+export interface ExerciseNumbers {
+  sets: number;
+  reps: number;
+  load: number | null;
+}
+
+function formatNumbers({ sets, reps, load }: ExerciseNumbers): string {
+  return `${sets}x${reps}${load ? ` at ${load} kg` : ''}`;
+}
+
+// The sentence the AI reads back later, so it knows the member judged the prescription for themselves. A
+// changed weight with the same sets and reps reads as heavier or lighter; the same weight with a different
+// volume reads as harder or easier; anything that moved both says nothing about direction.
+export function describeManualEdit(name: string, from: ExerciseNumbers, to: ExerciseNumbers): string {
+  const fromLoad = from.load ?? 0;
+  const toLoad = to.load ?? 0;
+  const fromVolume = from.sets * from.reps;
+  const toVolume = to.sets * to.reps;
+  let direction = '';
+  if (fromVolume === toVolume && fromLoad !== toLoad)
+    direction = toLoad > fromLoad ? ', making it heavier' : ', making it lighter';
+  else if (fromLoad === toLoad && fromVolume !== toVolume) {
+    direction = toVolume < fromVolume ? ', making it easier' : ', making it harder';
+  }
+  return `Member changed ${name} from ${formatNumbers(from)} to ${formatNumbers(to)} on their own${direction}`;
+}
+
+// A member's own correction of the numbers on a plan that can still be done. It is stored as a confirmed
+// fact (so the next plan and the chat reason from it) and as a change entry for trainer review.
+export async function updateExerciseNumbers(
+  userId: string,
+  planExerciseId: string,
+  numbers: ExerciseNumbers,
+  today: string = todayLocal(),
+) {
+  const target = await repository.findExerciseForEdit(planExerciseId);
+  if (!target || target.userId !== userId) throw new TRPCError({ code: 'NOT_FOUND', message: 'Exercise not found' });
+  if (target.planDate < today) throw new TRPCError({ code: 'BAD_REQUEST', message: 'Past plans cannot be edited' });
+
+  const from: ExerciseNumbers = { sets: target.sets, reps: target.reps, load: target.load };
+  const to: ExerciseNumbers = { ...numbers, load: numbers.load ? numbers.load : null };
+  if (from.sets === to.sets && from.reps === to.reps && (from.load ?? 0) === (to.load ?? 0)) {
+    return repository.updateExerciseNumbers(planExerciseId, to);
+  }
+
+  const snapshot = async () =>
+    (await repository.findExercisesForPlanWithDetails(target.trainingPlanId)).map((row) => ({
+      exerciseId: row.exerciseId,
+      name: row.exerciseName,
+      sets: row.sets,
+      reps: row.reps,
+      load: row.load,
+    }));
+  const before = await snapshot();
+  const updated = await repository.updateExerciseNumbers(planExerciseId, to);
+  const after = await snapshot();
+
+  await repository.insertProfileEvent({
+    userId,
+    eventType: 'manual_plan_edit',
+    payload: {
+      description: describeManualEdit(target.exerciseName, from, to),
+      exerciseId: target.exerciseId,
+      planDate: target.planDate,
+      from,
+      to,
+    },
+    sourceMessage: null,
+  });
+  await repository.insertPlanChange({
+    trainingPlanId: target.trainingPlanId,
+    userId,
+    kind: 'member_edit',
+    request: null,
+    before,
+    after,
+    acknowledgedWarnings: [],
+  });
+  return updated;
 }
 
 const TOP_EXERCISES_LIMIT = 10;

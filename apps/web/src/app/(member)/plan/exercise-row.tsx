@@ -2,6 +2,8 @@
 
 import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { CheckIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { PrescriptionFields, type PrescriptionNumbers } from '@/components/prescription-fields';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,7 +17,7 @@ interface ExerciseRowProps {
   instructions: string;
   sets: number;
   reps: number;
-  load: string | null;
+  load: number | null;
   notes: string | null;
   completed: boolean;
   isPerformable: boolean;
@@ -24,6 +26,35 @@ interface ExerciseRowProps {
   disabled?: boolean;
   // A day that has not come yet shows the same box as today's plan, switched off.
   isTickLocked?: boolean;
+  // Picking the exercise to talk about with the coach; left out, the name is plain text.
+  isSelected?: boolean;
+  onSelect?: () => void;
+  // The member's own correction of sets, reps or weight, made in place. It resolves when saved and rejects when
+  // it failed, so the fields fall back to what is stored.
+  onEditNumbers?: (numbers: PrescriptionNumbers) => Promise<unknown>;
+  isEditPending?: boolean;
+}
+
+function NameBlock({
+  children,
+  isSelected,
+  onSelect,
+}: {
+  children: ReactNode;
+  isSelected?: boolean;
+  onSelect?: () => void;
+}) {
+  if (!onSelect) return <div className="min-w-0">{children}</div>;
+  return (
+    <button
+      type="button"
+      aria-pressed={isSelected}
+      onClick={onSelect}
+      className="-mx-1 -my-0.5 min-w-0 rounded-sm px-1 py-0.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
+    >
+      {children}
+    </button>
+  );
 }
 
 // onToggle is only passed for today's plan; history rows omit it and render read-only.
@@ -43,17 +74,23 @@ function ExerciseRowRoot({
   onToggle,
   disabled,
   isTickLocked,
+  isSelected,
+  onSelect,
+  onEditNumbers,
+  isEditPending,
 }: ExerciseRowProps) {
   const primaryLabels = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
   const secondaryLabels = muscles
     .filter((entry) => entry.role === 'secondary')
     .map((entry) => muscleLabel(entry.muscle));
+  const isEditable = Boolean(onEditNumbers) && !completed && isPerformable;
 
   return (
     <div
       data-done={completed}
+      data-selected={isSelected ? 'true' : undefined}
       className={cn(
-        'flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 sm:gap-4 sm:px-6',
+        'flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 data-[selected=true]:bg-accent/40 sm:gap-4 sm:px-6',
         isDimmed && 'opacity-45',
       )}
     >
@@ -82,34 +119,34 @@ function ExerciseRowRoot({
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0">
-            <p
+          <NameBlock isSelected={isSelected} onSelect={onSelect}>
+            <span
               className={cn(
-                'strike-wipe w-fit text-base leading-6 font-semibold transition-colors duration-300',
+                'strike-wipe block w-fit text-base leading-6 font-semibold transition-colors duration-300',
                 completed && 'text-muted-foreground',
               )}
             >
               {name}
-            </p>
-            <p className="font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+            </span>
+            <span className="block font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               {primaryLabels.join(', ')}
               {secondaryLabels.length > 0 && (
                 <span className="font-sans tracking-normal normal-case"> + {secondaryLabels.join(', ')}</span>
               )}
-            </p>
-          </div>
-          <p
-            className={cn(
-              'numerals shrink-0 text-right text-3xl leading-none font-bold transition-opacity duration-300',
-              completed && 'opacity-45',
-              !isPerformable && 'text-muted-foreground line-through decoration-2',
-            )}
-          >
-            {sets}
-            <span className="px-0.5 text-muted-foreground">&times;</span>
-            {reps}
-            {load && <span className="mt-1 block text-sm font-semibold text-muted-foreground">{load}</span>}
-          </p>
+            </span>
+          </NameBlock>
+          <PrescriptionFields
+            name={name}
+            size="lg"
+            sets={sets}
+            reps={reps}
+            load={load}
+            isEditable={isEditable}
+            isPending={isEditPending}
+            isStruck={!isPerformable}
+            onCommit={onEditNumbers}
+            className={cn('duration-300', completed && 'opacity-45')}
+          />
         </div>
         {!isPerformable && (
           <Badge variant="outline" className="text-muted-foreground">

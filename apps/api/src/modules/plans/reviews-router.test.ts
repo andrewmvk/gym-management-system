@@ -5,6 +5,7 @@ import {
   dUsers,
   fCheckIns,
   fOnboardingSubmissions,
+  fPlanChanges,
   fPlanReviews,
   fProfileEvents,
   fTrainingPlanExercises,
@@ -88,6 +89,63 @@ describe('reviews router', () => {
 
       expect(trainerQueue.find((entry) => entry.id === plan.id)).toMatchObject({ memberName: 'Review Test Member' });
       expect(adminQueue.find((entry) => entry.id === plan.id)).toBeDefined();
+    });
+  });
+
+  describe('changes made through the coach', () => {
+    async function setup() {
+      const { member, plan } = await createMemberWithPlan(todayLocal());
+      const [exercise] = await db
+        .select({ id: dExercises.id, name: dExercises.name })
+        .from(dExercises)
+        .where(eq(dExercises.name, 'Barbell Back Squat'));
+      const snapshot = [{ exerciseId: exercise!.id, name: exercise!.name, sets: 3, reps: 8, load: null }];
+      await db.insert(fPlanChanges).values({
+        trainingPlanId: plan.id,
+        userId: member.id,
+        kind: 'coach',
+        request: 'More legs',
+        before: snapshot,
+        after: [{ ...snapshot[0]!, reps: 10 }],
+        acknowledgedWarnings: [{ exerciseId: exercise!.id, name: exercise!.name, reason: 'Trains your quads' }],
+      });
+      const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
+      return { plan, caller };
+    }
+
+    it('flags the plan as must-review with the acknowledged risk and lists the change in its detail', async () => {
+      const { plan, caller } = await setup();
+
+      const queued = (await caller.reviews.queue()).find((entry) => entry.id === plan.id);
+      const flagged = (await caller.reviews.overview()).needsReview.find((entry) => entry.planId === plan.id);
+      const detail = await caller.reviews.getPlan({ planId: plan.id });
+
+      expect(queued).toMatchObject({ needsReview: true, riskCount: 1, unavailableCount: 0 });
+      expect(flagged).toMatchObject({
+        blocked: [],
+        risks: [{ name: 'Barbell Back Squat', reason: 'Trains your quads' }],
+      });
+      expect(detail.risks).toHaveLength(1);
+      expect(detail.changes).toEqual([
+        expect.objectContaining({
+          kind: 'coach',
+          request: 'More legs',
+          after: [expect.objectContaining({ reps: 10 })],
+        }),
+      ]);
+    });
+
+    it('stops flagging the plan once a trainer has left a note after the change', async () => {
+      const { plan, caller } = await setup();
+
+      await caller.reviews.addNote({ planId: plan.id, note: 'Checked with the member.' });
+
+      expect((await caller.reviews.queue()).find((entry) => entry.id === plan.id)).toMatchObject({
+        needsReview: false,
+        riskCount: 0,
+      });
+      expect((await caller.reviews.overview()).needsReview.some((entry) => entry.planId === plan.id)).toBe(false);
+      expect((await caller.reviews.getPlan({ planId: plan.id })).changes).toHaveLength(1);
     });
   });
 

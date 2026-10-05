@@ -3,10 +3,13 @@
 import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarSearchIcon, CalendarX2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useCoach } from '@/app/(member)/coach/coach-context';
+import { CoachBar } from '@/app/(member)/plan/coach-bar';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
 import { MuscleDetail } from '@/app/(member)/plan/muscle-detail';
 import { TrainerNotes } from '@/app/(member)/plan/trainer-notes';
+import { useUpdateExerciseNumbers } from '@/app/(member)/plan/use-update-exercise-numbers';
 import { DatePicker } from '@/components/date-picker';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
@@ -112,6 +115,15 @@ export function PlanHistory() {
   const shownDate = useLaggedValue(selectedDate, selectedDate.length > 0 && selectedQuery.isPending);
   const planQuery = useQuery(planQueryFor(shownDate));
   const isFuture = shownDate > todayIso;
+  const updateNumbers = useUpdateExerciseNumbers();
+  const { selection, setSelection } = useCoach();
+
+  // Only days that can still be done are talked about from here, and the pick never outlives this view.
+  useEffect(() => () => setSelection(null), [setSelection]);
+  const shownExerciseIds = planQuery.data?.exercises.map((exercise) => exercise.exerciseId);
+  useEffect(() => {
+    if (selection && (!isFuture || !shownExerciseIds?.includes(selection.exerciseId))) setSelection(null);
+  }, [selection, isFuture, shownExerciseIds, setSelection]);
 
   return (
     <section aria-label="Plans by day" className="overflow-hidden rounded-lg border bg-card">
@@ -273,8 +285,26 @@ export function PlanHistory() {
               isPerformable={exercise.isPerformable}
               equipmentDown={exercise.equipmentDown}
               isTickLocked={isFuture}
+              isSelected={isFuture && selection?.exerciseId === exercise.exerciseId}
+              onSelect={
+                isFuture
+                  ? () =>
+                      setSelection(
+                        selection?.exerciseId === exercise.exerciseId
+                          ? null
+                          : { exerciseId: exercise.exerciseId, name: exercise.exerciseName },
+                      )
+                  : undefined
+              }
+              onEditNumbers={
+                isFuture
+                  ? (numbers) => updateNumbers.mutateAsync({ planExerciseId: exercise.id, ...numbers })
+                  : undefined
+              }
+              isEditPending={updateNumbers.isPending && updateNumbers.variables?.planExerciseId === exercise.id}
             />
           ))}
+          {isFuture && <CoachBar />}
         </div>
       )}
     </section>

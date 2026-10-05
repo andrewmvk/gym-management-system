@@ -1,3 +1,4 @@
+import { type MuscleId, MuscleIdSchema } from '@shared/schemas/muscles';
 import { z } from 'zod';
 
 export const PROFILE_EVENT_TYPES = [
@@ -8,13 +9,14 @@ export const PROFILE_EVENT_TYPES = [
   'state_update',
   'plan_adjustment_request',
   'muscle_focus_changed',
+  'manual_plan_edit',
 ] as const;
 export type ProfileEventType = (typeof PROFILE_EVENT_TYPES)[number];
 
 // Uniform { description } payload for every event type: docs/05-data-model.md leaves the shape of
-// f_profile_events.payload open, and P-16 doesn't need richer per-type fields - P-17/P-18, which would
-// consume this more deeply, are out of scope here.
+// f_profile_events.payload open. An injury also names the muscles it affects, so the body map can show it.
 const FactPayloadSchema = z.object({ description: z.string().trim().min(1) });
+const InjuryPayloadSchema = FactPayloadSchema.extend({ muscles: z.array(MuscleIdSchema).max(8).nullish() });
 
 export const PROFILE_EVENT_LABELS: Record<ProfileEventType, string> = {
   injury: 'Injury',
@@ -24,6 +26,7 @@ export const PROFILE_EVENT_LABELS: Record<ProfileEventType, string> = {
   state_update: 'Update',
   plan_adjustment_request: 'Plan request',
   muscle_focus_changed: 'Muscle focus',
+  manual_plan_edit: 'Manual edit',
 };
 
 // One short line for a remembered fact, e.g. "Injury: sore left knee". Falls back to the label alone when
@@ -34,8 +37,14 @@ export function describeProfileEvent(eventType: ProfileEventType, payload: unkno
   return parsed.success ? `${label}: ${parsed.data.description}` : label;
 }
 
+// The muscles a stored injury names, or none when the payload predates muscle tagging or is malformed.
+export function injuryMuscles(payload: unknown): MuscleId[] {
+  const parsed = InjuryPayloadSchema.safeParse(payload);
+  return parsed.success ? [...new Set(parsed.data.muscles ?? [])] : [];
+}
+
 export const ProfileEventFactSchema = z.discriminatedUnion('eventType', [
-  z.object({ eventType: z.literal('injury'), payload: FactPayloadSchema }),
+  z.object({ eventType: z.literal('injury'), payload: InjuryPayloadSchema }),
   z.object({ eventType: z.literal('skipped_exercise'), payload: FactPayloadSchema }),
   z.object({ eventType: z.literal('medication_change'), payload: FactPayloadSchema }),
   z.object({ eventType: z.literal('life_event'), payload: FactPayloadSchema }),
@@ -44,16 +53,7 @@ export const ProfileEventFactSchema = z.discriminatedUnion('eventType', [
 ]);
 export type ProfileEventFact = z.infer<typeof ProfileEventFactSchema>;
 
-export const ChatSendInputSchema = z.object({ message: z.string().trim().min(1).max(2000) });
-export type ChatSendInput = z.infer<typeof ChatSendInputSchema>;
-
-// P-17: enough for the chat panel's "Apply to my plan for <date>" button to call chat.adjustPlan
-// directly with these two fields.
-const ChatAdjustmentSchema = z.object({ date: z.iso.date(), instruction: z.string() });
-
-export const ChatResponseSchema = z.object({
-  reply: z.string(),
-  facts: z.array(ProfileEventFactSchema),
-  adjustment: ChatAdjustmentSchema.optional(),
+export const FactCorrectionSchema = z.object({
+  id: z.uuid(),
+  description: z.string().trim().min(1).max(500),
 });
-export type ChatResponse = z.infer<typeof ChatResponseSchema>;

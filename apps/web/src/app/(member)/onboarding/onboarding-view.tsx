@@ -7,7 +7,10 @@ import { type ReactNode, useEffect, useState } from 'react';
 import { CurrentProfile } from '@/app/(member)/onboarding/current-profile';
 import { OnboardingForm, type OnboardingInitialValues } from '@/app/(member)/onboarding/onboarding-form';
 import { RememberedFacts } from '@/app/(member)/onboarding/remembered-facts';
+import { type PlanOutcome, useOnboardingSubmit } from '@/app/(member)/onboarding/use-onboarding-submit';
+import { PlanBuildProgress, type StreamedPlanExercise } from '@/app/(member)/plan/plan-build-progress';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
+import { AiMark } from '@/components/ai-mark';
 import { Deferred } from '@/components/deferred';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -68,12 +71,34 @@ function OnboardingViewSkeleton() {
   return <ProfileLayout profile={<CurrentProfile.Skeleton />} facts={<RememberedFacts.Skeleton />} />;
 }
 
-// The submit already tried to build the plan on the server. If there is none, that attempt failed, and the
-// member sees it as a failure with a retry, never as a finished onboarding.
-function SubmittedPanel({ isUpdate }: { isUpdate: boolean }) {
+// The submit saved the information and then tried to build the plan. While it writes, the exercises stream in.
+// If it failed and there is no plan, the member sees a failure with a retry, never a finished onboarding.
+function SubmittedPanel({
+  isUpdate,
+  outcome,
+  streamed,
+}: {
+  isUpdate: boolean;
+  outcome: PlanOutcome;
+  streamed: StreamedPlanExercise[];
+}) {
   const trpc = useTRPC();
-  const todayQuery = useQuery(trpc.plans.getToday.queryOptions());
+  const todayQuery = useQuery({ ...trpc.plans.getToday.queryOptions(), enabled: outcome !== 'building' });
   const rebuild = useRebuildPlan({ isErrorInline: true });
+
+  if (outcome === 'building' || outcome === 'idle' || rebuild.isPending) {
+    const exercises = rebuild.isPending ? rebuild.streamed : streamed;
+    return (
+      <div className="flex flex-col gap-4">
+        <StatusPanel
+          icon={<AiMark isActive className="size-6" />}
+          title="Building your plan"
+          description="Your information is saved. Your coach is writing today's plan from it, and each exercise appears as it is ready."
+        />
+        {exercises.length > 0 && <PlanBuildProgress exercises={exercises} className="rounded-lg border bg-card" />}
+      </div>
+    );
+  }
 
   if (todayQuery.isPending || (todayQuery.isFetching && todayQuery.data === null)) {
     return (
@@ -111,9 +136,13 @@ function SubmittedPanel({ isUpdate }: { isUpdate: boolean }) {
       icon={<SparklesIcon className="size-6" />}
       title="Thanks, got it"
       description={
-        isUpdate
-          ? "Your update is saved and your coach uses it from now on. Today's plan is rebuilt unless you already ticked exercises or a trainer edited it. You can rebuild it from My plan."
-          : 'Your health profile is saved and your first plan is ready.'
+        outcome === 'kept'
+          ? "Your update is saved and your coach uses it from now on. Today's plan was kept as it is, because you already ticked exercises or a trainer edited it. You can rebuild it from My plan."
+          : outcome === 'failed'
+            ? "Your information is saved and your coach uses it from now on. Today's plan could not be rebuilt right now. You can rebuild it from My plan."
+            : isUpdate
+              ? "Your update is saved and your coach uses it from now on. Today's plan was rebuilt from it. You can rebuild it again from My plan."
+              : 'Your health profile is saved and your first plan is ready.'
       }
       actions={
         <Button asChild>
@@ -133,6 +162,12 @@ function OnboardingViewRoot() {
   const submissions = useQuery(trpc.onboarding.listMine.queryOptions());
   const [view, setView] = useState<View | null>(null);
   const [wasUpdate, setWasUpdate] = useState(false);
+  const submit = useOnboardingSubmit({
+    onSaved: () => {
+      setWasUpdate(status.data?.completed ?? false);
+      setView('submitted');
+    },
+  });
 
   // Seeds the view once from the server: a member with no submission yet goes straight to the form,
   // one who already has at least one sees what the coach knows first and can update from there.
@@ -160,7 +195,9 @@ function OnboardingViewRoot() {
     );
   }
 
-  if (view === 'submitted') return <SubmittedPanel isUpdate={wasUpdate} />;
+  if (view === 'submitted') {
+    return <SubmittedPanel isUpdate={wasUpdate} outcome={submit.outcome} streamed={submit.streamed} />;
+  }
 
   if (view === 'summary') {
     return <ProfileLayout profile={<CurrentProfile onUpdate={() => setView('form')} />} facts={<RememberedFacts />} />;
@@ -183,10 +220,8 @@ function OnboardingViewRoot() {
     <OnboardingForm
       isUpdate={status.data.completed}
       initialValues={initialValues}
-      onSubmitted={() => {
-        setWasUpdate(status.data.completed);
-        setView('submitted');
-      }}
+      isSubmitting={submit.isPending}
+      onSubmit={submit.start}
       onCancel={status.data.completed ? () => setView('summary') : undefined}
     />
   );

@@ -124,7 +124,10 @@ describe('runStructured in live mode', () => {
 
     await run('plan');
 
-    expect(log.warn).toHaveBeenCalledWith({ purpose: 'plan', reason: 'invalid_output' }, 'ai call failed');
+    expect(log.warn).toHaveBeenCalledWith(
+      { purpose: 'plan', reason: 'invalid_output', cause: expect.stringMatching(/^(not_json|schema:)/) },
+      'ai call failed',
+    );
     const logged = JSON.stringify(log.warn.mock.calls);
     expect(logged).not.toContain(API_KEY);
     expect(logged).not.toContain(USER_PROMPT);

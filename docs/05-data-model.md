@@ -16,6 +16,8 @@ erDiagram
     F_TRAINING_PLANS ||--o{ F_TRAINING_PLAN_EXERCISES : contains
     F_TRAINING_PLANS ||--o{ F_PLAN_REVIEWS : "has (many contributors)"
     D_USERS ||--o{ F_PLAN_REVIEWS : writes
+    F_TRAINING_PLANS ||--o{ F_PLAN_CHANGES : "changed through the coach"
+    D_USERS ||--o{ F_PLAN_CHANGES : makes
     D_EXERCISES ||--o{ F_TRAINING_PLAN_EXERCISES : "referenced by"
     D_EXERCISES ||--o{ D_EXERCISE_EQUIPMENT : requires
     D_EXERCISES ||--o{ D_EXERCISE_MUSCLES : trains
@@ -200,6 +202,22 @@ One row per contributor interaction with a plan - comments and edits alike - so 
 | is_edit | boolean | `true` if this entry accompanied a direct edit to the plan's exercises; `false` if it's only a comment |
 | created_at | timestamp | |
 
+### `f_plan_changes`
+What changed on a plan without a trainer, kept for trainer review (FR-71). One row per applied coach proposal (`kind = coach`, written by `chat.applyDraft`, FR-65) and one per member edit of an exercise's sets, reps or weight (`kind = member_edit`, written by `plans.updateExercise`, FR-68). Append-only: a row is never edited.
+| Column | Type | Notes |
+|---|---|---|
+| id | uuid PK | |
+| training_plan_id | uuid FK → f_training_plans.id | |
+| user_id | uuid FK → d_users.id | The member who made the change |
+| kind | enum `plan_change_kind` (`coach`,`member_edit`) | |
+| request | text, nullable | The member's request for a coach change; null for a member edit |
+| before | jsonb | The plan's exercises before the change, each `{ exerciseId, name, sets, reps, load }` |
+| after | jsonb | The same list after the change |
+| acknowledged_warnings | jsonb, default `[]` | The safety warnings the member accepted before applying, each `{ exerciseId, name, reason }` (FR-67) |
+| created_at | timestamptz | |
+
+The review page lists these oldest first (FR-71). A plan is also a must-review plan while a row has a non-empty `acknowledged_warnings` and no `f_plan_reviews` row was created after it (see Derived Data).
+
 ### `f_training_plan_exercises`
 | Column | Type | Notes |
 |---|---|---|
@@ -208,7 +226,7 @@ One row per contributor interaction with a plan - comments and edits alike - so 
 | exercise_id | uuid FK → d_exercises.id | |
 | sets | integer | |
 | reps | integer | |
-| load | text, nullable | Weight/resistance, free-form (kg, band level, etc.) |
+| load | double precision, nullable | The weight in kilograms as a number (0 to 1000), null for an exercise done without added weight. It was free text before migration 0014, which kept the first number found in each old value and cleared the ones with none |
 | order_index | integer | Display order within the plan |
 | completed | boolean, default false | Marked by the member. Never silently lost: regenerating or trainer-editing a plan keeps `completed` for each exercise that remains in it, matched by exercise (RN-16) |
 | notes | text, nullable | |
@@ -233,13 +251,14 @@ The durable "AI memory" extracted from chat (FR-27) - **not** a chat transcript 
 |---|---|---|
 | id | uuid PK | |
 | user_id | uuid FK → d_users.id | |
-| event_type | enum(`injury`,`skipped_exercise`,`medication_change`,`life_event`,`state_update`,`plan_adjustment_request`,`muscle_focus_changed`) | `muscle_focus_changed` is written by the focus module (FR-51), never extracted from chat |
-| payload | jsonb | Structured extracted data, shape depends on `event_type`. For `muscle_focus_changed`: `{ description, muscle, from, to }`, the levels before and after |
+| event_type | enum(`injury`,`skipped_exercise`,`medication_change`,`life_event`,`state_update`,`plan_adjustment_request`,`muscle_focus_changed`,`manual_plan_edit`) | `muscle_focus_changed` is written by the focus module (FR-51), and `manual_plan_edit` by the plans module when the member edits sets, reps or weight themselves (FR-68); neither is extracted from chat |
+| payload | jsonb | Structured data, shape depends on `event_type`. Extracted facts are `{ description }`; an `injury` may also carry `muscles`, the registry ids of the muscles it affects (FR-27, FR-69), which an injury written before muscle tagging lacks. For `muscle_focus_changed`: `{ description, muscle, from, to }`, the levels before and after. For `manual_plan_edit`: `{ description, exerciseId, planDate, from, to }` with the numbers `{ sets, reps, load }` before and after |
 | source_message | text, nullable | Optional raw excerpt kept for traceability/debugging, not for UI replay |
 | created_at | timestamp | |
-| resolved_at | timestamptz, nullable | Set when the member marks the fact "no longer true" (an injury that healed); cleared again by "applies again" (FR-58). A resolved fact stays as history but is skipped by every prompt |
+| confirmed_at | timestamptz, nullable | Defaults to the insert time, so every fact the system writes itself counts at once. A fact extracted from chat is inserted with `null` (pending) and gets the time when the member confirms it (FR-27, FR-72); rows that existed before this column were confirmed at their `created_at`. A pending fact never reaches a prompt and is not shown to staff |
+| resolved_at | timestamptz, nullable | Set when the member marks the fact "no longer true" (an injury that healed); cleared again by "applies again" (FR-58). A resolved fact stays as history but is skipped by every prompt. A pending fact the member dismisses is resolved without ever being confirmed, which discards it: it is no longer listed anywhere |
 
-This table is what the AI reads (alongside `f_onboarding_submissions` and recent `f_training_plans`) to build context for every new plan generation or chat response - it's the mechanism behind "the AI always knows about the user's current and historical state." The `muscle_focus_changed` rows are kept as history but left out of those prompts: the current levels in `f_member_muscle_focus` are read instead, and resolved rows are left out too. Injuries and medication changes that are still unresolved are always given to the AI in detail, however old, and are never folded into an "older events" count. The member sees every row on the Health profile page, grouped by type with the date and their own words (FR-58), and trainers see the unresolved ones beside a plan (FR-60).
+This table is what the AI reads (alongside `f_onboarding_submissions` and recent `f_training_plans`) to build context for every new plan generation or chat response - it's the mechanism behind "the AI always knows about the user's current and historical state." The `muscle_focus_changed` rows are kept as history but left out of those prompts: the current levels in `f_member_muscle_focus` are read instead, and resolved rows and pending rows (`confirmed_at` null) are left out too. Injuries and medication changes that are still unresolved are always given to the AI in detail, however old, and are never folded into an "older events" count. The member sees every row on the Health profile page, grouped by type with the date and their own words (FR-58), and trainers see the unresolved ones beside a plan (FR-60).
 
 ### `f_member_muscle_focus`
 A member's current emphasis per muscle (FR-51). A fact table in the sense of `rules/naming-conventions.md`: it records what the member chose, and a row is updated in place rather than versioned (the history is the `muscle_focus_changed` events above).
@@ -279,6 +298,8 @@ These are queries, not tables:
 - **Plan muscle load** (FR-50): for one plan, the sum over its exercises of `sets` times the role weight (primary 1, secondary 0.5) for each muscle the exercise trains. Only exercises that are performable right now (the FR-17 rule) count. The same weighting feeds the AI's "top muscles today" aggregate and the heat steps, which scale each muscle against the busiest one in the view.
 - **Catalog coverage** (FR-52): per muscle, the exercises in `d_exercise_muscles` that train it, how many of them are available now, and how many are lost, plus for each unavailable equipment item the exercises it takes out (unavailable, with that item unavailable) and the muscles they train. Computed in the browser from the catalog list with the shared functions.
 - **Must-review plan** (FR-53, RN-14): a row of `f_training_plans` whose `plan_date` is today or later and that has at least one `f_training_plan_exercises` row whose exercise fails the FR-17 rule (it has linked equipment and none of it is available). Evaluated on every read, never stored: there is no flag column and no acknowledged state, so it clears when the plan's exercises change or the equipment's `is_available` is switched back on. A plan dated before today is never flagged.
+- **Accepted safety warning** (FR-71, RN-20): the second reason a plan is a must-review plan. A row of `f_training_plans` with `plan_date` today or later that has an `f_plan_changes` row whose `acknowledged_warnings` is not empty and for which no `f_plan_reviews` row of that plan has a later `created_at` (a trainer's note or edit after the change is the review). Evaluated on every read and never stored, like the equipment reason; the queue reads it as `riskCount`, the Overview and the review page as `risks`.
+- **Active injuries** (FR-69): the member's `f_profile_events` rows of type `injury` that are confirmed and unresolved and whose payload names at least one muscle, each with its description and muscles; the plan page draws those muscles on the muscle map. The same rows give the server its deterministic injury check (FR-28, FR-67): an exercise whose primary muscle (`d_exercise_muscles`) an injury names conflicts with it.
 - **Plan review comparison** (FR-54): the member's weighted muscle load from the `completed` exercises of their plans in the 14 days before the plan's `plan_date` (the plan's own day excluded), and their current rows of `f_member_muscle_focus`. The load of the plan itself is computed in the browser from the exercises being edited.
 - **Today's demand** (FR-29, FR-56): for today's `f_training_plans` (every member, not only those checked in), everything counted in distinct plans, never exercise rows or sets. Muscle half: how many plans train each muscle through an exercise that can be done now, and how many of those belong to a member with a row in `f_check_ins` today ("Already checked in"). Equipment half: for each `d_gym_equipment` piece, "Plans" (today's plans that need it) and "In the gym" (how many of those plans belong to members who have checked in today); a plan counts toward a piece that is out of service only through an exercise that has no working alternative left, and a plan counts toward a working piece only through an exercise that can be done on it. The pieces are ordered out-of-service first, then by plan count. This is staff-only and is read from the staff Overview; the public gym info page carries no demand.
 - **Plan demand given to the AI** (FR-15): when a plan is built or rebuilt, the other members' plans for the same `plan_date`, counted in plans per equipment piece, plus their muscle load, so broad goals are spread across different equipment and overloaded equipment is avoided. Safety, injuries, medication, exams and muscle focus always win over it.
@@ -286,7 +307,7 @@ These are queries, not tables:
 - **Turnstile health** (FR-56, FR-61): for today's `f_check_ins`, the number with `turnstile_status = 'failed'` out of the total, and whether `d_turnstile_config.url` is set ("not configured" when it is empty). The check-in log lists the most recent rows with the member's name, time, result and the failure reason read from `turnstile_response`.
 - **Equipment impact** (FR-24): for one equipment piece, how many `f_training_plans` dated today or later would become must-review if it were switched off (a plan holding an exercise whose only working equipment is that piece), and how many distinct members they belong to; shown in the confirmation before the piece is switched off. Plans dated before today are never counted.
 - **Member week** (FR-55): the local calendar days of a range with a row in `f_check_ins` for the member, and the latest `checked_in_at` in the range; the same rule as days trained (FR-36).
-- **Member page** (FR-60): for one member, the profile and membership from `d_users`, the newest `f_onboarding_submissions` row as the current health profile, every `f_profile_events` row (resolved ones included, shown muted), the member's `f_training_plans` of the last 60 days (date, status, completed exercises out of the total, notes count, link to the review), and the member's last 30 local calendar days with a row in `f_check_ins`.
+- **Member page** (FR-60): for one member, the profile and membership from `d_users`, the newest `f_onboarding_submissions` row as the current health profile, every confirmed `f_profile_events` row (resolved ones included, shown muted; pending ones are not shown), the member's `f_training_plans` of the last 60 days (date, status, completed exercises out of the total, notes count, link to the review), and the member's last 30 local calendar days with a row in `f_check_ins`.
 - **Current occupancy** (FR-37): `COUNT(DISTINCT user_id) FROM f_check_ins WHERE checked_in_at >= now() - interval '90 minutes'` (window is a tunable constant, not user-configurable) - an estimate, since there is no checkout event, and distinct so a member who scans again is still one person in the gym.
 - **Check-ins per hour** (FR-37): for today's `f_check_ins`, the distinct members per local hour, for anyone with the read-check-ins permission. Whatever the turnstile did, the member was physically there.
 - **A user's effective permissions** (FR-42): every non-expired `f_user_policy_on_user` row for that user plus every policy of each non-expired group membership (`f_user_policy_group_on_user` → `d_user_policy_group_policy`), joined to `d_user_policy`, translated into CASL rules (see `f_user_policy_on_user`/`f_user_policy_group_on_user` above).

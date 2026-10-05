@@ -2,16 +2,19 @@
 
 import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
-import { CheckIcon, DumbbellIcon, SparklesIcon, TriangleAlertIcon } from 'lucide-react';
+import { CheckIcon, DumbbellIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { PlanBuildProgress } from '@/app/(member)/plan/plan-build-progress';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
 import { useToggleExercise } from '@/app/(member)/plan/use-toggle-exercise';
+import { AiButton } from '@/components/ai-button';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatWeight } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 
 function CardShell({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
@@ -84,13 +87,18 @@ function NextUpCardRoot() {
             title="No plan yet for today"
             description="Your plan is built from your health profile and everything you've told your coach."
             action={
-              <Button size="lg" disabled={generate.isPending} onClick={generate.requestRebuild}>
-                <SparklesIcon data-icon="inline-start" />
-                {generate.isPending ? 'Building your plan...' : 'Build my plan'}
-              </Button>
+              <AiButton
+                size="lg"
+                isPending={generate.isPending}
+                pendingLabel="Building your plan..."
+                onClick={generate.requestRebuild}
+              >
+                Build my plan
+              </AiButton>
             }
           />
         )}
+        {generate.isPending && generate.streamed.length > 0 && <PlanBuildProgress exercises={generate.streamed} />}
         {generate.dialog}
       </CardShell>
     );
@@ -173,7 +181,9 @@ function NextUpCardRoot() {
           {next.sets}
           <span className="px-1 text-muted-foreground">&times;</span>
           {next.reps}
-          {next.load && <span className="mt-2 block text-2xl font-bold text-muted-foreground">{next.load}</span>}
+          {next.load ? (
+            <span className="mt-2 block text-2xl font-bold text-muted-foreground">{formatWeight(next.load)}</span>
+          ) : null}
         </p>
         <details>
           <summary className="flex min-h-11 w-fit items-center text-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/45">

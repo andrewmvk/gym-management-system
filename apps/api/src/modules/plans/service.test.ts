@@ -454,7 +454,7 @@ describe('plans', () => {
       const donePlan = await createPlanWithExercises(member.id, doneDate, ['Barbell Back Squat']);
       await db
         .update(fTrainingPlanExercises)
-        .set({ completed: true, load: '60kg' })
+        .set({ completed: true, load: 60 })
         .where(eq(fTrainingPlanExercises.trainingPlanId, donePlan.id));
       await createPlanWithExercises(member.id, missedDate, ['Push-Up']);
       await createPlanWithExercises(member.id, outsideWindow, ['Pull-Up']);
@@ -475,7 +475,7 @@ describe('plans', () => {
 
       const prompt = await captureAiPrompt(member.id);
 
-      expect(prompt).toContain(`- ${doneDate}: Barbell Back Squat 3x10 60kg (done)`);
+      expect(prompt).toContain(`- ${doneDate}: Barbell Back Squat 3x10 60 kg (done)`);
       expect(prompt).toContain(`- ${missedDate}: Push-Up 3x10 (not done)`);
       expect(prompt).not.toContain('Pull-Up 3x10');
       expect(prompt).toContain(`Gym check-in dates in the same period: ${doneDate}`);

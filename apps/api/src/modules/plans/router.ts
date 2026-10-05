@@ -2,6 +2,7 @@ import { todayLocal } from '@api/lib/dates';
 import * as service from '@api/modules/plans/service';
 import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 import { subject } from '@cadence/shared/auth';
+import { UpdateExerciseInputSchema } from '@cadence/shared/schemas/coach';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -13,9 +14,11 @@ const MarkExerciseCompletedInputSchema = z.object({ planExerciseId: z.uuid(), co
 export const plansRouter = router({
   // update_own_plans (scope self): generating/regenerating a plan is a write on the member's own
   // TrainingPlan, same policy the member-facing plan screen uses for marking exercises.
-  generateToday: authedProcedure.input(GenerateTodayInputSchema).mutation(({ ctx, input }) => {
+  // Streams each exercise as the AI finishes it, then one `done` event with the saved plan (or the overwrite
+  // confirmation the member must answer first).
+  generateToday: authedProcedure.input(GenerateTodayInputSchema).mutation(async function* ({ ctx, input }) {
     assertCan(ctx.ability, 'update', subject('TrainingPlan', { userId: ctx.user.id }));
-    return service.generateForDate(ctx.user.id, todayLocal(), input.confirmOverwrite);
+    yield* service.streamGenerateForDate(ctx.user.id, todayLocal(), input.confirmOverwrite);
   }),
 
   getToday: authedProcedure.query(({ ctx }) => {
@@ -37,6 +40,18 @@ export const plansRouter = router({
   listUpcoming: authedProcedure.query(({ ctx }) => {
     assertCan(ctx.ability, 'read', subject('TrainingPlan', { userId: ctx.user.id }));
     return service.listUpcomingPlans(ctx.user.id);
+  }),
+
+  // The member's own correction of sets, reps or weight, for a plan that can still be done.
+  updateExercise: authedProcedure.input(UpdateExerciseInputSchema).mutation(async ({ ctx, input }) => {
+    const owner = await service.getExerciseOwner(input.planExerciseId);
+    if (!owner) throw new TRPCError({ code: 'NOT_FOUND', message: 'Exercise not found' });
+    assertCan(ctx.ability, 'update', subject('TrainingPlan', { userId: owner.userId }));
+    return service.updateExerciseNumbers(owner.userId, input.planExerciseId, {
+      sets: input.sets,
+      reps: input.reps,
+      load: input.load ?? null,
+    });
   }),
 
   // The owner is resolved from the database, never assumed to be the caller, before the ability check

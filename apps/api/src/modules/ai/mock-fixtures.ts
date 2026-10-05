@@ -6,6 +6,10 @@ export function mockFixtureFor(purpose: AiPurpose): unknown {
       // Empty on purpose: plan generation falls back to its deterministic placeholder in mock mode.
       return { exercises: [] };
     case 'chat':
-      return { reply: 'Mock reply: noted. Your coach AI is running in mock mode.', facts: [] };
+      return {
+        reply: 'Mock reply: noted. Your coach AI is running in mock mode.',
+        facts: [],
+        quickReplies: ['What is on my plan today?', 'Explain my plan'],
+      };
   }
 }

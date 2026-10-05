@@ -5,7 +5,7 @@ import * as repository from '@api/modules/members/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import { findPlanSummariesForMember } from '@api/modules/plans/repository';
 import { findRememberedEvents } from '@api/modules/profile/repository';
-import { PROFILE_EVENT_LABELS } from '@cadence/shared/schemas/profile-events';
+import { injuryMuscles, PROFILE_EVENT_LABELS } from '@cadence/shared/schemas/profile-events';
 import { TRPCError } from '@trpc/server';
 
 export const PLAN_HISTORY_DAYS = 60;
@@ -32,6 +32,7 @@ function toFact(event: Awaited<ReturnType<typeof findRememberedEvents>>[number])
     id: event.id,
     eventType: event.eventType,
     description: factDescription(event),
+    muscles: event.eventType === 'injury' ? injuryMuscles(event.payload) : [],
     sourceMessage: event.sourceMessage,
     createdAt: event.createdAt,
     resolvedAt: event.resolvedAt,
@@ -71,7 +72,7 @@ export async function getMemberContext(userId: string, now: Date = new Date()) {
     name: member.name,
     age: ageOn(member.birthdate, now),
     onboarding,
-    facts: events.filter((event) => event.resolvedAt === null).map(toFact),
+    facts: events.filter((event) => event.confirmedAt !== null && event.resolvedAt === null).map(toFact),
   };
 }
 
@@ -102,7 +103,7 @@ export async function getMember(userId: string, now: Date = new Date()) {
     },
     membership: { status: member.membershipStatus, plan: member.membershipPlan },
     onboarding,
-    facts: events.map(toFact),
+    facts: events.filter((event) => event.confirmedAt !== null).map(toFact),
     plans,
     checkInDates,
   };

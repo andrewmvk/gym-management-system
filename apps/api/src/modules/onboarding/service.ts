@@ -1,8 +1,9 @@
+import type { OnboardingSubmission } from '@api/db/schema';
 import { todayLocal } from '@api/lib/dates';
 import { logger } from '@api/lib/logger';
 import { saveUpload } from '@api/lib/uploads';
 import * as repository from '@api/modules/onboarding/repository';
-import { generateForDate } from '@api/modules/plans/service';
+import { type StreamedPlanExercise, streamGenerateForDate } from '@api/modules/plans/service';
 import type { ExamEntry, ExamInput, OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
 import { TRPCError } from '@trpc/server';
 
@@ -39,7 +40,17 @@ async function toStoredExam(userId: string, exam: ExamInput): Promise<ExamEntry>
   return entry;
 }
 
-export async function submit(userId: string, input: OnboardingSubmitInput) {
+export type OnboardingStreamEvent =
+  | { type: 'saved'; submission: OnboardingSubmission }
+  | { type: 'exercise'; exercise: StreamedPlanExercise }
+  | { type: 'done'; plan: 'built' | 'kept' | 'failed' };
+
+// The submission is saved and reported first, so the member's information is never held back by the plan
+// that follows it. The plan is built best-effort and its exercises stream as the AI finishes each one.
+export async function* submitStream(
+  userId: string,
+  input: OnboardingSubmitInput,
+): AsyncGenerator<OnboardingStreamEvent> {
   const exams = await Promise.all((input.exams ?? []).map((exam) => toStoredExam(userId, exam)));
 
   const submission = await repository.insertSubmission({
@@ -52,16 +63,29 @@ export async function submit(userId: string, input: OnboardingSubmitInput) {
     exams,
   });
 
+  yield { type: 'saved', submission };
+
   // FR-13: best effort only - a failure here never fails the onboarding submission itself. The member
   // can always retry via plans.generateToday (P-13). A needs_confirmation result (trainer edit or ticked
   // exercises on an existing plan) is skipped on purpose: nothing here may overwrite the member's work.
+  let plan: 'built' | 'kept' | 'failed' = 'failed';
   try {
-    await generateForDate(userId, todayLocal(), false);
+    for await (const event of streamGenerateForDate(userId, todayLocal(), false)) {
+      if (event.type === 'exercise') yield event;
+      else plan = event.result.status === 'ok' ? 'built' : 'kept';
+    }
   } catch (error) {
     log.warn({ error, userId }, 'best-effort plan generation after onboarding submission failed');
   }
+  yield { type: 'done', plan };
+}
 
-  return submission;
+export async function submit(userId: string, input: OnboardingSubmitInput) {
+  let saved: OnboardingSubmission | undefined;
+  for await (const event of submitStream(userId, input)) {
+    if (event.type === 'saved') saved = event.submission;
+  }
+  return saved!;
 }
 
 // FR-14: onboarding is never "done" in the sense of a single row - completed just means at least one

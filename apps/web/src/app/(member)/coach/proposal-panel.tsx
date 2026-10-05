@@ -2,8 +2,7 @@
 
 import type { ProposalRow as ProposalRowData } from '@cadence/shared/schemas/coach';
 import { countChanges, diffDraft } from '@cadence/shared/schemas/coach-draft';
-import { FOCUS_BIAS_LABELS, muscleLabel } from '@cadence/shared/schemas/muscles';
-import { ArrowLeftIcon, ArrowRightIcon, Undo2Icon } from 'lucide-react';
+import { ArrowLeftIcon, Undo2Icon } from 'lucide-react';
 import { type MentionChip, mentionKey } from '@/app/(member)/coach/coach-context';
 import { Prescription } from '@/app/(member)/coach/prescription';
 import { ProposalRow } from '@/app/(member)/coach/proposal-row';
@@ -26,7 +25,7 @@ interface ProposalPanelProps {
 // by hand, an exercise can be taken out or pointed at for the coach, and nothing reaches the plan until Apply.
 export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap, className }: ProposalPanelProps) {
   const diff = diffDraft(draft.before, draft.rows);
-  const changeCount = countChanges(diff) + draft.focusChanges.length;
+  const changeCount = countChanges(diff);
   const mentionedKeys = new Set(mentions.map(mentionKey));
   const isBlocked = api.unacknowledgedWarnings.length > 0;
   const isEmpty = draft.rows.length === 0;
@@ -104,34 +103,6 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
                   <Button type="button" size="sm" variant="outline" onClick={() => api.restoreRow(row.exerciseId)}>
                     <Undo2Icon data-icon="inline-start" />
                     Put back
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          </section>
-        )}
-
-        {draft.focusChanges.length > 0 && (
-          <section aria-label="Muscle focus changes" className="border-t">
-            <h3 className="bg-muted/60 px-4 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase">
-              Muscle focus
-            </h3>
-            <ul>
-              {draft.focusChanges.map((change) => (
-                <li
-                  key={change.muscle}
-                  className="flex items-center justify-between gap-3 border-b px-4 py-2 last:border-b-0"
-                >
-                  <span className="flex min-w-0 flex-col text-sm">
-                    <span className="font-semibold">{muscleLabel(change.muscle)}</span>
-                    <span className="flex items-center gap-1.5 text-muted-foreground">
-                      {FOCUS_BIAS_LABELS[change.from]}
-                      <ArrowRightIcon className="size-3.5" aria-hidden />
-                      <span className="font-semibold text-foreground">{FOCUS_BIAS_LABELS[change.to]}</span>
-                    </span>
-                  </span>
-                  <Button type="button" size="sm" variant="ghost" onClick={() => api.dropFocusChange(change.muscle)}>
-                    Keep mine
                   </Button>
                 </li>
               ))}

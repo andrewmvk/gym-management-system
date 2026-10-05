@@ -15,7 +15,7 @@ The client wants to replace both with a unified, AI-driven system: face recognit
 
 ## 3. Vision / Value Proposition
 
-- **24/7 personalization**: a member can get plan feedback and adjustments any time, not just during a trainer's shift. The AI coach works as a custom trainer: the member asks, points at an exercise or muscle, reads a proposed change as a diff, edits it and applies it, and the AI never writes on its own.
+- **24/7 personalization**: a member can get plan feedback and adjustments any time, not just during a trainer's shift. The AI coach works as a custom trainer: the member asks, points at an exercise, a muscle, a muscle group or the whole muscle distribution, reads a proposed change as a diff, edits it and applies it, and the AI never writes a plan on its own.
 - **Cautious, data-informed plans**: the AI reasons from accumulated health/state data (physical information, medication, injuries, exams, self-reported physical state) rather than a single verbal check-in, and the member can see and correct every fact it remembers.
 - **Frictionless access**: face recognition at the door replaces fingerprint hardware, integrating with the gym's existing turnstile REST API.
 - **Human oversight preserved**: personal trainers remain in the loop, reviewing and able to override any AI-generated plan.

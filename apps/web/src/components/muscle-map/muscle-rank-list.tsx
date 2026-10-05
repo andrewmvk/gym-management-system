@@ -12,7 +12,6 @@ export interface MuscleRankItem {
   value: ReactNode;
   isLost?: boolean;
   isGap?: boolean;
-  bias?: number;
   isInjured?: boolean;
 }
 
@@ -24,19 +23,6 @@ interface MuscleRankListProps {
   onSelect: (muscle: MuscleId) => void;
   onHover?: (muscle: MuscleId | null) => void;
   className?: string;
-}
-
-function BiasTag({ bias }: { bias: number }) {
-  return (
-    <span
-      className="numerals text-base font-bold text-primary"
-      title="Your focus"
-      role="img"
-      aria-label={`focus ${bias}`}
-    >
-      {bias > 0 ? `+${bias}` : bias}
-    </span>
-  );
 }
 
 // The keyboard and screen-reader path to the body: every muscle on the map is a button here.
@@ -82,7 +68,6 @@ export function MuscleRankList({ label, items, selected, onSelect, onHover, clas
                   <TriangleAlertIcon className="size-3.5" />
                 </span>
               )}
-              {item.bias ? <BiasTag bias={item.bias} /> : null}
               <span className="numerals shrink-0 text-xl leading-none font-bold">{item.value}</span>
             </button>
           </li>

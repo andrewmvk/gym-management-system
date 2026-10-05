@@ -1,7 +1,6 @@
 import { endOfLocalDay, shiftLocalDate, startOfLocalDay, todayLocal } from '@api/lib/dates';
 import { equipmentInUse, listEquipment, listExercises } from '@api/modules/catalog/service';
 import { findCheckedInMemberIds } from '@api/modules/checkins/repository';
-import { findFocusByUserId } from '@api/modules/focus/repository';
 import { getMemberContext } from '@api/modules/members/service';
 import { findPlanExercisesInRange } from '@api/modules/metrics/repository';
 import type { PlanExerciseInput } from '@api/modules/plans/repository';
@@ -185,7 +184,7 @@ export async function getPlan(planId: string) {
   const plan = await repository.findPlanWithMember(planId);
   if (!plan) return null;
 
-  const [exercises, reviews, changes, catalog, recentExercises, muscleFocus, memberContext] = await Promise.all([
+  const [exercises, reviews, changes, catalog, recentExercises, memberContext] = await Promise.all([
     repository.findExercisesForPlanWithDetails(planId),
     repository.findReviewsForPlan(planId),
     repository.findPlanChangesForPlan(planId),
@@ -195,7 +194,6 @@ export async function getPlan(planId: string) {
       shiftLocalDate(plan.planDate, -RECENT_MUSCLE_WINDOW_DAYS),
       shiftLocalDate(plan.planDate, -1),
     ),
-    findFocusByUserId(plan.userId),
     getMemberContext(plan.userId),
   ]);
 
@@ -218,7 +216,6 @@ export async function getPlan(planId: string) {
     })),
     catalog,
     recentMuscleLoad,
-    muscleFocus,
     blocked,
     risks,
     memberContext,

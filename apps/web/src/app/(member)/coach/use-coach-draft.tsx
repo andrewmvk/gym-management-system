@@ -4,12 +4,10 @@ import type {
   BeforeRow,
   CoachBlock,
   CoachDraft,
-  FocusChange,
   PickerOption,
   ProposalRow,
   SafetyWarning,
 } from '@cadence/shared/schemas/coach';
-import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -37,8 +35,9 @@ export interface CoachDraftState {
   rows: ProposalRow[];
   warnings: SafetyWarning[];
   acknowledged: string[];
-  focusChanges: FocusChange[];
   request: string;
+  // The line remembered about this plan once it is applied; empty for a draft the coach did not write.
+  memoryNote: string;
   status: 'open' | 'applied';
 }
 
@@ -67,7 +66,6 @@ export function useCoachDraft() {
     queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
     queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
     queryClient.invalidateQueries({ queryKey: trpc.plans.listUpcoming.queryKey() });
-    queryClient.invalidateQueries({ queryKey: trpc.focus.get.queryKey() });
   };
 
   const applyMutation = useMutation(
@@ -116,8 +114,8 @@ export function useCoachDraft() {
         rows: block.after,
         warnings: block.warnings,
         acknowledged: keptAcknowledgements,
-        focusChanges: block.focusChanges,
         request,
+        memoryNote: block.memoryNote,
         status: 'open',
       };
     });
@@ -155,8 +153,8 @@ export function useCoachDraft() {
       })),
       warnings: [],
       acknowledged: [],
-      focusChanges: [],
       request,
+      memoryNote: '',
       status: 'open',
     };
   }
@@ -217,14 +215,6 @@ export function useCoachDraft() {
     });
   }
 
-  function dropFocusChange(muscle: MuscleId) {
-    setDraft((current) =>
-      current
-        ? { ...current, focusChanges: current.focusChanges.filter((change) => change.muscle !== muscle) }
-        : current,
-    );
-  }
-
   function setAcknowledged(exerciseId: string, isAcknowledged: boolean) {
     setDraft((current) => {
       if (!current) return current;
@@ -242,6 +232,7 @@ export function useCoachDraft() {
     return {
       date: current.date,
       request: current.request,
+      memoryNote: current.memoryNote,
       confirmOverwrite,
       exercises: current.rows.map((row) => ({
         exerciseId: row.exerciseId,
@@ -251,7 +242,6 @@ export function useCoachDraft() {
         notes: row.notes,
         completed: row.completed,
       })),
-      focusChanges: current.focusChanges.map((change) => ({ muscle: change.muscle, bias: change.to })),
       acknowledgedWarnings: current.warnings
         .filter(
           (warning) =>
@@ -284,6 +274,7 @@ export function useCoachDraft() {
   const sendableDraft: CoachDraft | undefined = openDraft
     ? {
         date: openDraft.date,
+        memoryNote: openDraft.memoryNote || null,
         exercises: openDraft.rows.map((row) => ({
           exerciseId: row.exerciseId,
           sets: row.sets,
@@ -319,7 +310,6 @@ export function useCoachDraft() {
     updateRow,
     removeRow,
     restoreRow,
-    dropFocusChange,
     setAcknowledged,
     discard,
     apply,

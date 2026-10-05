@@ -51,7 +51,7 @@ export function ProposalRow({
             type="button"
             onClick={onMention}
             aria-pressed={isMentioned}
-            aria-label={`Ask the coach about ${row.name}`}
+            aria-label={`Point the coach at ${row.name}`}
             className={cn(
               'group flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-sm text-left text-base font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
               isMentioned && 'text-primary',
@@ -59,7 +59,7 @@ export function ProposalRow({
           >
             <span className="min-w-0 text-pretty">{row.name}</span>
             <AtSignIcon
-              className="size-3.5 shrink-0 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+              className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary group-focus-visible:text-primary"
               aria-hidden
             />
           </button>

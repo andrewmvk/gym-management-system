@@ -74,13 +74,16 @@ Onboarding is not a one-time gate - members can add or revise this information l
      to update it.
    - "What your coach remembers": every confirmed fact stored in the
      member's history (injuries, medication changes, skipped exercises,
-     life events, muscle focus changes, the member's own manual edits of
-     sets, reps and weight), grouped by type, each with its date and the
+     life events, plan requests such as a plan applied through the coach or
+     a wish for more of a muscle, the member's own manual edits of sets,
+     reps and weight), grouped by type, each with its date and the
      member's own words.
-2. Facts the coach picked up in the chat and the member has not saved yet
-   come first, under "Waiting for your confirmation" (FR-72): Confirm,
-   Edit (then confirm) or Dismiss. They shape no plan until confirmed and
-   staff do not see them. A dismissed fact is discarded.
+2. Only an injury or a medication change the coach picked up in the chat
+   waits for the member's yes. Those come first, under "Waiting for your
+   confirmation" (FR-72): Confirm, Edit (then confirm) or Dismiss. They
+   shape no plan until confirmed and staff do not see them. A dismissed
+   fact is discarded. Every other fact is remembered at once and appears in
+   the list without asking (FR-27).
 3. The member can mark a fact "No longer true". It moves to a "No longer
    true" list, struck through, and the AI stops using it on every future
    plan and chat turn. "Applies again" brings it back.
@@ -131,10 +134,14 @@ Notes:
    only shows as currently performable if it needs no equipment or at
    least one of its linked equipment items is available.
    Beside the plan sits a muscle map (FR-50): a front and back body where
-   each muscle is shaded by its weighted sets in today's plan, plus a
-   ranked list of the same muscles. Selecting a muscle (on the body or in
-   the list) shows the exercises that train it, as primary or supporting,
-   and dims the other exercises in the plan.
+   each muscle is shaded by its weighted sets in today's plan, plus a radar
+   of the six muscle groups (chest, shoulders, back, arms, core, legs). The
+   panel follows the plan down the page on a wide screen. Hovering a muscle
+   or a radar point lights up the other and shows its name and value in a
+   tooltip; selecting a muscle (on the body) shows the exercises that train
+   it, as primary or supporting, and dims the other exercises in the plan.
+   A ranked list of the muscles stays in the page, visually hidden, for the
+   keyboard and screen readers.
    If the plan holds an exercise that cannot be done because its equipment
    is out of service, the plan is a must-review plan (flow 11): a notice
    names those exercises and the equipment, and offers "rebuild without
@@ -146,10 +153,11 @@ Notes:
    change (FR-68): tapping sets x reps or the weight swaps them for an
    inline editor; saving records it as a confirmed fact the AI reads later
    and as an entry in the trainers' change log.
-   Tapping an exercise's name selects it (FR-64) and a single "Ask coach"
-   bar appears, with no buttons on the rows; asking opens the chat with the
-   exercise attached as a chip. Selecting a muscle offers "Find exercises
-   for this muscle", which opens the chat and asks at once.
+   There are no coach buttons on the rows or on the map. The coach is
+   asked about anything on the page by pointing at it (FR-64): the @ button
+   in the chat, then "Pick from the page" lights up every exercise, muscle,
+   muscle group and the whole distribution; tapping them adds them to the
+   message, and nothing is sent until the member sends it.
 2. The plan page's "Other days" tab lets the member browse plan history by
    date and see upcoming plans: the days from today onwards that already hold
    a plan appear as date chips with their exercise count. Each day shows its
@@ -159,11 +167,13 @@ Notes:
    - Report a physical state change (injury, soreness, medication change).
    - Report a life event affecting training (e.g. "I played soccer yesterday").
    - Ask the AI to adapt today's or a future day's plan.
-   - Point at an exercise (from the plan, or a row of a proposal) or a
-     muscle (on the muscle map): the exercise or muscle goes with the
-     message as a chip, so "4 reps is too much, reduce to 3" or "how do I
-     do that exercise?" or "what are the benefits?" is about exactly that
-     one (FR-64).
+   - Point at an exercise (from the plan, or a row of a proposal), a
+     muscle, a muscle group or the whole muscle distribution: type @ (or
+     press the @ button) for a list narrowed by what follows the @, or pick
+     from the page itself. What is pointed at goes with the message as a
+     chip, so "4 reps is too much, reduce to 3", "how do I do that
+     exercise?", "is my back balanced?" or "rebalance it for me" is about
+     exactly that (FR-64). Suggested questions only fill the message box.
    - Ask the AI how their plan compares to what other members are doing
      today (AI can pull aggregate info from other members' published plans).
    The reply streams as text, then each component the coach chose settles
@@ -171,12 +181,18 @@ Notes:
    picker, an exercise explainer, a safety warning, facts to remember and
    suggested replies. While it works the button and the status line show
    the animated Coach Mark.
-4. Every message is parsed by the AI to extract structured facts. They are
+4. Every message is parsed by the AI to extract structured facts, which are
+   part of the member's history and read back on future plans and chat
+   turns, not the raw chat log (FR-27). An injury or a medication change is
    offered in the thread as "Remember this?" (an injury also names the
-   muscles it affects): the member saves, edits or dismisses each one.
-   Only a saved fact is stored as part of the member's history and read
-   back on future plans and chat turns, not the raw chat log; an unsaved
-   one waits on the Health profile page (flow 2).
+   muscles it affects): the member saves, edits or dismisses it, and an
+   unsaved one waits on the Health profile page (flow 2). Every other fact
+   (a skipped exercise, a life event, a wish such as "more back next time")
+   is remembered at once without asking and can be marked no longer true
+   there. A request for a plan is not remembered when it is made: it is
+   remembered when the member applies the plan, as one short line written by
+   the coach that says what was asked and any detail that mattered, updated
+   with every revision of the proposal (FR-66).
 5. A plan change is proposed, never made, by the coach (FR-65). The
    proposal card summarizes it and opens the editable proposal beside the
    chat on a wide screen (over it on a phone):
@@ -188,8 +204,6 @@ Notes:
    - From the exercise picker (after pointing at a muscle) the member adds
      an option to the current or proposed plan; from a safety warning the
      member swaps in a safer alternative.
-   - A proposed change of muscle focus is listed with the old and new level
-     and can be dropped (FR-66).
    - An exercise that conflicts with a reported injury carries a safety
      warning that must be accepted before Apply is enabled, or the member
      asks for a safer swap (FR-67).
@@ -226,29 +240,13 @@ Notes:
    live AI.
 ```
 
-What the AI balances when it builds or rebuilds a plan (FR-15): the member's goals, physical information, physical conditions, medications, exams, the accumulated facts that still apply, the muscle focus, the last 14 days of plans with what was done and when the member checked in, the latest trainer notes and edits, and the demand other members' plans for that date already place on each piece of equipment (counted in plans) and on each muscle. Broad goals are spread across different equipment and overloaded equipment is avoided, but safety, injuries, medications, exams and muscle focus always win over that spreading.
+What the AI balances when it builds or rebuilds a plan (FR-15): the member's goals, physical information, physical conditions, medications, exams, the accumulated facts that still apply (including the plan requests the member made), the last 14 days of plans with what was done and when the member checked in, the latest trainer notes and edits, and the demand other members' plans for that date already place on each piece of equipment (counted in plans) and on each muscle. Broad goals are spread across different equipment and overloaded equipment is avoided, but safety, injuries, medications, exams and the member's plan requests always win over that spreading.
 
 Trainer notes (FR-19): each note and each edit a trainer leaves is its own entry (author, time, text). The member whose plan it is reads them in full, oldest first, on the plan and on Now; an edit is flagged "Edited the plan". The plan badge reads "Edited by a trainer", or "Trainer note" for a note without an edit.
 
-### Setting muscle focus and rebuilding (FR-51)
+### Wanting more or less of a muscle (FR-51, withdrawn)
 
-```
-1. On today's plan, the member selects a muscle (body or list). Its panel
-   shows five slanted segments centered on "normal", from much less to
-   much more.
-2. Choosing a level saves it at once for that muscle. Choosing normal
-   removes it. Each change is also written to the member's profile
-   history as a muscle focus event; setting the level a muscle already has
-   writes nothing.
-3. The saved focus is part of the context the AI reads on every plan
-   generation and chat turn. It steers the balance of future plans, but
-   injuries, conditions, medications and safety always win over it.
-4. Nothing about today's plan changes yet. The member can choose "Rebuild
-   today with my focus", which asks for confirmation first when a trainer
-   edited the plan or the member already ticked exercises (the warnings of
-   flow 4, step 5): trainer edits are replaced, and ticks are kept on the
-   exercises that stay.
-```
+There is no separate muscle focus setting and no rebuild button for it. The member says what they want in the chat ("I'd like more back next time", "more chest and shoulders for the 10th"); a wish for future plans is remembered at once as a plan request (FR-27), and a plan built around it follows the same proposal and Apply path as any other change (flow 4, steps 5 and 6). Plan generation reads the remembered plan requests with the other facts, so injuries, conditions, medications and safety still win over them.
 
 ## 5. Member: Metrics
 
@@ -287,10 +285,10 @@ Trainer notes (FR-19): each note and each edit a trainer leaves is its own entry
    - The exercises, each marked "Done" when the member did it.
    - A muscle balance preview (FR-54): by default it follows the exercises
      as they are edited, before saving; it can be switched to the member's
-     completed work in the 14 days before the plan. The member's muscle
-     focus is outlined on the body, and a line names focused muscles the
-     plan does not train. The preview only shows facts: whether the plan
-     lacks something useful for the member is the trainer's own judgement.
+     completed work in the 14 days before the plan. The member's reported
+     injuries are outlined on the body. The preview only shows facts:
+     whether the plan lacks something useful for the member is the
+     trainer's own judgement.
    - If the plan is a must-review plan, a banner at the top names the
      exercises that cannot be done and the equipment that is down. A plan
      where the member accepted a safety warning in the coach and applied
@@ -433,8 +431,8 @@ The page is public (no sign-in needed) and is linked from the public header, the
      notice: "Your trainer changed this plan" (the list already includes the
      change) when the plan was edited, or "A note from your trainer" for a
      note without an edit, with the notes in full (FR-55).
-2. There is no muscle map on Now. The map, the focus controls and the
-   plan history are on the plan page (flow 4).
+2. There is no muscle map on Now. The map and the plan history are on the
+   plan page (flow 4).
 3. With no plan yet, Now offers the same single action as the plan page:
    build my plan.
 ```

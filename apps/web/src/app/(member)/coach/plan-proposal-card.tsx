@@ -71,12 +71,6 @@ export function PlanProposalCard({ block, state, onReview }: PlanProposalCardPro
           </li>
         ))}
         {hidden > 0 && <li className="text-xs text-muted-foreground">and {hidden} more</li>}
-        {block.focusChanges.length > 0 && (
-          <li className="text-xs text-muted-foreground">
-            Also changes your focus for {block.focusChanges.length}{' '}
-            {block.focusChanges.length === 1 ? 'muscle' : 'muscles'}.
-          </li>
-        )}
       </ul>
 
       <div className="flex flex-wrap items-center justify-between gap-2">

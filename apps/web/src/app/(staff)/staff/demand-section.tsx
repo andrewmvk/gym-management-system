@@ -40,7 +40,7 @@ function DemandSkeleton() {
       <div className="grid md:grid-cols-2">
         <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
           <Skeleton className="h-10 w-full sm:w-80" />
-          <MuscleLoadView.Skeleton />
+          <MuscleLoadView.Skeleton breakdown="list" />
         </div>
         <div className="relative border-t md:border-t-0 md:border-l">
           <div className="flex max-h-96 flex-col md:absolute md:inset-0 md:max-h-none">
@@ -128,6 +128,8 @@ function DemandRoot() {
           <MuscleLoadView
             load={isCheckedInOnly ? muscleCheckedIn : musclePlans}
             label={isCheckedInOnly ? 'Muscles trained by plans of members already checked in' : 'Muscles trained today'}
+            breakdown="list"
+            unit={{ singular: 'plan', plural: 'plans' }}
             note="Each number is how many plans train that muscle. Exercises that cannot be done now are not counted."
             legend={{ lowLabel: 'Fewer plans', highLabel: 'More plans', gapLabel: 'No plan trains it' }}
             emptyNote={

@@ -2,7 +2,6 @@ import { db, pool } from '@api/db/client';
 import {
   dExercises,
   dUsers,
-  fMemberMuscleFocus,
   fPlanChanges,
   fProfileEvents,
   fTrainingPlanExercises,
@@ -122,6 +121,81 @@ describe('chat', () => {
       expect(rows.map((row) => row.id).sort()).toEqual(facts.facts.map((fact) => fact.id).sort());
     });
 
+    it('remembers everything but an injury or a medication at once, without asking the member', async () => {
+      const member = await createMember();
+      const stream = answering({
+        facts: [
+          { eventType: 'life_event', payload: { description: 'moved to a new flat' } },
+          { eventType: 'plan_adjustment_request', payload: { description: 'wants more back work later' } },
+        ],
+      });
+
+      const { blocks } = await collect(sendMessage(member.id, message('We moved. More back next time.'), { stream }));
+
+      expect(blockOf(blocks, 'facts')).toBeUndefined();
+      const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
+      expect(rows.map((row) => row.eventType).sort()).toEqual(['life_event', 'plan_adjustment_request']);
+      expect(rows.every((row) => row.confirmedAt !== null && row.resolvedAt === null)).toBe(true);
+    });
+
+    it('does not report a request for a plan as a fact while it proposes that plan', async () => {
+      const member = await createMember();
+      const lungeId = await exerciseIdByName('Walking Lunge');
+      const stream = answering({
+        facts: [{ eventType: 'plan_adjustment_request', payload: { description: 'wants a plan for Oct 10' } }],
+        planProposal: {
+          date: todayLocal(),
+          summary: 'A leg day',
+          memory: 'Asked for a hard leg day to test their limits.',
+          exercises: [{ exerciseId: lungeId, sets: 3, reps: 10 }],
+        },
+      });
+
+      const { blocks } = await collect(sendMessage(member.id, message('A plan for Oct 10'), { stream }));
+
+      expect(blockOf(blocks, 'plan_proposal')?.memoryNote).toBe('Asked for a hard leg day to test their limits.');
+      expect(await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id))).toHaveLength(0);
+    });
+
+    it('writes its own memory note for a proposal when the coach gave none', async () => {
+      const member = await createMember();
+      const lungeId = await exerciseIdByName('Walking Lunge');
+      const stream = answering({
+        planProposal: {
+          date: todayLocal(),
+          summary: 'A leg day',
+          exercises: [{ exerciseId: lungeId, sets: 3, reps: 10 }],
+        },
+      });
+
+      const { blocks } = await collect(sendMessage(member.id, message('Legs please'), { stream }));
+
+      expect(blockOf(blocks, 'plan_proposal')?.memoryNote).toBe(`Plan for ${todayLocal()}: A leg day`);
+    });
+
+    it('shows the draft memory note to the coach so a revision can build on it', async () => {
+      const member = await createMember();
+      const stream = answering({});
+      const lungeId = await exerciseIdByName('Walking Lunge');
+
+      await collect(
+        sendMessage(
+          member.id,
+          message('More chest', {
+            draft: {
+              date: todayLocal(),
+              memoryNote: 'Asked for a hard chest day.',
+              exercises: [{ exerciseId: lungeId, sets: 3, reps: 10 }],
+            },
+          }),
+          { stream },
+        ),
+      );
+
+      expect(stream.mock.calls[0]![0].user).toContain('Memory note for this draft so far');
+      expect(stream.mock.calls[0]![0].user).toContain('Asked for a hard chest day.');
+    });
+
     it('keeps a pending fact and a dismissed one out of the next prompt', async () => {
       const member = await createMember();
       await db.insert(fProfileEvents).values([
@@ -238,26 +312,34 @@ describe('chat', () => {
         ]);
       });
 
-      it('shows a focus change only when it differs from the current level', async () => {
+      it('survives the slips a model makes: numbers as text, no summary, no date, one exercise that does not exist', async () => {
         const member = await createMember();
-        await db.insert(fMemberMuscleFocus).values({ userId: member.id, muscle: 'chest', bias: 1 });
-        await createPlan(member.id, todayLocal(), ['Push-Up']);
         const lungeId = await exerciseIdByName('Walking Lunge');
         const stream = answering({
           planProposal: {
-            date: todayLocal(),
-            summary: 'More legs',
-            exercises: [{ exerciseId: lungeId, sets: 3, reps: 10 }],
-            focusChanges: [
-              { muscle: 'chest', bias: 1 },
-              { muscle: 'quads', bias: 2 },
-            ],
+            exercises: [{ exerciseId: lungeId, sets: '3', reps: '12' }, { exerciseId: 'not-an-exercise' }],
           },
         });
 
-        const { blocks } = await collect(sendMessage(member.id, message('More legs'), { stream }));
+        const { blocks, text } = await collect(sendMessage(member.id, message('More chest'), { stream }));
 
-        expect(blockOf(blocks, 'plan_proposal')!.focusChanges).toEqual([{ muscle: 'quads', from: 0, to: 2 }]);
+        const proposal = blockOf(blocks, 'plan_proposal');
+        expect(proposal?.date).toBe(todayLocal());
+        expect(proposal?.after).toMatchObject([{ exerciseId: lungeId, sets: 3, reps: 12 }]);
+        expect(text).toBe('Ok.');
+      });
+
+      it('tells the member when the coach wrote a proposal the server could not use', async () => {
+        const member = await createMember();
+        const stream = answering({
+          reply: 'Done, I updated your plan.',
+          planProposal: { date: todayLocal(), summary: 'More chest', exercises: [{ exerciseId: 'not-an-exercise' }] },
+        });
+
+        const { blocks, text } = await collect(sendMessage(member.id, message('More chest'), { stream }));
+
+        expect(blockOf(blocks, 'plan_proposal')).toBeUndefined();
+        expect(text).toContain("I couldn't turn that into a plan change");
       });
 
       it('is dropped when it changes nothing', async () => {
@@ -473,7 +555,7 @@ describe('chat', () => {
         reply: 'Here is the change.',
         exercisePicker: { muscle: 'not-a-muscle', options: [] },
         facts: [
-          { eventType: 'life_event', payload: { description: 'played soccer' } },
+          { eventType: 'injury', payload: { description: 'sore ankle from soccer' } },
           { eventType: 'not-a-type', payload: {} },
         ],
         quickReplies: ['Short', 'x'.repeat(200), '', 'Third', 'Fourth'],
@@ -501,7 +583,7 @@ describe('chat', () => {
     it('returns quick replies last', async () => {
       const member = await createMember();
       const stream = answering({
-        facts: [{ eventType: 'life_event', payload: { description: 'played soccer' } }],
+        facts: [{ eventType: 'injury', payload: { description: 'sore ankle from soccer' } }],
         quickReplies: ['Make it shorter', 'Explain why'],
       });
 
@@ -512,7 +594,28 @@ describe('chat', () => {
   });
 
   describe('applyDraft', () => {
-    const base = { request: 'Make it easier', focusChanges: [], acknowledgedWarnings: [], confirmOverwrite: false };
+    const base = { request: 'Make it easier', memoryNote: '', acknowledgedWarnings: [], confirmOverwrite: false };
+
+    it('remembers the applied plan as one confirmed line, the coach note when there is one and the request otherwise', async () => {
+      const member = await createMember();
+      const lungeId = await exerciseIdByName('Walking Lunge');
+      const exercises = [{ exerciseId: lungeId, sets: 3, reps: 12 }];
+
+      await applyDraft(member.id, {
+        ...base,
+        date: '2999-10-10',
+        memoryNote: 'Asked for a hard chest and shoulders day to test their limits.',
+        exercises,
+      });
+      await applyDraft(member.id, { ...base, date: '2999-10-11', exercises });
+
+      const rows = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
+      expect(rows.every((row) => row.eventType === 'plan_adjustment_request' && row.confirmedAt !== null)).toBe(true);
+      expect(rows.map((row) => (row.payload as { description: string }).description).sort()).toEqual([
+        'Applied a plan for 2999-10-11: Make it easier',
+        'Asked for a hard chest and shoulders day to test their limits.',
+      ]);
+    });
 
     it('replaces the plan with exactly the draft, keeps ticks of exercises that stay, and logs the change', async () => {
       const member = await createMember();
@@ -553,23 +656,6 @@ describe('chat', () => {
       expect(change).toMatchObject({ kind: 'coach', request: 'Make it easier', acknowledgedWarnings: [] });
       expect((change!.before as { name: string }[]).map((row) => row.name)).toEqual(['Barbell Back Squat', 'Push-Up']);
       expect((change!.after as { name: string }[]).map((row) => row.name)).toEqual(['Push-Up', 'Walking Lunge']);
-    });
-
-    it('applies muscle focus changes through the focus module', async () => {
-      const member = await createMember();
-      const lungeId = await exerciseIdByName('Walking Lunge');
-
-      await applyDraft(member.id, {
-        ...base,
-        date: todayLocal(),
-        exercises: [{ exerciseId: lungeId, sets: 3, reps: 12 }],
-        focusChanges: [{ muscle: 'quads', bias: 2 }],
-      });
-
-      const focus = await db.select().from(fMemberMuscleFocus).where(eq(fMemberMuscleFocus.userId, member.id));
-      expect(focus).toMatchObject([{ muscle: 'quads', bias: 2 }]);
-      const events = await db.select().from(fProfileEvents).where(eq(fProfileEvents.userId, member.id));
-      expect(events.map((event) => event.eventType)).toEqual(['muscle_focus_changed']);
     });
 
     it('asks for acknowledgement of an injury warning, then records the acknowledged risk', async () => {
@@ -750,7 +836,6 @@ describe('chat', () => {
       expect(prompt).toContain(`Plan for ${todayLocal()}: none generated yet.`);
       expect(prompt).toContain('- none reported');
       expect(prompt).toContain('- none yet');
-      expect(prompt).toContain('- none set');
     });
   });
 });

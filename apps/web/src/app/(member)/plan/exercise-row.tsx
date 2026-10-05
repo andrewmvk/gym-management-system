@@ -1,8 +1,7 @@
 'use client';
 
 import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
-import { CheckIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { AtSignIcon, CheckIcon } from 'lucide-react';
 import { PrescriptionFields, type PrescriptionNumbers } from '@/components/prescription-fields';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -26,35 +25,12 @@ interface ExerciseRowProps {
   disabled?: boolean;
   // A day that has not come yet shows the same box as today's plan, switched off.
   isTickLocked?: boolean;
-  // Picking the exercise to talk about with the coach; left out, the name is plain text.
-  isSelected?: boolean;
-  onSelect?: () => void;
+  // The coach's pointing mode: the whole row becomes one target that adds this exercise to the message.
+  pointing?: { isActive: boolean; isMarked: boolean; onPoint: () => void };
   // The member's own correction of sets, reps or weight, made in place. It resolves when saved and rejects when
   // it failed, so the fields fall back to what is stored.
   onEditNumbers?: (numbers: PrescriptionNumbers) => Promise<unknown>;
   isEditPending?: boolean;
-}
-
-function NameBlock({
-  children,
-  isSelected,
-  onSelect,
-}: {
-  children: ReactNode;
-  isSelected?: boolean;
-  onSelect?: () => void;
-}) {
-  if (!onSelect) return <div className="min-w-0">{children}</div>;
-  return (
-    <button
-      type="button"
-      aria-pressed={isSelected}
-      onClick={onSelect}
-      className="-mx-1 -my-0.5 min-w-0 rounded-sm px-1 py-0.5 text-left outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
-    >
-      {children}
-    </button>
-  );
 }
 
 // onToggle is only passed for today's plan; history rows omit it and render read-only.
@@ -74,8 +50,7 @@ function ExerciseRowRoot({
   onToggle,
   disabled,
   isTickLocked,
-  isSelected,
-  onSelect,
+  pointing,
   onEditNumbers,
   isEditPending,
 }: ExerciseRowProps) {
@@ -88,12 +63,29 @@ function ExerciseRowRoot({
   return (
     <div
       data-done={completed}
-      data-selected={isSelected ? 'true' : undefined}
       className={cn(
-        'flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 data-[selected=true]:bg-accent/40 sm:gap-4 sm:px-6',
+        'relative flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 sm:gap-4 sm:px-6',
         isDimmed && 'opacity-45',
+        pointing?.isActive && 'outline-2 -outline-offset-2 outline-primary/60 outline-dashed',
+        pointing?.isMarked && 'bg-accent/50 outline-solid outline-primary',
       )}
     >
+      {pointing?.isActive && (
+        <button
+          type="button"
+          onClick={pointing.onPoint}
+          aria-pressed={pointing.isMarked}
+          className="absolute inset-0 z-10 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
+        >
+          <span className="sr-only">Point the coach at {name}</span>
+        </button>
+      )}
+      {pointing?.isMarked && (
+        <span className="absolute top-2 right-3 z-10 flex h-6 items-center gap-1 rounded-sm bg-primary px-2 font-display text-xs font-semibold tracking-widest text-primary-foreground uppercase">
+          <AtSignIcon className="size-3" aria-hidden />
+          Pointed at
+        </span>
+      )}
       {onToggle || isTickLocked ? (
         <Checkbox
           checked={completed}
@@ -119,7 +111,7 @@ function ExerciseRowRoot({
       </span>
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
-          <NameBlock isSelected={isSelected} onSelect={onSelect}>
+          <div className="min-w-0">
             <span
               className={cn(
                 'strike-wipe block w-fit text-base leading-6 font-semibold transition-colors duration-300',
@@ -134,7 +126,7 @@ function ExerciseRowRoot({
                 <span className="font-sans tracking-normal normal-case"> + {secondaryLabels.join(', ')}</span>
               )}
             </span>
-          </NameBlock>
+          </div>
           <PrescriptionFields
             name={name}
             size="lg"

@@ -11,7 +11,6 @@ import {
 } from '@api/modules/chat/context';
 import * as repository from '@api/modules/chat/repository';
 import { buildChatTools } from '@api/modules/chat/tools';
-import { setFocus } from '@api/modules/focus/service';
 import * as plansRepository from '@api/modules/plans/repository';
 import { checkOverwriteGuard, type NeedsConfirmation } from '@api/modules/plans/service';
 import { listActiveInjuries } from '@api/modules/profile/service';
@@ -29,6 +28,7 @@ import {
 import { findInjuryConflicts } from '@cadence/shared/schemas/coach-draft';
 import {
   injuryMuscles,
+  needsConfirmation,
   PROFILE_EVENT_LABELS,
   type ProfileEventFact,
   ProfileEventFactSchema,
@@ -50,6 +50,9 @@ export interface CoachStreamRequest {
 }
 
 export type CoachStream = (request: CoachStreamRequest) => AsyncGenerator<AiStreamItem<CoachAiEnvelope>>;
+
+const UNUSABLE_PROPOSAL_NOTE =
+  "\n\nI couldn't turn that into a plan change, so nothing has been proposed. Ask me again and I'll rebuild it.";
 
 const MAX_QUICK_REPLIES = 3;
 const MAX_QUICK_REPLY_LENGTH = 60;
@@ -129,6 +132,10 @@ export async function* sendMessage(
   const emitted = new Set<string>();
   let hasText = false;
   let result: AiResult<CoachAiEnvelope> | undefined;
+  // A proposal the coach wrote but the server could not use must not vanish while the reply talks as if it
+  // existed, so the member is told.
+  let hasProposalAttempt = false;
+  let hasProposalBlock = false;
 
   for await (const item of stream({
     purpose: 'chat',
@@ -150,6 +157,10 @@ export async function* sendMessage(
       const key = event.key as (typeof STREAMED_BLOCK_KEYS)[number];
       const block = await blockForPart(userId, key, event.value, context);
       emitted.add(key);
+      if (key === 'planProposal') {
+        hasProposalAttempt = true;
+        hasProposalBlock ||= block !== null;
+      }
       if (block) yield { type: 'block', block };
     }
   }
@@ -160,18 +171,40 @@ export async function* sendMessage(
   for (const key of STREAMED_BLOCK_KEYS) {
     if (emitted.has(key) || !answer[key]) continue;
     const block = await blockForPart(userId, key, answer[key], context);
+    if (key === 'planProposal') {
+      hasProposalAttempt = true;
+      hasProposalBlock ||= block !== null;
+    }
     if (block) yield { type: 'block', block };
   }
+  if (hasProposalAttempt && !hasProposalBlock) yield { type: 'text', delta: UNUSABLE_PROPOSAL_NOTE };
 
-  const facts = validFacts(answer.facts);
-  if (facts.length > 0) {
-    const sourceMessage = input.message.slice(0, SOURCE_MESSAGE_EXCERPT_LENGTH);
-    const rows = await repository.insertPendingProfileEvents(
-      facts.map((fact) => ({ userId, eventType: fact.eventType, payload: fact.payload, sourceMessage })),
-    );
+  // A plan the coach proposes is remembered when the member applies it, with a note that carries what was
+  // asked, so the request is not also reported as a fact here.
+  const facts = validFacts(answer.facts).filter(
+    (fact) => !(hasProposalBlock && fact.eventType === 'plan_adjustment_request'),
+  );
+  const sourceMessage = input.message.slice(0, SOURCE_MESSAGE_EXCERPT_LENGTH);
+  const toInput = (fact: ProfileEventFact) => ({
+    userId,
+    eventType: fact.eventType,
+    payload: fact.payload,
+    sourceMessage,
+  });
+
+  // Only an injury or a medication change waits for the member's yes; everything else is remembered at once.
+  const needingConfirmation = facts.filter((fact) => needsConfirmation(fact.eventType));
+  const rememberedAtOnce = facts.filter((fact) => !needsConfirmation(fact.eventType));
+  await repository.insertConfirmedProfileEvents(rememberedAtOnce.map(toInput));
+  if (needingConfirmation.length > 0) {
+    const rows = await repository.insertPendingProfileEvents(needingConfirmation.map(toInput));
     yield {
       type: 'block',
-      block: { type: 'facts', id: randomUUID(), facts: rows.map((row, index) => toPendingFact(row, facts[index]!)) },
+      block: {
+        type: 'facts',
+        id: randomUUID(),
+        facts: rows.map((row, index) => toPendingFact(row, needingConfirmation[index]!)),
+      },
     };
   }
 
@@ -269,7 +302,19 @@ export async function applyDraft(userId: string, input: CoachApplyInput): Promis
       })),
   });
 
-  for (const { muscle, bias } of input.focusChanges) await setFocus(userId, { muscle, bias });
+  // The plan is remembered only once it is applied, as one short line: what was asked and what mattered. The
+  // coach writes it and rewrites it as the conversation refines the proposal; without one the request stands in.
+  await plansRepository.insertProfileEvent({
+    userId,
+    eventType: 'plan_adjustment_request',
+    payload: {
+      description:
+        input.memoryNote ||
+        `Applied a plan for ${input.date}${input.request ? `: ${input.request.slice(0, 200)}` : ''}`,
+      planDate: input.date,
+    },
+    sourceMessage: input.request ? input.request.slice(0, SOURCE_MESSAGE_EXCERPT_LENGTH) : null,
+  });
 
   return { status: 'ok', plan };
 }

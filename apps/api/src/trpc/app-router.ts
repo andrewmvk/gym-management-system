@@ -2,7 +2,6 @@ import { authRouter } from '@api/modules/auth/router';
 import { catalogRouter } from '@api/modules/catalog/router';
 import { chatRouter } from '@api/modules/chat/router';
 import { checkinsRouter } from '@api/modules/checkins/router';
-import { focusRouter } from '@api/modules/focus/router';
 import { gymRouter } from '@api/modules/gym/router';
 import { membersRouter } from '@api/modules/members/router';
 import { metricsRouter } from '@api/modules/metrics/router';
@@ -20,7 +19,6 @@ export const appRouter = router({
   catalog: catalogRouter,
   chat: chatRouter,
   checkins: checkinsRouter,
-  focus: focusRouter,
   gym: gymRouter,
   members: membersRouter,
   metrics: metricsRouter,

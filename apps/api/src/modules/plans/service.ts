@@ -4,22 +4,13 @@ import { localDateString, startOfLocalDay, todayLocal } from '@api/lib/dates';
 import { type AiResult, type AiStreamItem, streamStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
-import { findFocusByUserId } from '@api/modules/focus/repository';
 import { findCheckInTimes } from '@api/modules/metrics/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import type { DemandRow, MemberReviewRow, PlanExerciseInput, PlanHistoryRow } from '@api/modules/plans/repository';
 import * as repository from '@api/modules/plans/repository';
 import { WEIGHT_KG_MAX } from '@cadence/shared/schemas/coach';
 import { computeMuscleLoad, type MuscleLoad, rankMuscles } from '@cadence/shared/schemas/muscle-heat';
-import {
-  type ExerciseMuscle,
-  FOCUS_BIAS_LABELS,
-  FOCUS_BIAS_MIN,
-  type MemberMuscleFocus,
-  MUSCLE_IDS,
-  type MuscleId,
-  muscleLabel,
-} from '@cadence/shared/schemas/muscles';
+import { type ExerciseMuscle, MUSCLE_IDS, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -198,46 +189,33 @@ export interface PlanContext {
   trainerReviews: MemberReviewRow[];
   demand: PlanDemand;
   availableExercises: AvailableExercise[];
-  muscleFocus: MemberMuscleFocus[];
 }
 
 async function assemblePlanContext(userId: string, planDate: string): Promise<PlanContext> {
   const since = shiftDate(planDate, -RECENT_PLAN_WINDOW_DAYS);
-  const [
-    user,
-    onboardingSubmissions,
-    profileEvents,
-    planHistory,
-    checkInTimes,
-    trainerReviews,
-    demandRows,
-    catalog,
-    muscleFocus,
-  ] = await Promise.all([
-    findUserById(userId),
-    findSubmissionsByUserId(userId),
-    repository.findUnresolvedProfileEvents(userId),
-    repository.findPlanHistory(userId, since, planDate),
-    findCheckInTimes(userId, startOfLocalDay(since), startOfLocalDay(planDate)),
-    repository.findRecentReviewsForMember(userId, TRAINER_NOTES_LIMIT),
-    repository.findDemandRowsForDate(planDate, userId),
-    listExercises(),
-    findFocusByUserId(userId),
-  ]);
+  const [user, onboardingSubmissions, profileEvents, planHistory, checkInTimes, trainerReviews, demandRows, catalog] =
+    await Promise.all([
+      findUserById(userId),
+      findSubmissionsByUserId(userId),
+      repository.findUnresolvedProfileEvents(userId),
+      repository.findPlanHistory(userId, since, planDate),
+      findCheckInTimes(userId, startOfLocalDay(since), startOfLocalDay(planDate)),
+      repository.findRecentReviewsForMember(userId, TRAINER_NOTES_LIMIT),
+      repository.findDemandRowsForDate(planDate, userId),
+      listExercises(),
+    ]);
 
   return {
     planDate,
     today: todayLocal(),
     ageYears: computeAge(user?.birthdate ?? null),
     onboardingSubmissions,
-    // The focus block below is the current truth; its change events would only repeat stale levels.
-    profileEvents: profileEvents.filter((event) => event.eventType !== 'muscle_focus_changed'),
+    profileEvents,
     planHistory,
     checkInDates: [...new Set(checkInTimes.map((time) => localDateString(time)))].sort().reverse(),
     trainerReviews,
     demand: computePlanDemand(demandRows, catalog),
     availableExercises: catalog.filter((exercise) => exercise.isAvailable),
-    muscleFocus,
   };
 }
 
@@ -252,29 +230,16 @@ export function formatCatalogLine(exercise: AvailableExercise): string {
   return `- ${exercise.id} | ${exercise.name} | primary: ${listMuscles(exercise.muscles, 'primary')} | secondary: ${listMuscles(exercise.muscles, 'secondary')}`;
 }
 
-export function buildMuscleFocusLines(muscleFocus: readonly MemberMuscleFocus[]): string[] {
-  const lines = ['Member muscle focus (a preference between -2 and +2, normal is 0; unlisted muscles are normal):'];
-  if (muscleFocus.length === 0) {
-    lines.push('- none set');
-    return lines;
-  }
-  const ordered = [...muscleFocus].sort((a, b) => b.bias - a.bias);
-  for (const { muscle, bias } of ordered) {
-    lines.push(`- ${muscle}: ${bias > 0 ? '+' : ''}${bias} (${FOCUS_BIAS_LABELS[bias]?.toLowerCase()})`);
-  }
-  return lines;
-}
-
 // FR-15: the system/user prompt wording is this project's own product decision, not a requirement quote.
 const PLAN_SYSTEM_PROMPT =
   "You are a personal trainer AI. Build today's training plan for a gym member using only the " +
   "provided exercise catalog and the member's profile, onboarding data, and history. Choose exercises " +
   'appropriate to their goals and physical conditions, avoiding anything they should not safely perform. ' +
-  'Each catalog exercise lists the muscles it trains as primary or secondary. Use the member muscle focus ' +
-  'to steer the balance of the plan: give muscles with a positive focus more exercises and sets, and muscles ' +
-  'with a negative focus fewer, with -2 meaning avoid training that muscle as a primary target unless needed. ' +
-  'Focus is a preference only: injuries, medical conditions, medications, exam findings and safety always ' +
-  'override it, and a plan must never be built from the focus alone. Give an exercise that uses added weight ' +
+  'Each catalog exercise lists the muscles it trains as primary or secondary. When a remembered fact is a plan ' +
+  'request, such as wanting more of a muscle or less of an exercise, steer the balance of the plan that way: ' +
+  'give the muscle more exercises and sets, or fewer. It is a preference only: injuries, medical conditions, ' +
+  'medications, exam findings and safety always override it, and a plan must never be built from it alone. ' +
+  'Give an exercise that uses added weight ' +
   'a load in kilograms as a plain number, sized to what the member did recently (their history shows the weights ' +
   'used) and to their height, weight and goals; leave load out for bodyweight exercises. Size the load to the height and weight ' +
   'you are given and read the medical exam findings for anything that limits what the member can do. Reason ' +
@@ -283,7 +248,8 @@ const PLAN_SYSTEM_PROMPT =
   "Trainer notes and edits are guidance from the member's own trainer, so follow them. You are also told how " +
   "many other members' plans already use each piece of equipment and train each muscle on that date. When the " +
   "member's goal is broad, spread the exercises across different equipment and avoid pieces other members " +
-  'already need heavily, but safety, injuries, medication, exams and muscle focus always win over that spreading. ' +
+  'already need heavily, but safety, injuries, medication, exams and the remembered plan requests always win ' +
+  'over that spreading. ' +
   'Respond only with the chosen exercises.';
 
 export function buildPlanUserPrompt(context: PlanContext, instruction?: string): string {
@@ -303,7 +269,6 @@ export function buildPlanUserPrompt(context: PlanContext, instruction?: string):
   lines.push(...buildTrainerNoteLines(context.trainerReviews));
   lines.push(...buildPlanHistoryLines(context.planHistory, context.checkInDates, context.today));
   lines.push(...buildDemandLines(context.demand, context.planDate));
-  lines.push(...buildMuscleFocusLines(context.muscleFocus));
 
   lines.push('Available exercise catalog - choose exerciseId only from this list:');
   for (const exercise of context.availableExercises) lines.push(formatCatalogLine(exercise));
@@ -359,40 +324,26 @@ function effectivePlanGenerator(): PlanGeneratorMode {
   return env.PLAN_GENERATOR ?? (env.AI_MODE === 'mock' ? 'placeholder' : 'ai');
 }
 
-// Deterministic (no randomness): exercises are grouped by their lead muscle (the primary muscle the member
-// wants most), groups are ordered by that focus and then by the muscle registry, and one exercise per group
-// is picked alphabetically, up to 5. Groups topped up from already-used ones (still alphabetical) if fewer
-// than 3 distinct groups have an available exercise. An exercise whose primary muscle is set to -2 is left
-// out unless that would leave nothing to choose from, and a positive or negative lead focus adds or removes
-// a set so the shift is visible without a model.
-export function generatePlaceholderExercises(
-  availableExercises: readonly AvailableExercise[],
-  muscleFocus: readonly MemberMuscleFocus[] = [],
-): PlanExerciseInput[] {
-  const biasOf = (muscle: MuscleId) => muscleFocus.find((entry) => entry.muscle === muscle)?.bias ?? 0;
-  const primaryMuscles = (exercise: AvailableExercise) =>
-    exercise.muscles.filter((entry) => entry.role === 'primary').map((entry) => entry.muscle);
+// Deterministic (no randomness): exercises are grouped by their lead muscle (the first primary muscle in the
+// muscle registry), groups are ordered by that registry, and one exercise per group is picked alphabetically,
+// up to 5. Groups topped up from already-used ones (still alphabetical) if fewer than 3 distinct groups have
+// an available exercise.
+export function generatePlaceholderExercises(availableExercises: readonly AvailableExercise[]): PlanExerciseInput[] {
   const leadMuscle = (exercise: AvailableExercise) =>
-    [...primaryMuscles(exercise)].sort(
-      (a, b) => biasOf(b) - biasOf(a) || MUSCLE_IDS.indexOf(a) - MUSCLE_IDS.indexOf(b),
-    )[0];
-
-  const wanted = availableExercises.filter((exercise) =>
-    primaryMuscles(exercise).some((muscle) => biasOf(muscle) > FOCUS_BIAS_MIN),
-  );
-  const pool = wanted.length > 0 ? wanted : availableExercises;
+    exercise.muscles
+      .filter((entry) => entry.role === 'primary')
+      .map((entry) => entry.muscle)
+      .sort((a, b) => MUSCLE_IDS.indexOf(a) - MUSCLE_IDS.indexOf(b))[0];
 
   const byLead = new Map<MuscleId | undefined, AvailableExercise[]>();
-  for (const exercise of pool) {
+  for (const exercise of availableExercises) {
     const lead = leadMuscle(exercise);
     byLead.set(lead, [...(byLead.get(lead) ?? []), exercise]);
   }
   for (const list of byLead.values()) list.sort((a, b) => a.name.localeCompare(b.name));
 
   const leads = [...byLead.keys()].sort(
-    (a, b) =>
-      (b ? biasOf(b) : 0) - (a ? biasOf(a) : 0) ||
-      (a ? MUSCLE_IDS.indexOf(a) : MUSCLE_IDS.length) - (b ? MUSCLE_IDS.indexOf(b) : MUSCLE_IDS.length),
+    (a, b) => (a ? MUSCLE_IDS.indexOf(a) : MUSCLE_IDS.length) - (b ? MUSCLE_IDS.indexOf(b) : MUSCLE_IDS.length),
   );
   const picked: AvailableExercise[] = [];
   const pickedIds = new Set<string>();
@@ -414,12 +365,7 @@ export function generatePlaceholderExercises(
     }
   }
 
-  return picked.map((exercise) => {
-    const lead = leadMuscle(exercise);
-    const bias = lead ? biasOf(lead) : 0;
-    const sets = PLACEHOLDER_SETS + (bias > 0 ? 1 : 0) - (bias < 0 ? 1 : 0);
-    return { exerciseId: exercise.id, sets, reps: PLACEHOLDER_REPS };
-  });
+  return picked.map((exercise) => ({ exerciseId: exercise.id, sets: PLACEHOLDER_SETS, reps: PLACEHOLDER_REPS }));
 }
 
 export interface GenerateForDateOverrides {
@@ -540,7 +486,7 @@ export async function* streamGenerateForDate(
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
     }
   } else {
-    exercises = generatePlaceholderExercises(context.availableExercises, context.muscleFocus);
+    exercises = generatePlaceholderExercises(context.availableExercises);
     for (const exercise of exercises) {
       const streamed = toStreamed(exercise);
       if (streamed) yield { type: 'exercise', exercise: streamed };

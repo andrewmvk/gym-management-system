@@ -2,17 +2,39 @@ import {
   computeEquipmentImpact,
   computeMuscleCoverage,
   computeMuscleLoad,
+  groupMuscleLoad,
   HEAT_STEPS,
   heatStep,
   rankMuscles,
 } from '@shared/schemas/muscle-heat';
-import { ExerciseMusclesSchema, MUSCLE_IDS, MUSCLES } from '@shared/schemas/muscles';
+import { ExerciseMusclesSchema, MUSCLE_GROUPS, MUSCLE_IDS, MUSCLES, muscleGroupOf } from '@shared/schemas/muscles';
 import { describe, expect, it } from 'vitest';
 
 describe('muscle registry', () => {
   it('has unique ids and a view for every muscle', () => {
     expect(new Set(MUSCLE_IDS).size).toBe(MUSCLES.length);
     expect(MUSCLES.every((muscle) => muscle.views.length > 0)).toBe(true);
+  });
+
+  it('puts every muscle in exactly one group', () => {
+    const grouped = MUSCLE_GROUPS.flatMap((group) => [...group.muscles]);
+    expect([...grouped].sort()).toEqual([...MUSCLE_IDS].sort());
+    expect(muscleGroupOf('lats')).toBe('back');
+    expect(muscleGroupOf('quads-outer')).toBe('legs');
+  });
+});
+
+describe('groupMuscleLoad', () => {
+  it('sums each group and counts its trained muscles', () => {
+    const groups = groupMuscleLoad({ quads: 6, glutes: 3, 'rear-deltoid': 1.5 });
+    expect(groups.find((entry) => entry.group === 'legs')).toEqual({ group: 'legs', load: 9, trained: 2, total: 6 });
+    expect(groups.find((entry) => entry.group === 'shoulders')).toEqual({
+      group: 'shoulders',
+      load: 1.5,
+      trained: 1,
+      total: 4,
+    });
+    expect(groups.find((entry) => entry.group === 'chest')?.load).toBe(0);
   });
 });
 

@@ -4,8 +4,7 @@ import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { CalendarSearchIcon, CalendarX2Icon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useCoach } from '@/app/(member)/coach/coach-context';
-import { CoachBar } from '@/app/(member)/plan/coach-bar';
+import { mentionKey, useCoach } from '@/app/(member)/coach/coach-context';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
 import { MuscleDetail } from '@/app/(member)/plan/muscle-detail';
 import { TrainerNotes } from '@/app/(member)/plan/trainer-notes';
@@ -116,14 +115,13 @@ export function PlanHistory() {
   const planQuery = useQuery(planQueryFor(shownDate));
   const isFuture = shownDate > todayIso;
   const updateNumbers = useUpdateExerciseNumbers();
-  const { selection, setSelection } = useCoach();
+  const coach = useCoach();
+  const markedKeys = new Set(coach.mentions.map(mentionKey));
 
-  // Only days that can still be done are talked about from here, and the pick never outlives this view.
-  useEffect(() => () => setSelection(null), [setSelection]);
-  const shownExerciseIds = planQuery.data?.exercises.map((exercise) => exercise.exerciseId);
-  useEffect(() => {
-    if (selection && (!isFuture || !shownExerciseIds?.includes(selection.exerciseId))) setSelection(null);
-  }, [selection, isFuture, shownExerciseIds, setSelection]);
+  // Only days that can still be done are talked about from here.
+  const canPointHere = isFuture && Boolean(planQuery.data);
+  const { registerTargets } = coach;
+  useEffect(() => (canPointHere ? registerTargets() : undefined), [canPointHere, registerTargets]);
 
   return (
     <section aria-label="Plans by day" className="overflow-hidden rounded-lg border bg-card">
@@ -257,7 +255,7 @@ export function PlanHistory() {
           <TrainerNotes notes={planQuery.data.trainerNotes} className="mt-4 border-b px-5 pb-4 sm:px-6" />
           <div className="border-b px-5 py-5 sm:px-6">
             <MuscleLoadView
-              isSplit
+              isPaired
               load={planQuery.data.muscleLoad}
               label={
                 isFuture
@@ -285,15 +283,18 @@ export function PlanHistory() {
               isPerformable={exercise.isPerformable}
               equipmentDown={exercise.equipmentDown}
               isTickLocked={isFuture}
-              isSelected={isFuture && selection?.exerciseId === exercise.exerciseId}
-              onSelect={
+              pointing={
                 isFuture
-                  ? () =>
-                      setSelection(
-                        selection?.exerciseId === exercise.exerciseId
-                          ? null
-                          : { exerciseId: exercise.exerciseId, name: exercise.exerciseName },
-                      )
+                  ? {
+                      isActive: coach.isPointing,
+                      isMarked: markedKeys.has(`exercise:${exercise.exerciseId}`),
+                      onPoint: () =>
+                        coach.toggleMention({
+                          type: 'exercise',
+                          exerciseId: exercise.exerciseId,
+                          name: exercise.exerciseName,
+                        }),
+                    }
                   : undefined
               }
               onEditNumbers={
@@ -304,7 +305,6 @@ export function PlanHistory() {
               isEditPending={updateNumbers.isPending && updateNumbers.variables?.planExerciseId === exercise.id}
             />
           ))}
-          {isFuture && <CoachBar />}
         </div>
       )}
     </section>

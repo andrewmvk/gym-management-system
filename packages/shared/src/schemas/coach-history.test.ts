@@ -37,7 +37,7 @@ const proposal: CoachBlock = {
     },
   ],
   warnings: [],
-  focusChanges: [],
+  memoryNote: 'Asked for a lighter day.',
 };
 
 describe('summarizeBlock', () => {

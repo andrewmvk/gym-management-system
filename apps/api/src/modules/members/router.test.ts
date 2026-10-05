@@ -170,7 +170,6 @@ describe('members router', () => {
           resolvedAt: new Date(),
           createdAt: new Date(Date.now() - 1000),
         },
-        { userId: member.id, eventType: 'muscle_focus_changed', payload: { description: 'Focus changed' } },
       ]);
       const today = todayLocal();
       const recent = await addPlan(member.id, shiftLocalDate(today, -3), 2);

@@ -2,12 +2,10 @@ import type { ProfileEvent } from '@api/db/schema';
 import { todayLocal } from '@api/lib/dates';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
-import { findFocusByUserId } from '@api/modules/focus/repository';
 import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import * as plansRepository from '@api/modules/plans/repository';
 import {
   type AvailableExercise,
-  buildMuscleFocusLines,
   buildOnboardingLines,
   formatCatalogLine,
   getTodayAggregate,
@@ -15,11 +13,14 @@ import {
 } from '@api/modules/plans/service';
 import type { CoachDraft, CoachSendInput } from '@cadence/shared/schemas/coach';
 import { findInjuryConflicts, type InjuryForConflicts } from '@cadence/shared/schemas/coach-draft';
+import { computeMuscleLoad, groupMuscleLoad } from '@cadence/shared/schemas/muscle-heat';
 import {
   type ExerciseMuscle,
-  type MemberMuscleFocus,
+  MUSCLE_GROUPS,
   MUSCLES,
+  type MuscleGroupId,
   type MuscleId,
+  muscleGroupLabel,
   muscleLabel,
 } from '@cadence/shared/schemas/muscles';
 import { injuryMuscles } from '@cadence/shared/schemas/profile-events';
@@ -56,14 +57,16 @@ export interface ChatContext {
   olderEventsSummary: string | null;
   catalog: CatalogEntry[];
   availableExercises: AvailableExercise[];
-  muscleFocus: MemberMuscleFocus[];
   aggregate: PlanAggregate;
   injuries: InjuryForConflicts[];
   planDate: string;
   storedPlan: DiscussedPlan;
   draft: DiscussedPlan | null;
+  draftMemoryNote: string | null;
   mentionedExercises: CatalogEntry[];
   mentionedMuscles: MuscleId[];
+  mentionedGroups: MuscleGroupId[];
+  mentionsDistribution: boolean;
   muscleCandidates: AvailableExercise[];
 }
 
@@ -113,6 +116,39 @@ export function buildMuscleCandidates(
     .slice(0, MUSCLE_CANDIDATES_LIMIT);
 }
 
+// A group has no exercises of its own: the best ones for each of its muscles, the least worked muscle first so
+// the member sees what would balance the plan, without repeating an exercise that trains two of them.
+export function buildGroupCandidates(
+  group: MuscleGroupId,
+  available: readonly AvailableExercise[],
+  excludeIds: ReadonlySet<string>,
+  injuries: readonly InjuryForConflicts[],
+  load: Partial<Record<MuscleId, number>> = {},
+): AvailableExercise[] {
+  const members = MUSCLE_GROUPS.find((entry) => entry.id === group)?.muscles ?? [];
+  const byLeastWork = [...members].sort((a, b) => (load[a] ?? 0) - (load[b] ?? 0));
+  const picked = new Map<string, AvailableExercise>();
+  for (const muscle of byLeastWork) {
+    for (const exercise of buildMuscleCandidates(muscle, available, excludeIds, injuries)) {
+      if (!picked.has(exercise.id)) picked.set(exercise.id, exercise);
+    }
+  }
+  return [...picked.values()].slice(0, MUSCLE_CANDIDATES_LIMIT);
+}
+
+// How the sets of a plan spread over the six groups and the muscles inside them, so "is this balanced" is
+// answered from numbers instead of guessed from exercise names.
+export function buildDistributionLines(exercises: readonly PlanExerciseSnapshot[]): string[] {
+  const load = computeMuscleLoad(exercises);
+  const lines = ['Weighted sets per muscle group (a supporting muscle counts half), then per muscle:'];
+  for (const entry of groupMuscleLoad(load)) {
+    const members = MUSCLE_GROUPS.find((group) => group.id === entry.group)?.muscles ?? [];
+    const detail = members.map((muscle) => `${muscleLabel(muscle)} ${load[muscle] ?? 0}`).join(', ');
+    lines.push(`- ${muscleGroupLabel(entry.group)} ${entry.load} (${detail})`);
+  }
+  return lines;
+}
+
 export async function loadStoredPlan(userId: string, date: string): Promise<DiscussedPlan> {
   const plan = await plansRepository.findPlanByUserAndDate(userId, date);
   if (!plan) return { date, status: null, exercises: [] };
@@ -160,19 +196,17 @@ function draftSnapshot(draft: CoachDraft, catalog: readonly CatalogEntry[]): Dis
 export async function assembleChatContext(userId: string, input: CoachSendInput): Promise<ChatContext> {
   const today = todayLocal();
   const planDate = input.draft?.date ?? today;
-  const [user, onboardingSubmissions, profileEvents, catalog, aggregate, muscleFocus] = await Promise.all([
+  const [user, onboardingSubmissions, profileEvents, catalog, aggregate] = await Promise.all([
     findUserById(userId),
     findSubmissionsByUserId(userId),
     plansRepository.findUnresolvedProfileEvents(userId),
     listExercises(),
     getTodayAggregate(),
-    findFocusByUserId(userId),
   ]);
   const storedPlan = await loadStoredPlan(userId, planDate);
   const draft = input.draft ? draftSnapshot(input.draft, catalog) : null;
 
-  // The focus block is the current truth; its change events would only repeat stale levels.
-  const allEvents = profileEvents.filter((event) => event.eventType !== 'muscle_focus_changed');
+  const allEvents = profileEvents;
   const injuries = allEvents
     .filter((event) => event.eventType === 'injury')
     .map((event) => ({
@@ -186,10 +220,21 @@ export async function assembleChatContext(userId: string, input: CoachSendInput)
     mention.type === 'exercise' && catalogById.has(mention.exerciseId) ? [catalogById.get(mention.exerciseId)!] : [],
   );
   const mentionedMuscles = input.mentions.flatMap((mention) => (mention.type === 'muscle' ? [mention.muscle] : []));
-  const inPlanIds = new Set((draft ?? storedPlan).exercises.map((exercise) => exercise.exerciseId));
+  const mentionedGroups = input.mentions.flatMap((mention) => (mention.type === 'group' ? [mention.group] : []));
+  const mentionsDistribution = input.mentions.some((mention) => mention.type === 'distribution');
+  const discussedPlan = draft ?? storedPlan;
+  const inPlanIds = new Set(discussedPlan.exercises.map((exercise) => exercise.exerciseId));
   const muscleCandidates = mentionedMuscles[0]
     ? buildMuscleCandidates(mentionedMuscles[0], availableExercises, inPlanIds, injuries)
-    : [];
+    : mentionedGroups[0]
+      ? buildGroupCandidates(
+          mentionedGroups[0],
+          availableExercises,
+          inPlanIds,
+          injuries,
+          computeMuscleLoad(discussedPlan.exercises),
+        )
+      : [];
 
   return {
     today,
@@ -201,14 +246,16 @@ export async function assembleChatContext(userId: string, input: CoachSendInput)
     olderEventsSummary: summarizeOlderEvents(allEvents.slice(RECENT_EVENTS_LIMIT)),
     catalog,
     availableExercises,
-    muscleFocus,
     aggregate,
     injuries,
     planDate,
     storedPlan,
     draft,
+    draftMemoryNote: input.draft?.memoryNote ?? null,
     mentionedExercises,
     mentionedMuscles,
+    mentionedGroups,
+    mentionsDistribution,
     muscleCandidates,
   };
 }
@@ -238,13 +285,32 @@ function formatPlanLine(exercise: PlanExerciseSnapshot, showCompleted: boolean):
 }
 
 function buildMentionLines(context: ChatContext): string[] {
-  if (context.mentionedExercises.length === 0 && context.mentionedMuscles.length === 0) return [];
+  const { mentionedExercises, mentionedMuscles, mentionedGroups, mentionsDistribution } = context;
+  if (
+    mentionedExercises.length === 0 &&
+    mentionedMuscles.length === 0 &&
+    mentionedGroups.length === 0 &&
+    !mentionsDistribution
+  ) {
+    return [];
+  }
   const lines = ['The member pointed at these in the app (they mean exactly these, not a similar one):'];
-  for (const exercise of context.mentionedExercises) lines.push(`- exercise ${exercise.id} | ${exercise.name}`);
-  for (const muscle of context.mentionedMuscles) lines.push(`- muscle ${muscle} | ${muscleLabel(muscle)}`);
+  for (const exercise of mentionedExercises) lines.push(`- exercise ${exercise.id} | ${exercise.name}`);
+  for (const muscle of mentionedMuscles) lines.push(`- muscle ${muscle} | ${muscleLabel(muscle)}`);
+  for (const group of mentionedGroups) {
+    const members = MUSCLE_GROUPS.find((entry) => entry.id === group)?.muscles ?? [];
+    lines.push(`- muscle group ${group} | ${muscleGroupLabel(group)} | muscles: ${members.join(', ')}`);
+  }
+  if (mentionsDistribution) {
+    lines.push(`- the whole muscle distribution of the plan for ${(context.draft ?? context.storedPlan).date}`);
+    lines.push(...buildDistributionLines((context.draft ?? context.storedPlan).exercises));
+  } else if (mentionedGroups.length > 0) {
+    lines.push(...buildDistributionLines((context.draft ?? context.storedPlan).exercises));
+  }
   if (context.muscleCandidates.length > 0) {
+    const subject = mentionedMuscles[0] ? muscleLabel(mentionedMuscles[0]) : muscleGroupLabel(mentionedGroups[0]!);
     lines.push(
-      `Candidate exercises for ${muscleLabel(context.mentionedMuscles[0]!)} that suit this member (if you offer an exercisePicker, choose only from these):`,
+      `Candidate exercises for ${subject} that suit this member (if you offer an exercisePicker, choose only from these):`,
     );
     for (const exercise of context.muscleCandidates) lines.push(formatCatalogLine(exercise));
   }
@@ -276,6 +342,9 @@ export function buildChatUserPrompt(
       `Draft the member is reviewing for ${context.draft.date} (not applied yet; when you revise it, return the full revised list as planProposal):`,
     );
     for (const exercise of context.draft.exercises) lines.push(formatPlanLine(exercise, false));
+    if (context.draftMemoryNote) {
+      lines.push(`Memory note for this draft so far (rewrite it in planProposal.memory): ${context.draftMemoryNote}`);
+    }
   }
 
   // FR-28: placed right next to the plan so a risk (e.g. an old knee injury) is easy to weigh against the
@@ -284,7 +353,6 @@ export function buildChatUserPrompt(
   if (context.activeHealthEvents.length === 0) lines.push('- none reported');
   for (const event of context.activeHealthEvents) lines.push(`- ${event.eventType}: ${JSON.stringify(event.payload)}`);
 
-  lines.push(...buildMuscleFocusLines(context.muscleFocus));
   lines.push(...buildMentionLines(context));
 
   lines.push('Available exercise catalog - propose exercises only from this list:');
@@ -326,18 +394,33 @@ export const CHAT_SYSTEM_PROMPT =
   'for exactly that offer; do not ask what they mean when the conversation already says. ' +
   'Use the other keys only when they help: ' +
   'facts: new, durable facts the message reveals (injury, skipped exercise, medication change, life event, ' +
-  'updated physical state, or a request to adjust their plan), never invented. For an injury also set ' +
+  'updated physical state, or a wish about their future plans such as "more back next time"), never invented. ' +
+  'Only an injury or a medication change asks the member to confirm; every other fact is remembered at once, ' +
+  'so write each one as a short, plain sentence about the member. Do not report a request for a plan, or a ' +
+  'change to a plan you are proposing, as a fact: the plan is remembered when the member applies it, through ' +
+  'planProposal.memory. For an injury also set ' +
   `payload.muscles to the muscle ids it affects, chosen only from: ${MUSCLE_REGISTRY}. ` +
   'planProposal: whenever the member wants their plan changed, or you propose a safer alternative. It is the ' +
   'FULL exercise list for that date after your change, not only the changes. Its date is the member plan date ' +
   'as YYYY-MM-DD: use the plan date given above unless the member names another day, and never a date in the ' +
   'past unless they are correcting a day that already happened (then set completed on every exercise). Give ' +
   'every changed or added exercise a one-line reason, and keep the rest as they were. Choose exerciseId only ' +
-  'from the available catalog. If the member shows a draft, revise that draft. If they ask for more focus on ' +
-  'a muscle, also set focusChanges (bias -2 much less to +2 much more) and build the plan around it. ' +
+  'from the available catalog. If the member shows a draft, revise that draft: answer with the complete revised ' +
+  'list as a new planProposal for the same date, even when the change is small, because the new one replaces ' +
+  'the draft they see. If they ask for a plan for another day, answer with a new planProposal for that day. ' +
+  'Never say in the reply that you created, changed or updated a plan unless the same answer contains the ' +
+  'planProposal that does it. When the member says they want more or less of a muscle ("more chest and ' +
+  'shoulders") for a plan, build the planProposal around it right away. Every planProposal also carries ' +
+  'memory: one short sentence for the member history, written once the plan is applied, saying what they asked ' +
+  'for and any detail that matters (a goal, a test, a limit, a reason), for example "Asked for a plan for 10 ' +
+  'Oct to test whether they can do a hard chest and shoulders workout". Rewrite it with every revision so it ' +
+  'includes the important things they said earlier in this conversation. ' +
   'exercisePicker: when the member points at a muscle and wants exercises for it, offer 3 to 5 options chosen ' +
-  'only from the candidate list, each with sets, reps and a one-line reason that mentions their goal, focus or ' +
+  'only from the candidate list, each with sets, reps and a one-line reason that mentions their goal or ' +
   'limits. ' +
+  'When the member points at a muscle group or at the whole muscle distribution, read the numbers given for it: ' +
+  'say plainly what is carrying the plan, what is missing and whether that fits their goals and injuries. ' +
+  'If they ask to rebalance or change it, answer with planProposal, never with a list in the reply. ' +
   'Weights: every planProposal exercise and every exercisePicker option that uses added weight needs a load, ' +
   'in kilograms as a plain number (20, not "20 kg"). Base it on the weights the member recently used (look at ' +
   'their workout history when you are unsure), the numbers they edited by hand, their body weight, goals and ' +
@@ -351,7 +434,7 @@ export const CHAT_SYSTEM_PROMPT =
   'quickReplies: two or three short follow-ups the member is likely to send next. ' +
   "Weigh the member's active injuries, medication changes, medications and medical exam findings against the " +
   'exercises: if one conflicts, warn about it in planProposal.warnings and propose a safer alternative. ' +
-  'Catalog exercises list the muscles they train as primary or secondary, and the member muscle focus says ' +
-  'which muscles they want emphasized; respect it, but never above safety. Numbers the member edited by ' +
+  'Catalog exercises list the muscles they train as primary or secondary, and the remembered plan requests say ' +
+  'which muscles the member wants emphasized; respect them, but never above safety. Numbers the member edited by ' +
   'hand (history entries about manual edits) show what they could or could not do: respect them. Only ' +
   'mention the cross-member aggregate if the member asks about what others are doing.';

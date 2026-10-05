@@ -4,12 +4,14 @@ import type { ProposalRow } from '@cadence/shared/schemas/coach';
 import { useQuery } from '@tanstack/react-query';
 import { XIcon } from 'lucide-react';
 import { Dialog } from 'radix-ui';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppAbility } from '@/abilities';
 import { CoachComposer } from '@/app/(member)/coach/coach-composer';
 import { useCoach } from '@/app/(member)/coach/coach-context';
 import { CoachMessage } from '@/app/(member)/coach/coach-message';
 import { DraftBar } from '@/app/(member)/coach/draft-bar';
+import { buildMentionOptions } from '@/app/(member)/coach/mention-options';
+import { PointingBar } from '@/app/(member)/coach/pointing-bar';
 import { ProposalPanel } from '@/app/(member)/coach/proposal-panel';
 import { useCoachChat } from '@/app/(member)/coach/use-coach-chat';
 import { useCoachDraft } from '@/app/(member)/coach/use-coach-draft';
@@ -38,18 +40,9 @@ export function CoachPanel() {
   const todayQuery = useQuery({ ...trpc.plans.getToday.queryOptions(), enabled: coach.isOpen });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-
-  const latest = useRef({ chat, draftApi, coach });
-  latest.current = { chat, draftApi, coach };
-
-  const { request } = coach;
-  useEffect(() => {
-    if (!request) return;
-    const { chat: activeChat, draftApi: activeDraft, coach: activeCoach } = latest.current;
-    activeCoach.consumeRequest(request.id);
-    if (request.message) activeChat.send(request.message, request.mentions, activeDraft.sendableDraft);
-    else for (const chip of request.mentions) activeCoach.addMention(chip);
-  }, [request]);
+  // Kept here, not in the composer, so the half-written message survives the chat closing for pointing mode.
+  const [message, setMessage] = useState('');
+  const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: new messages and a growing reply are the triggers, not values read inside.
   useEffect(() => {
@@ -61,6 +54,9 @@ export function CoachPanel() {
   const lastRequest = [...chat.messages].reverse().find((message) => message.role === 'member')?.text ?? '';
   const lastMessageId = chat.messages.at(-1)?.id;
   const planExercises = todayQuery.data?.exercises ?? [];
+  const mentionOptions = buildMentionOptions(
+    planExercises.map((exercise) => ({ exerciseId: exercise.exerciseId, name: exercise.exerciseName })),
+  );
   const starters = planExercises[0] ? [`How do I do ${planExercises[0].exerciseName}?`, ...STARTERS] : STARTERS;
   const openDraft = draftApi.openDraft;
   const isDocked = openDraft !== null && draftApi.isPanelOpen;
@@ -93,16 +89,18 @@ export function CoachPanel() {
   return (
     <>
       <Dialog.Root open={coach.isOpen} onOpenChange={coach.setIsOpen}>
-        <Dialog.Trigger asChild>
-          <Button
-            type="button"
-            size="lg"
-            className="fixed right-4 bottom-4 z-40 rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6"
-          >
-            <AiMark className="size-5" data-icon="inline-start" />
-            Coach
-          </Button>
-        </Dialog.Trigger>
+        {!coach.isPointing && (
+          <Dialog.Trigger asChild>
+            <Button
+              type="button"
+              size="lg"
+              className="fixed right-4 bottom-4 z-40 rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6"
+            >
+              <AiMark className="size-5" data-icon="inline-start" />
+              Coach
+            </Button>
+          </Dialog.Trigger>
+        )}
 
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45 duration-300 data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0 sm:bg-black/20" />
@@ -114,8 +112,11 @@ export function CoachPanel() {
             onInteractOutside={(event) => {
               if (isOverlayTarget(event.target)) event.preventDefault();
             }}
+            onEscapeKeyDown={(event) => {
+              if (isMentionMenuOpen) event.preventDefault();
+            }}
             className={cn(
-              'fixed inset-0 z-50 flex flex-col overflow-hidden bg-card outline-none duration-300 data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4 sm:inset-auto sm:right-6 sm:bottom-24 sm:h-144 sm:max-h-[calc(100dvh-8rem)] sm:w-96 sm:flex-row sm:rounded-lg sm:border sm:shadow-overlay',
+              'fixed inset-0 z-50 flex flex-col overflow-hidden bg-card outline-none transition-none duration-300 data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom-4 data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom-4 sm:inset-auto sm:right-6 sm:bottom-24 sm:h-144 sm:max-h-[calc(100dvh-8rem)] sm:w-96 sm:flex-row sm:rounded-lg sm:border sm:shadow-overlay',
               isDocked && 'lg:w-3xl',
             )}
           >
@@ -127,7 +128,8 @@ export function CoachPanel() {
                     AI coach
                   </Dialog.Title>
                   <Dialog.Description className="text-xs text-kit-muted">
-                    Facts you share are remembered once you save them. The chat itself isn&apos;t saved.
+                    I remember what matters, and ask before saving an injury or a medication. The chat itself isn&apos;t
+                    saved.
                   </Dialog.Description>
                 </div>
                 <Dialog.Close asChild>
@@ -147,7 +149,8 @@ export function CoachPanel() {
                 {chat.messages.length === 0 && (
                   <div className="flex flex-col gap-3 py-2">
                     <p className="text-sm text-muted-foreground">
-                      Ask about your plan, report an injury, point at an exercise or a muscle, or share an update.
+                      Ask about your plan, report an injury or share an update. Type @ to point me at an exercise, a
+                      muscle, a muscle group or your whole plan.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {starters.map((prompt) => (
@@ -183,8 +186,15 @@ export function CoachPanel() {
                 mentions={coach.mentions}
                 isStreaming={chat.isStreaming}
                 inputRef={inputRef}
+                draft={message}
+                onDraftChange={setMessage}
+                options={mentionOptions}
+                canPoint={coach.canPoint}
+                onPoint={coach.startPointing}
+                onMention={coach.addMention}
                 onRemoveMention={coach.removeMention}
                 onSend={sendTyped}
+                onMenuOpenChange={setIsMentionMenuOpen}
               />
             </div>
 
@@ -195,13 +205,14 @@ export function CoachPanel() {
                 mentions={coach.mentions}
                 onMention={mentionRow}
                 onAskSaferSwap={askSaferSwap}
-                className="absolute inset-0 z-10 animate-block-in lg:static lg:order-first lg:w-96 lg:animate-none lg:border-r"
+                className="absolute inset-0 z-10 animate-block-in lg:static lg:order-first lg:w-96 lg:animate-panel-in lg:border-r"
               />
             )}
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
 
+      <PointingBar />
       {draftApi.overwriteDialog}
     </>
   );

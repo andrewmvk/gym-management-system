@@ -70,6 +70,8 @@
   --animate-ai-spark: ai-spark 1100ms ease-in-out infinite;
   /* A block of coach content settling into the thread. */
   --animate-block-in: block-in 420ms var(--ease-out-expo) both;
+  /* The proposal opening beside the chat: only the proposal moves, the chat stays where it is. */
+  --animate-panel-in: panel-in 320ms var(--ease-out-expo) both;
 
   @keyframes ai-bar {
     0%,
@@ -89,6 +91,16 @@
     50% {
       opacity: 1;
       transform: scale(1) rotate(45deg);
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateX(-1.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
     }
   }
   @keyframes block-in {

@@ -4,8 +4,7 @@ import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { DumbbellIcon } from 'lucide-react';
 import { type ReactNode, useEffect, useState } from 'react';
-import { useCoach } from '@/app/(member)/coach/coach-context';
-import { CoachBar } from '@/app/(member)/plan/coach-bar';
+import { mentionKey, useCoach } from '@/app/(member)/coach/coach-context';
 import { ExerciseRow } from '@/app/(member)/plan/exercise-row';
 import { NeedsReviewNotice } from '@/app/(member)/plan/needs-review-notice';
 import { PlanBuildProgress } from '@/app/(member)/plan/plan-build-progress';
@@ -93,16 +92,15 @@ function TodayPlanRoot() {
   const [selectedMuscle, setSelectedMuscle] = useState<MuscleId | null>(null);
   const generate = useRebuildPlan({ isErrorInline: true });
   const toggle = useToggleExercise();
-  const { selection, setSelection } = useCoach();
+  const coach = useCoach();
+  const markedKeys = new Set(coach.mentions.map(mentionKey));
 
   const updateNumbers = useUpdateExerciseNumbers();
 
-  // The coach bar belongs to this screen: leaving it, or the exercise leaving the plan, drops the pick.
-  useEffect(() => () => setSelection(null), [setSelection]);
-  const planExerciseIds = todayQuery.data?.exercises.map((exercise) => exercise.exerciseId);
-  useEffect(() => {
-    if (selection && planExerciseIds && !planExerciseIds.includes(selection.exerciseId)) setSelection(null);
-  }, [selection, planExerciseIds, setSelection]);
+  // While a plan is on screen the coach can be pointed at its exercises and its muscles.
+  const hasPlan = Boolean(todayQuery.data);
+  const { registerTargets } = coach;
+  useEffect(() => (hasPlan ? registerTargets() : undefined), [hasPlan, registerTargets]);
 
   if (todayQuery.isPending) {
     return (
@@ -208,14 +206,16 @@ function TodayPlanRoot() {
               equipmentDown={exercise.equipmentDown}
               disabled={toggle.isPending}
               onToggle={(completed) => toggle.mutate({ planExerciseId: exercise.id, completed })}
-              isSelected={selection?.exerciseId === exercise.exerciseId}
-              onSelect={() =>
-                setSelection(
-                  selection?.exerciseId === exercise.exerciseId
-                    ? null
-                    : { exerciseId: exercise.exerciseId, name: exercise.exerciseName },
-                )
-              }
+              pointing={{
+                isActive: coach.isPointing,
+                isMarked: markedKeys.has(`exercise:${exercise.exerciseId}`),
+                onPoint: () =>
+                  coach.toggleMention({
+                    type: 'exercise',
+                    exerciseId: exercise.exerciseId,
+                    name: exercise.exerciseName,
+                  }),
+              }}
               onEditNumbers={(numbers) => updateNumbers.mutateAsync({ planExerciseId: exercise.id, ...numbers })}
               isEditPending={updateNumbers.isPending && updateNumbers.variables?.planExerciseId === exercise.id}
             />
@@ -223,15 +223,12 @@ function TodayPlanRoot() {
         </PlanShell>
       }
       aside={
-        <>
-          <PlanMusclePanel
-            muscleLoad={plan.muscleLoad}
-            exercises={plan.exercises}
-            selected={selectedMuscle}
-            onSelectedChange={setSelectedMuscle}
-          />
-          <CoachBar />
-        </>
+        <PlanMusclePanel
+          muscleLoad={plan.muscleLoad}
+          exercises={plan.exercises}
+          selected={selectedMuscle}
+          onSelectedChange={setSelectedMuscle}
+        />
       }
     />
   );

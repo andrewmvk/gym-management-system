@@ -1,29 +1,65 @@
 'use client';
 
 import type { MuscleLoad } from '@cadence/shared/schemas/muscle-heat';
-import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
+import { useQuery } from '@tanstack/react-query';
+import { AtSignIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { toast } from 'sonner';
-import { useCoach } from '@/app/(member)/coach/coach-context';
+import { type MentionChip, mentionKey, useCoach } from '@/app/(member)/coach/coach-context';
 import { MuscleDetail, type PanelExercise } from '@/app/(member)/plan/muscle-detail';
-import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
-import { AiButton } from '@/components/ai-button';
-import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
-import { focusToMap } from '@/components/muscle-map/muscle-marks';
+import { MuscleLoadView, type MusclePointTarget } from '@/components/muscle-map/muscle-load-view';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
-function PanelShell({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+interface DistributionPointing {
+  isActive: boolean;
+  isMarked: boolean;
+  onPoint: () => void;
+}
+
+// From lg the panel sits beside the plan and follows it down the page, so the map and the plan are on
+// screen together. Its head stays put and only the body scrolls, and only on a short screen. While the member
+// is pointing the coach at things, the head is the target for the whole distribution.
+function PanelShell({ children, distribution }: { children: ReactNode; distribution?: DistributionPointing }) {
+  const isPointing = Boolean(distribution?.isActive);
   return (
-    <section aria-label="Muscle map" className="overflow-hidden rounded-lg border bg-card">
-      <div className="border-b px-5 py-4 sm:px-6">
-        <h2 className="font-display text-xl font-bold tracking-wide uppercase">Muscle map</h2>
+    <section
+      aria-label="Muscle map"
+      className="flex flex-col overflow-hidden rounded-lg border bg-card lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)]"
+    >
+      <div
+        className={cn(
+          'relative shrink-0 border-b px-5 py-4 transition-colors sm:px-6',
+          isPointing && 'outline-2 -outline-offset-2 outline-primary/60 outline-dashed',
+          distribution?.isMarked && 'bg-accent/50 outline-solid outline-primary',
+        )}
+      >
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-display text-xl font-bold tracking-wide uppercase">Muscle map</h2>
+          {distribution?.isMarked && (
+            <span className="flex h-6 items-center gap-1 rounded-sm bg-primary px-2 font-display text-xs font-semibold tracking-widest text-primary-foreground uppercase">
+              <AtSignIcon className="size-3" aria-hidden />
+              Pointed at
+            </span>
+          )}
+        </div>
         <p className="text-sm text-muted-foreground">
-          Where today&apos;s plan lands. Tap a muscle to see its exercises and steer your next plans.
+          {isPointing
+            ? 'Tap here to ask about the whole distribution, or a muscle or group below.'
+            : "Where today's plan lands. Tap a muscle to see which exercises train it."}
         </p>
+        {isPointing && (
+          <button
+            type="button"
+            onClick={distribution?.onPoint}
+            aria-pressed={distribution?.isMarked}
+            className="absolute inset-0 z-10 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
+          >
+            <span className="sr-only">Point the coach at the whole muscle distribution</span>
+          </button>
+        )}
       </div>
-      <div className="px-5 py-5 sm:px-6">{children}</div>
-      {footer}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4 sm:px-6">{children}</div>
     </section>
   );
 }
@@ -31,7 +67,7 @@ function PanelShell({ children, footer }: { children: ReactNode; footer?: ReactN
 function PlanMusclePanelSkeleton() {
   return (
     <PanelShell>
-      <MuscleLoadView.Skeleton isSingleView />
+      <MuscleLoadView.Skeleton isPaired />
     </PanelShell>
   );
 }
@@ -43,38 +79,14 @@ interface PlanMusclePanelProps {
   onSelectedChange: (muscle: MuscleId | null) => void;
 }
 
+function toChip(target: MusclePointTarget): MentionChip {
+  return target;
+}
+
 function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange }: PlanMusclePanelProps) {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const focusQuery = useQuery(trpc.focus.get.queryOptions());
-  const focusKey = trpc.focus.get.queryKey();
-
-  const setFocus = useMutation(
-    trpc.focus.set.mutationOptions({
-      onMutate: async (input) => {
-        await queryClient.cancelQueries({ queryKey: focusKey });
-        const previous = queryClient.getQueryData(focusKey);
-        queryClient.setQueryData(focusKey, (old) => [
-          ...(old ?? []).filter((entry) => entry.muscle !== input.muscle),
-          ...(input.bias === 0 ? [] : [input]),
-        ]);
-        return { previous };
-      },
-      onError: (_error, _input, context) => {
-        if (context?.previous !== undefined) queryClient.setQueryData(focusKey, context.previous);
-        toast.error("We couldn't save that focus. Try again.");
-      },
-      // Only the last of several quick taps refetches, so an early response never overwrites a later tap.
-      onSettled: () => {
-        if (queryClient.isMutating({ mutationKey: trpc.focus.set.mutationKey() }) === 1) {
-          queryClient.invalidateQueries({ queryKey: focusKey });
-        }
-      },
-    }),
-  );
-
-  const rebuild = useRebuildPlan({ successMessage: 'Your plan was rebuilt with your muscle focus.' });
   const coach = useCoach();
+  const markedKeys = new Set(coach.mentions.map(mentionKey));
 
   // An enhancement only: without the injuries (still loading or failed) the map simply draws without them.
   const injuriesQuery = useQuery(trpc.profile.listActiveInjuries.queryOptions());
@@ -86,61 +98,31 @@ function PlanMusclePanelRoot({ muscleLoad, exercises, selected, onSelectedChange
     }
   }
 
-  const focus = focusToMap(focusQuery.data ?? []);
-  const canEditFocus = focusQuery.isSuccess;
-
   return (
-    <>
-      <PanelShell
-        footer={
-          <div className="flex flex-col gap-2 border-t bg-muted/60 px-5 py-4 sm:px-6">
-            <AiButton
-              variant="outline"
-              isPending={rebuild.isPending}
-              pendingLabel="Rebuilding..."
-              onClick={rebuild.requestRebuild}
-            >
-              Rebuild today with my focus
-            </AiButton>
-            {focusQuery.isError && (
-              <p role="alert" className="text-sm text-destructive">
-                We couldn&apos;t load your muscle focus, so it can&apos;t be changed right now.
-              </p>
-            )}
-          </div>
-        }
-      >
-        <MuscleLoadView
-          load={muscleLoad}
-          focus={focus}
-          label="Muscles worked in today's plan"
-          includeUntrained
-          isSingleView
-          selected={selected}
-          onSelectedChange={onSelectedChange}
-          injured={injured}
-          emptyNote="Nothing in today's plan can be done right now."
-          detail={(muscle) => (
-            <MuscleDetail
-              muscle={muscle}
-              exercises={exercises}
-              bias={focus[muscle]}
-              onBias={(bias) => setFocus.mutate({ muscle, bias })}
-              isBiasDisabled={!canEditFocus}
-              injury={injured.get(muscle)}
-              onAsk={() =>
-                coach.ask({
-                  mentions: [{ type: 'muscle', muscle }],
-                  message: `Which exercises could I add for my ${muscleLabel(muscle).toLowerCase()}?`,
-                })
-              }
-            />
-          )}
-        />
-      </PanelShell>
-
-      {rebuild.dialog}
-    </>
+    <PanelShell
+      distribution={{
+        isActive: coach.isPointing,
+        isMarked: markedKeys.has('distribution'),
+        onPoint: () => coach.toggleMention({ type: 'distribution' }),
+      }}
+    >
+      <MuscleLoadView
+        load={muscleLoad}
+        label="Muscles worked in today's plan"
+        includeUntrained
+        isPaired
+        selected={selected}
+        onSelectedChange={onSelectedChange}
+        injured={injured}
+        pointing={{
+          isActive: coach.isPointing,
+          isMarked: (target) => markedKeys.has(mentionKey(toChip(target))),
+          onPoint: (target) => coach.toggleMention(toChip(target)),
+        }}
+        emptyNote="Nothing in today's plan can be done right now."
+        detail={(muscle) => <MuscleDetail muscle={muscle} exercises={exercises} injury={injured.get(muscle)} />}
+      />
+    </PanelShell>
   );
 }
 

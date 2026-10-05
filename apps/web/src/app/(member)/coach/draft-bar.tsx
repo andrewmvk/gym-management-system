@@ -10,7 +10,7 @@ export function DraftBar({ api }: { api: CoachDraftApi }) {
   const { openDraft } = api;
   if (!openDraft || api.isPanelOpen) return null;
 
-  const changeCount = countChanges(diffDraft(openDraft.before, openDraft.rows)) + openDraft.focusChanges.length;
+  const changeCount = countChanges(diffDraft(openDraft.before, openDraft.rows));
 
   return (
     <div className="flex items-center justify-between gap-3 border-t bg-accent/60 px-4 py-2 text-accent-foreground">

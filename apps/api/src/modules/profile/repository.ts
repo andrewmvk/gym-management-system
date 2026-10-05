@@ -1,6 +1,6 @@
 import { type DatabaseExecutor, db } from '@api/db/client';
 import { fProfileEvents } from '@api/db/schema';
-import { and, desc, eq, isNotNull, isNull, ne, or } from 'drizzle-orm';
+import { and, desc, eq, isNotNull, isNull, or } from 'drizzle-orm';
 
 const eventColumns = {
   id: fProfileEvents.id,
@@ -12,7 +12,6 @@ const eventColumns = {
   resolvedAt: fProfileEvents.resolvedAt,
 };
 
-// Muscle focus changes are system bookkeeping with their own screen, so they never show as a remembered fact.
 // A pending fact is listed so the member can confirm it; one the member dismissed (resolved without ever
 // being confirmed) is gone.
 export function findRememberedEvents(userId: string, executor: DatabaseExecutor = db) {
@@ -22,7 +21,6 @@ export function findRememberedEvents(userId: string, executor: DatabaseExecutor 
     .where(
       and(
         eq(fProfileEvents.userId, userId),
-        ne(fProfileEvents.eventType, 'muscle_focus_changed'),
         or(isNotNull(fProfileEvents.confirmedAt), isNull(fProfileEvents.resolvedAt)),
       ),
     )

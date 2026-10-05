@@ -1,4 +1,4 @@
-import { dExercises, muscle } from '@api/db/schema/catalog';
+import { dExercises } from '@api/db/schema/catalog';
 import { dUsers } from '@api/db/schema/users';
 import {
   boolean,
@@ -8,8 +8,6 @@ import {
   jsonb,
   pgEnum,
   pgTable,
-  primaryKey,
-  smallint,
   text,
   timestamp,
   unique,
@@ -25,7 +23,6 @@ export const profileEventType = pgEnum('profile_event_type', [
   'life_event',
   'state_update',
   'plan_adjustment_request',
-  'muscle_focus_changed',
   'manual_plan_edit',
 ]);
 
@@ -128,21 +125,3 @@ export const fPlanChanges = pgTable('f_plan_changes', {
 });
 
 export type PlanChange = typeof fPlanChanges.$inferSelect;
-
-// The member's current muscle emphasis (-2 much less to +2 much more). A missing row means normal, so
-// resetting a muscle deletes its row. Each change is also appended to f_profile_events so the history
-// the AI reasons from stays complete.
-export const fMemberMuscleFocus = pgTable(
-  'f_member_muscle_focus',
-  {
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => dUsers.id),
-    muscle: muscle('muscle').notNull(),
-    bias: smallint('bias').notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.muscle] })],
-);
-
-export type MemberMuscleFocusRow = typeof fMemberMuscleFocus.$inferSelect;

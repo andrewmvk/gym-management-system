@@ -183,7 +183,6 @@ export function PlanReviewBody({ planId }: { planId: string }) {
     reviews,
     catalog,
     recentMuscleLoad,
-    muscleFocus,
     blocked,
     risks,
     changes,
@@ -405,9 +404,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
           </Card>
         </div>
       }
-      preview={
-        <PlanMusclePreview planLoad={planLoad} recentLoad={recentMuscleLoad} focus={muscleFocus} injured={injured} />
-      }
+      preview={<PlanMusclePreview planLoad={planLoad} recentLoad={recentMuscleLoad} injured={injured} />}
       history={
         <div className="flex flex-col gap-6">
           {changes.length > 0 && <CoachChanges changes={changes} />}

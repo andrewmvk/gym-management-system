@@ -124,31 +124,11 @@ describe('plans', () => {
     const curl = { id: 'curl', name: 'Curl', muscles: [{ muscle: 'biceps', role: 'primary' }] } as const;
     const exercises = [chestPress, row, squat, curl];
 
-    it('orders groups by muscle focus and adds a set to emphasized muscles', () => {
-      const picked = generatePlaceholderExercises(exercises, [{ muscle: 'quads', bias: 2 }]);
+    it('picks one exercise per lead muscle in registry order, three sets each', () => {
+      const picked = generatePlaceholderExercises(exercises);
 
-      expect(picked[0]).toMatchObject({ exerciseId: 'squat', sets: 4 });
-    });
-
-    it('takes a set off a muscle set to less', () => {
-      const picked = generatePlaceholderExercises(exercises, [{ muscle: 'chest', bias: -1 }]);
-
-      expect(picked.find((entry) => entry.exerciseId === 'chest-press')?.sets).toBe(2);
-    });
-
-    it('leaves out an exercise whose primary muscle is set to much less', () => {
-      const picked = generatePlaceholderExercises(exercises, [{ muscle: 'biceps', bias: -2 }]);
-
-      expect(picked.map((entry) => entry.exerciseId)).not.toContain('curl');
-    });
-
-    it('still builds a plan when every exercise is set to much less', () => {
-      const picked = generatePlaceholderExercises(
-        exercises,
-        exercises.map((exercise) => ({ muscle: exercise.muscles[0].muscle, bias: -2 })),
-      );
-
-      expect(picked.length).toBeGreaterThan(0);
+      expect(picked.map((entry) => entry.exerciseId)).toEqual(['chest-press', 'curl', 'row', 'squat']);
+      expect(picked.every((entry) => entry.sets === 3)).toBe(true);
     });
   });
 

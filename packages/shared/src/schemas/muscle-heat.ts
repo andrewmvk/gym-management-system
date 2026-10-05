@@ -1,4 +1,11 @@
-import { type ExerciseMuscle, MUSCLE_IDS, type MuscleId, ROLE_WEIGHT } from '@shared/schemas/muscles';
+import {
+  type ExerciseMuscle,
+  MUSCLE_GROUPS,
+  MUSCLE_IDS,
+  type MuscleGroupId,
+  type MuscleId,
+  ROLE_WEIGHT,
+} from '@shared/schemas/muscles';
 
 // Raw weighted load per muscle. A muscle with no work is absent, never zero.
 export type MuscleLoad = Partial<Record<MuscleId, number>>;
@@ -38,6 +45,23 @@ export function rankMuscles(load: MuscleLoad): { muscle: MuscleId; load: number 
     const value = load[muscle];
     return value && value > 0 ? [{ muscle, load: value }] : [];
   }).sort((a, b) => b.load - a.load || MUSCLE_IDS.indexOf(a.muscle) - MUSCLE_IDS.indexOf(b.muscle));
+}
+
+export interface GroupLoad {
+  group: MuscleGroupId;
+  load: number;
+  // How many of the group's muscles have any work, out of how many it has.
+  trained: number;
+  total: number;
+}
+
+export function groupMuscleLoad(load: MuscleLoad): GroupLoad[] {
+  return MUSCLE_GROUPS.map((group) => ({
+    group: group.id,
+    load: group.muscles.reduce((sum, muscle) => sum + (load[muscle] ?? 0), 0),
+    trained: group.muscles.filter((muscle) => (load[muscle] ?? 0) > 0).length,
+    total: group.muscles.length,
+  }));
 }
 
 export interface CoverageExercise {
@@ -101,5 +125,3 @@ export function computeEquipmentImpact(exercises: readonly CoverageExercise[]): 
     ),
   }));
 }
-
-export type MemberFocus = Partial<Record<MuscleId, number>>;

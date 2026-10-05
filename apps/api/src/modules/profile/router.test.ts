@@ -26,7 +26,7 @@ async function callerFor(token?: string) {
   return createCallerFactory(appRouter)(ctx);
 }
 
-async function addEvent(userId: string, eventType: 'injury' | 'muscle_focus_changed', description: string, at: Date) {
+async function addEvent(userId: string, eventType: 'injury', description: string, at: Date) {
   const [row] = await db
     .insert(fProfileEvents)
     .values({ userId, eventType, payload: { description }, sourceMessage: 'said in chat', createdAt: at })
@@ -50,17 +50,11 @@ describe('profile router', () => {
     });
   });
 
-  it('lists only the member own facts, newest first, without muscle focus changes', async () => {
+  it('lists only the member own facts, newest first', async () => {
     const member = await createMember();
     const other = await createMember('profile-other@example.com');
     await addEvent(member.id, 'injury', 'older knee pain', new Date('2026-09-01T10:00:00Z'));
     await addEvent(member.id, 'injury', 'newer wrist pain', new Date('2026-09-20T10:00:00Z'));
-    await addEvent(
-      member.id,
-      'muscle_focus_changed',
-      'Muscle focus for Chest changed',
-      new Date('2026-09-25T10:00:00Z'),
-    );
     await addEvent(other.id, 'injury', 'someone else', new Date('2026-09-10T10:00:00Z'));
 
     const rows = await (await callerFor(signSessionToken(member.id))).profile.listMine();

@@ -1,6 +1,6 @@
 'use client';
 
-import type { CoachBlock, CoachDraft, CoachStreamEvent, HistoryTurn } from '@cadence/shared/schemas/coach';
+import type { CoachBlock, CoachDraft, CoachStreamEvent, HistoryTurn, Mention } from '@cadence/shared/schemas/coach';
 import { buildHistory } from '@cadence/shared/schemas/coach-history';
 import { useQueryClient } from '@tanstack/react-query';
 import { useRef, useState } from 'react';
@@ -32,6 +32,14 @@ interface UseCoachChatOptions {
   onProposal: (block: PlanProposalBlock, request: string) => void;
 }
 
+// The coach receives the ids only; the name on an exercise chip is for the screen.
+function toApiMention(chip: MentionChip): Mention {
+  if (chip.type === 'exercise') return { type: 'exercise', exerciseId: chip.exerciseId };
+  if (chip.type === 'muscle') return { type: 'muscle', muscle: chip.muscle };
+  if (chip.type === 'group') return { type: 'group', group: chip.group };
+  return { type: 'distribution' };
+}
+
 const FAILED_MESSAGE = "We couldn't finish that reply. Nothing was changed. Try again.";
 
 // FR-25/FR-26: messages live only in this hook's state, so a reload forgets them. Durability lives in the
@@ -53,11 +61,7 @@ export function useCoachChat({ onProposal }: UseCoachChatOptions) {
       client.chat.send.mutate({
         message: text,
         history,
-        mentions: mentions.map((chip) =>
-          chip.type === 'exercise'
-            ? { type: 'exercise' as const, exerciseId: chip.exerciseId }
-            : { type: 'muscle' as const, muscle: chip.muscle },
-        ),
+        mentions: mentions.map(toApiMention),
         draft,
       }),
     onEvent: (event, input) => {

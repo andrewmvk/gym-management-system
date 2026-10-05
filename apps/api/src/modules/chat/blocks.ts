@@ -11,7 +11,7 @@ import type {
   ProposalRow,
   SafetyWarning,
 } from '@cadence/shared/schemas/coach';
-import { WEIGHT_KG_MAX } from '@cadence/shared/schemas/coach';
+import { MEMORY_NOTE_MAX, WEIGHT_KG_MAX } from '@cadence/shared/schemas/coach';
 import { countChanges, diffDraft, findInjuryConflicts, mergeWarnings } from '@cadence/shared/schemas/coach-draft';
 
 const MAX_PROPOSAL_EXERCISES = 20;
@@ -65,7 +65,7 @@ export async function buildProposalBlock(
 ): Promise<CoachBlock | null> {
   const date = await resolveProposalDate(
     userId,
-    ISO_DATE.test(proposal.date) ? proposal.date : context.planDate,
+    proposal.date && ISO_DATE.test(proposal.date) ? proposal.date : context.planDate,
     context,
   );
   const isPast = date < context.today;
@@ -101,12 +101,6 @@ export async function buildProposalBlock(
     load: exercise.load,
   }));
 
-  const focusChanges = (proposal.focusChanges ?? []).flatMap(({ muscle, bias: rawBias }) => {
-    const bias = clamp(rawBias, -2, 2);
-    const from = context.muscleFocus.find((entry) => entry.muscle === muscle)?.bias ?? 0;
-    return from === bias ? [] : [{ muscle, from, to: bias }];
-  });
-
   const coachWarnings: SafetyWarning[] = (proposal.warnings ?? [])
     .filter((warning) => seen.has(warning.exerciseId))
     .map((warning) => ({ exerciseId: warning.exerciseId, reason: shorten(warning.reason), source: 'coach' }));
@@ -118,16 +112,17 @@ export async function buildProposalBlock(
     coachWarnings,
   );
 
-  if (countChanges(diffDraft(before, after)) === 0 && focusChanges.length === 0) return null;
+  if (countChanges(diffDraft(before, after)) === 0) return null;
+  const summary = shorten(proposal.summary?.trim() || 'Your plan, changed as you asked.');
   return {
     type: 'plan_proposal',
     id: randomUUID(),
     date,
-    summary: shorten(proposal.summary),
+    summary,
     before,
     after,
     warnings,
-    focusChanges,
+    memoryNote: shorten(proposal.memory?.trim() || `Plan for ${date}: ${summary}`, MEMORY_NOTE_MAX),
   };
 }
 

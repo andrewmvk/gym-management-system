@@ -1,20 +1,14 @@
 import { heatStep, type MuscleLoad, peakLoad } from '@cadence/shared/schemas/muscle-heat';
-import { MUSCLE_IDS, type MuscleId } from '@cadence/shared/schemas/muscles';
+import { MUSCLE_IDS } from '@cadence/shared/schemas/muscles';
 import type { MuscleMarks } from '@/components/muscle-map/muscle-map';
 
-export type MuscleFocusMap = Partial<Record<MuscleId, number>>;
-
-export function marksFromLoad(load: MuscleLoad, focus: MuscleFocusMap = {}): MuscleMarks {
+export function marksFromLoad(load: MuscleLoad): MuscleMarks {
   const peak = peakLoad(load);
   const marks: MuscleMarks = {};
   for (const muscle of MUSCLE_IDS) {
-    marks[muscle] = { step: heatStep(load[muscle], peak), bias: focus[muscle] };
+    marks[muscle] = { step: heatStep(load[muscle], peak) };
   }
   return marks;
-}
-
-export function focusToMap(focus: readonly { muscle: MuscleId; bias: number }[]): MuscleFocusMap {
-  return Object.fromEntries(focus.map((entry) => [entry.muscle, entry.bias]));
 }
 
 // Secondary muscles count half, so a load can end in .5.

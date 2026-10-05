@@ -43,7 +43,7 @@ target, not what the code does until `P-31` is done.
 Goal: swap the MVP 2 stubs for the real rules and confirm invalid cases are blocked with a clear
 message (this is literally the course booklet's definition of MVP 3).
 
-- Real OpenRouter integration for plan and chat (FR-15, FR-25-29); an AI technical failure is its own error state and never saves a plan (RN-01). The AI purposes are only `plan` and `chat`. The plan is demand-aware (it receives other members' plans per equipment piece and their muscle load, with safety, injuries, medication, exams and muscle focus always winning), and plan safety is part of generation: completed exercises are kept and a confirmation is asked when ticks exist, and a past plan is history (FR-59, RN-06, RN-16, RN-17).
+- Real OpenRouter integration for plan and chat (FR-15, FR-25-29); an AI technical failure is its own error state and never saves a plan (RN-01). The AI purposes are only `plan` and `chat`. The plan is demand-aware (it receives other members' plans per equipment piece and their muscle load, with safety, injuries, medication, exams and the member's plan requests always winning), and plan safety is part of generation: completed exercises are kept and a confirmation is asked when ticks exist, and a past plan is history (FR-59, RN-06, RN-16, RN-17).
 - Remembered facts the member can see and correct: the Health profile page lists every fact, marks one "no longer true", and the chat shows what it just remembered (FR-58).
 - Real face recognition (face-api.js) at signup and on the kiosk (FR-2, FR-30-32, RN-08); the kiosk never shows a member's name.
 - Check-in + turnstile (FR-33, FR-34, RN-09), with an inactive membership refused at the kiosk (RN-15), and an admin check-in log with turnstile health (FR-61).
@@ -60,7 +60,7 @@ to RN-17) only derive or protect what is already stored.
 
 - Member metrics and membership (FR-36, FR-40): an `inactive` membership locks the member out of login and of the kiosk (RN-15), an admin switches it with a confirmation, and staff get a Member page (FR-60).
 - Gym info page: open or closed, hours and the occupancy estimate (distinct members) for everyone, check-ins per hour for staff; equipment and muscle demand lives on the staff Overview as "Today's demand", counted in plans (FR-37, FR-38, FR-39); an admin edits the opening hours (FR-62).
-- Muscle map: the muscle registry on every exercise, the plan, history, metrics and gym heat maps, the member's muscle focus and the staff coverage view (FR-49 to FR-52).
+- Muscle map: the muscle registry on every exercise, the plan, history, metrics and gym heat maps, a radar of the six muscle groups and the staff coverage view (FR-49 to FR-52). The per-muscle focus of the first version was withdrawn: wishes about muscles are remembered as plan requests.
 - Must-review plans (an exercise that cannot be done flags the plan for the member and for staff), the muscle balance preview on the plan review page, the member Now screen and the staff exceptions Overview (FR-53 to FR-56, RN-14).
 - Admin policy management screen with policy groups (FR-43, FR-47, FR-48, RN-10, RN-13).
 - Irreversible actions ask for confirmation (switching equipment off shows its impact first, deactivating a membership, regenerating a plan with ticks). These and the features above were refined by the 2026-10-04 critique (audit-log item 21), which amended the prompts it affected instead of adding a new one (implemented, except the browser check).

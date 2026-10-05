@@ -8,10 +8,18 @@ export const PROFILE_EVENT_TYPES = [
   'life_event',
   'state_update',
   'plan_adjustment_request',
-  'muscle_focus_changed',
   'manual_plan_edit',
 ] as const;
 export type ProfileEventType = (typeof PROFILE_EVENT_TYPES)[number];
+
+// The facts that steer safety (an injury rules exercises out, a medication changes what is wise) are the only
+// ones the coach asks about before remembering. Everything else it learns is saved at once, visible on the
+// Health profile where the member can mark it no longer true.
+const CONFIRMATION_EVENT_TYPES: readonly ProfileEventType[] = ['injury', 'medication_change'];
+
+export function needsConfirmation(eventType: ProfileEventType): boolean {
+  return CONFIRMATION_EVENT_TYPES.includes(eventType);
+}
 
 // Uniform { description } payload for every event type: docs/05-data-model.md leaves the shape of
 // f_profile_events.payload open. An injury also names the muscles it affects, so the body map can show it.
@@ -25,7 +33,6 @@ export const PROFILE_EVENT_LABELS: Record<ProfileEventType, string> = {
   life_event: 'Life event',
   state_update: 'Update',
   plan_adjustment_request: 'Plan request',
-  muscle_focus_changed: 'Muscle focus',
   manual_plan_edit: 'Manual edit',
 };
 

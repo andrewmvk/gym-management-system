@@ -1,8 +1,9 @@
-import { ExerciseMuscleSchema, FocusBiasSchema, MuscleIdSchema } from '@shared/schemas/muscles';
+import { ExerciseMuscleSchema, MuscleGroupIdSchema, MuscleIdSchema } from '@shared/schemas/muscles';
 import { ProfileEventFactSchema } from '@shared/schemas/profile-events';
 import { z } from 'zod';
 
 export const DRAFT_MAX_EXERCISES = 20;
+export const MEMORY_NOTE_MAX = 300;
 export const COACH_MAX_MENTIONS = 8;
 
 export const WEIGHT_KG_MAX = 1000;
@@ -32,6 +33,9 @@ export type UpdateExerciseInput = z.infer<typeof UpdateExerciseInputSchema>;
 export const MentionSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('exercise'), exerciseId: z.uuid() }),
   z.object({ type: z.literal('muscle'), muscle: MuscleIdSchema }),
+  z.object({ type: z.literal('group'), group: MuscleGroupIdSchema }),
+  // The whole muscle distribution of the plan the member is looking at.
+  z.object({ type: z.literal('distribution') }),
 ]);
 export type Mention = z.infer<typeof MentionSchema>;
 
@@ -39,6 +43,8 @@ export type Mention = z.infer<typeof MentionSchema>;
 export const CoachDraftSchema = z.object({
   date: z.iso.date(),
   exercises: z.array(DraftExerciseSchema).max(DRAFT_MAX_EXERCISES),
+  // What would be remembered if the member applied it now, so a revision can build on it.
+  memoryNote: z.string().max(MEMORY_NOTE_MAX).nullish(),
 });
 export type CoachDraft = z.infer<typeof CoachDraftSchema>;
 
@@ -68,25 +74,51 @@ export type CoachSendInput = z.infer<typeof CoachSendInputSchema>;
 // fill an unused key with null.
 const ReasonSchema = z.string().trim().min(1);
 
+const AiProposalExerciseSchema = z.object({
+  exerciseId: z.string(),
+  // A model sometimes writes a number as text.
+  sets: z.coerce.number(),
+  reps: z.coerce.number(),
+  // Kilograms. A model sometimes writes "20 kg" or "20", so both are read.
+  load: z.union([z.number(), z.string()]).nullish(),
+  notes: z.string().nullish(),
+  completed: z.boolean().nullish(),
+  reason: z.string().nullish(),
+});
+
+const AiProposalWarningSchema = z.object({ exerciseId: z.string(), reason: ReasonSchema });
+
+// Shown to the model so it knows the shape it should write.
 const AiProposalSchema = z.object({
   date: z.string(),
   summary: ReasonSchema,
-  exercises: z.array(
-    z.object({
-      exerciseId: z.string(),
-      sets: z.number(),
-      reps: z.number(),
-      // Kilograms. A model sometimes writes "20 kg" or "20", so both are read.
-      load: z.union([z.number(), z.string()]).nullish(),
-      notes: z.string().nullish(),
-      completed: z.boolean().nullish(),
-      reason: z.string().nullish(),
-    }),
-  ),
-  warnings: z.array(z.object({ exerciseId: z.string(), reason: ReasonSchema })).nullish(),
-  focusChanges: z.array(z.object({ muscle: MuscleIdSchema, bias: z.number() })).nullish(),
+  // What is remembered about this plan once the member applies it: what they asked and any detail that matters.
+  memory: z.string().nullish(),
+  exercises: z.array(AiProposalExerciseSchema),
+  warnings: z.array(AiProposalWarningSchema).nullish(),
 });
-export type AiProposal = z.infer<typeof AiProposalSchema>;
+
+// Each item is judged on its own: an exercise or a warning that does not fit is left out, and a missing date or
+// summary falls back to the plan being discussed, so one slip never turns a whole proposal into a silent nothing.
+function leniently<T extends z.ZodType>(item: T) {
+  return (value: unknown[]) =>
+    value.flatMap((entry) => {
+      const parsed = item.safeParse(entry);
+      return parsed.success ? [parsed.data as z.output<T>] : [];
+    });
+}
+
+const AiProposalReadSchema = z.object({
+  date: z.string().nullish(),
+  summary: z.string().nullish(),
+  memory: z.string().nullish(),
+  exercises: z.array(z.unknown()).transform(leniently(AiProposalExerciseSchema)),
+  warnings: z
+    .array(z.unknown())
+    .nullish()
+    .transform((value) => leniently(AiProposalWarningSchema)(value ?? [])),
+});
+export type AiProposal = z.output<typeof AiProposalReadSchema>;
 
 const AiPickerSchema = z.object({
   muscle: MuscleIdSchema,
@@ -145,7 +177,7 @@ export const CoachAiEnvelopeSchema = z.object({
 export type CoachAiEnvelope = z.infer<typeof CoachAiEnvelopeSchema>;
 
 export const AI_RESPONSE_PARTS = {
-  planProposal: AiProposalSchema,
+  planProposal: AiProposalReadSchema,
   exercisePicker: AiPickerSchema,
   exerciseExplainer: AiExplainerSchema,
   safetyWarning: AiSafetySchema,
@@ -191,9 +223,6 @@ export const PickerOptionSchema = ExerciseRefSchema.extend({
 });
 export type PickerOption = z.infer<typeof PickerOptionSchema>;
 
-export const FocusChangeSchema = z.object({ muscle: MuscleIdSchema, from: FocusBiasSchema, to: FocusBiasSchema });
-export type FocusChange = z.infer<typeof FocusChangeSchema>;
-
 export const PendingFactSchema = z.object({
   id: z.uuid(),
   eventType: z.string(),
@@ -212,7 +241,8 @@ export const CoachBlockSchema = z.discriminatedUnion('type', [
     before: z.array(BeforeRowSchema),
     after: z.array(ProposalRowSchema),
     warnings: z.array(SafetyWarningSchema),
-    focusChanges: z.array(FocusChangeSchema),
+    // Saved to the member's history when they apply the proposal.
+    memoryNote: z.string(),
   }),
   z.object({
     type: z.literal('exercise_picker'),
@@ -248,11 +278,9 @@ export type CoachStreamEvent = { type: 'text'; delta: string } | { type: 'block'
 export const CoachApplyInputSchema = z.object({
   date: z.iso.date(),
   request: z.string().trim().max(2000).default(''),
+  // The short line remembered about this plan; the server writes its own when it is empty.
+  memoryNote: z.string().trim().max(MEMORY_NOTE_MAX).default(''),
   exercises: z.array(DraftExerciseSchema).min(1).max(DRAFT_MAX_EXERCISES),
-  focusChanges: z
-    .array(z.object({ muscle: MuscleIdSchema, bias: FocusBiasSchema }))
-    .max(22)
-    .default([]),
   acknowledgedWarnings: z
     .array(z.object({ exerciseId: z.uuid(), reason: z.string().max(280) }))
     .max(DRAFT_MAX_EXERCISES)

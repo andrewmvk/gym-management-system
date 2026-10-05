@@ -16,7 +16,6 @@ import { SEED_ADMIN_EMAIL, SEED_TRAINER_EMAIL, seedBase } from '@api/db/seed';
 import { todayLocal } from '@api/lib/dates';
 import { logger } from '@api/lib/logger';
 import { signSessionToken } from '@api/modules/auth/session';
-import { setFocus } from '@api/modules/focus/service';
 import { generateForDate } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
@@ -239,11 +238,6 @@ describe('reviews router', () => {
           createdAt: new Date('2026-09-10T10:00:00Z'),
           resolvedAt: new Date('2026-09-12T10:00:00Z'),
         },
-        {
-          userId: member.id,
-          eventType: 'muscle_focus_changed',
-          payload: { description: 'Muscle focus for Chest changed' },
-        },
       ]);
       const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
 
@@ -273,7 +267,7 @@ describe('reviews router', () => {
       expect(JSON.stringify(memberContext)).not.toMatch(/embedding|photo/i);
     });
 
-    it('adds the muscle work the member completed in the 14 days before the plan, and their focus', async () => {
+    it('adds the muscle work the member completed in the 14 days before the plan', async () => {
       const { member, plan } = await createMemberWithPlan();
       const [bench] = await db.select().from(dExercises).where(eq(dExercises.name, 'Barbell Bench Press'));
       const addPlan = async (planDate: string, completed: boolean) => {
@@ -288,13 +282,11 @@ describe('reviews router', () => {
       await addPlan('2026-09-28', true);
       await addPlan('2026-09-29', false);
       await addPlan('2026-09-10', true);
-      await setFocus(member.id, { muscle: 'glutes', bias: 2 });
       const caller = await callerFor(signSessionToken(await seededId(SEED_TRAINER_EMAIL)));
 
       const result = await caller.reviews.getPlan({ planId: plan.id });
 
       expect(result.recentMuscleLoad).toEqual({ chest: 3, triceps: 1.5, 'front-deltoid': 1.5 });
-      expect(result.muscleFocus).toEqual([{ muscle: 'glutes', bias: 2 }]);
     });
   });
 

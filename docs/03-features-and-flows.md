@@ -129,10 +129,12 @@ Notes:
 ```
 0. Member logs in and lands on the Now screen (flow 10); the full plan, its
    muscle map and its history live on the plan page below.
-1. Member opens the plan page. A day strip at the top shows the current
-   week, Monday to Sunday, one quiet tile per day with what the day holds
-   (a segment per exercise, filled when done, a check when the whole plan
-   is done, dashed for a day ahead), and today is chosen. Below it is the
+1. Member opens the plan page. A day strip beside the page heading shows
+   the week of the chosen day, Monday to Sunday, as a circle per day under
+   a fixed row of weekday names; each circle's border is that day's plan
+   (an arc per exercise, filled when done, empty for a day ahead, none for
+   a day with no plan), and today is chosen. A month button on the strip
+   opens a popover with every day of the month. Below it is the
    plan of the chosen day (exercises from the curated library:
    sets/reps/equipment), whose header shows the day's completion, and the
    member can mark today's exercises as completed. An exercise

@@ -30,18 +30,23 @@ interface PlanShellProps {
   title: ReactNode;
   tally: ReactNode;
   aside?: ReactNode;
+  progress?: ReactNode;
   children: ReactNode;
 }
 
-function PlanShell({ title, tally, aside, children }: PlanShellProps) {
+// The sleeve stripes run the full height of the ink head, so the progress under the title sits on top of them.
+function PlanShell({ title, tally, aside, progress, children }: PlanShellProps) {
   return (
     <section className="overflow-hidden rounded-lg border bg-card">
-      <div className="kit-corner flex items-end justify-between gap-4 bg-kit pt-4 pr-20 pb-3 pl-5 text-kit-foreground sm:pl-6">
-        <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-display text-sm font-semibold tracking-widest text-kit-muted uppercase">{title}</h2>
-          {tally}
+      <div className="kit-corner bg-kit pt-4 pl-5 text-kit-foreground sm:pl-6">
+        <div className="flex items-end justify-between gap-4 pr-20 pb-3">
+          <div className="flex min-w-0 flex-col gap-1">
+            <h2 className="font-display text-sm font-semibold tracking-widest text-kit-muted uppercase">{title}</h2>
+            {tally}
+          </div>
+          {aside && <div className="flex shrink-0 flex-col items-end gap-2 pb-1 text-right">{aside}</div>}
         </div>
-        {aside && <div className="flex shrink-0 flex-col items-end gap-2 pb-1 text-right">{aside}</div>}
+        {progress && <div className="pr-5 pb-4 sm:pr-6">{progress}</div>}
       </div>
       {children}
     </section>
@@ -51,18 +56,14 @@ function PlanShell({ title, tally, aside, children }: PlanShellProps) {
 // Filled for what is done; dashed outlines for a day that has not come, so a plan ahead never reads as undone.
 function ProgressSegments({ states, isPlanned }: { states: boolean[]; isPlanned: boolean }) {
   return (
-    <div
-      className="grid gap-1 border-b px-5 py-3 sm:px-6"
-      style={{ gridTemplateColumns: `repeat(${states.length}, minmax(0, 1fr))` }}
-      aria-hidden
-    >
+    <div className="grid gap-1" style={{ gridTemplateColumns: `repeat(${states.length}, minmax(0, 1fr))` }} aria-hidden>
       {states.map((isDone, index) => (
         <span
           // biome-ignore lint/suspicious/noArrayIndexKey: one fixed segment per exercise slot, never reordered.
           key={index}
           className={cn(
             'h-2 -skew-x-12 rounded-xs transition-colors duration-500',
-            isPlanned ? 'border border-dashed border-foreground/40' : isDone ? 'bg-primary' : 'bg-muted',
+            isPlanned ? 'border border-dashed border-kit-foreground/50' : isDone ? 'bg-kit-foreground' : 'bg-card',
           )}
         />
       ))}
@@ -76,10 +77,8 @@ function DayPlanSkeleton({ date, todayIso }: { date?: string; todayIso?: string 
     <PlanShell
       title={date && todayIso ? describeDay(date, todayIso) : <Skeleton className="h-5 w-48 bg-white/12" />}
       tally={<Skeleton className="h-12 w-24 bg-white/12" />}
+      progress={<Skeleton className="h-2 w-full bg-white/12" />}
     >
-      <div className="border-b px-5 py-3 sm:px-6">
-        <Skeleton className="h-2 w-full" />
-      </div>
       <PlanMusclePanel.Skeleton />
       {Array.from({ length: 4 }, (_, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
@@ -233,6 +232,7 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
           </p>
         )
       }
+      progress={plan.exercises.length > 0 && <ProgressSegments states={doneStates} isPlanned={isFuture} />}
       aside={
         <>
           {plan.status === 'trainer_edited' ? (
@@ -246,7 +246,6 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
     >
       {plan.needsReview && <NeedsReviewNotice exercises={plan.exercises} canRebuild={isToday} className="border-b" />}
       <TrainerNotes notes={plan.trainerNotes} className="border-b px-5 py-4 sm:px-6" />
-      {plan.exercises.length > 0 && <ProgressSegments states={doneStates} isPlanned={isFuture} />}
       <PlanMusclePanel
         date={date}
         todayIso={todayIso}

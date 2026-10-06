@@ -1,4 +1,4 @@
-import { addDays, toIsoDate } from '@/lib/calendar-date';
+import { addDays, startOfMonth, toIsoDate } from '@/lib/calendar-date';
 
 export interface WeekDay {
   iso: string;
@@ -12,4 +12,14 @@ export function currentWeek(now: Date = new Date()): WeekDay[] {
     const date = addDays(monday, index);
     return { iso: toIsoDate(date), date };
   });
+}
+
+// Every Monday-to-Sunday row that touches the month of `now`, so the first and last rows are whole weeks.
+export function monthWeeks(now: Date = new Date()): WeekDay[][] {
+  const lastSunday = currentWeek(new Date(now.getFullYear(), now.getMonth() + 1, 0))[6]!.date;
+  const weeks: WeekDay[][] = [];
+  for (let monday = currentWeek(startOfMonth(now))[0]!.date; monday <= lastSunday; monday = addDays(monday, 7)) {
+    weeks.push(currentWeek(monday));
+  }
+  return weeks;
 }

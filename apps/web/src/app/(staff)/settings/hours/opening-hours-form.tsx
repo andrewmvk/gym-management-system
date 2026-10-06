@@ -17,9 +17,9 @@ import { useAppAbility } from '@/abilities';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
+import { TimePicker } from '@/components/time-picker';
 import { Button } from '@/components/ui/button';
 import { FieldError } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { serverMessage } from '@/lib/error-message';
@@ -159,12 +159,12 @@ function OpeningHoursFormRoot() {
                             name={`${day}.open`}
                             control={form.control}
                             render={({ field: openField }) => (
-                              <Input
-                                {...openField}
-                                type="time"
+                              <TimePicker
+                                value={openField.value}
+                                onChange={openField.onChange}
+                                onBlur={openField.onBlur}
                                 aria-label={`${DAY_LABELS[day]} opens`}
                                 aria-invalid={Boolean(dayErrors?.open)}
-                                className="numerals w-32 text-lg"
                               />
                             )}
                           />
@@ -173,12 +173,12 @@ function OpeningHoursFormRoot() {
                             name={`${day}.close`}
                             control={form.control}
                             render={({ field: closeField }) => (
-                              <Input
-                                {...closeField}
-                                type="time"
+                              <TimePicker
+                                value={closeField.value}
+                                onChange={closeField.onChange}
+                                onBlur={closeField.onBlur}
                                 aria-label={`${DAY_LABELS[day]} closes`}
                                 aria-invalid={Boolean(dayErrors?.close)}
-                                className="numerals w-32 text-lg"
                               />
                             )}
                           />

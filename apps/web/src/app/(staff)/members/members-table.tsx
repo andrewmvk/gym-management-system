@@ -3,11 +3,11 @@
 import { useQuery } from '@tanstack/react-query';
 import { LockIcon, SearchXIcon, UsersIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import { useAppAbility } from '@/abilities';
 import { MembershipControl } from '@/app/(staff)/members/membership-control';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
 import { SearchInput } from '@/components/search-input';
@@ -35,41 +35,37 @@ function MembersHead() {
   );
 }
 
-function Toolbar({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      {children}
-    </div>
-  );
-}
-
 function MembersTableSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <Toolbar>
-        <Skeleton className="h-10 w-full sm:w-72" />
-        <Skeleton className="h-10 w-full sm:w-80" />
-      </Toolbar>
-      <Table>
-        <MembersHead />
-        <TableBody>
-          {Array.from({ length: 6 }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
-            <TableRow key={index}>
-              <TableCell>
-                <Skeleton className="h-5 w-36" />
-                <Skeleton className="mt-1 h-4 w-48" />
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <Skeleton className="h-5 w-20" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-6 w-28" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="flex flex-col gap-4">
+      <FilterBar>
+        <Skeleton className="h-10 w-full lg:w-72" />
+        <FilterBar.Trailing>
+          <Skeleton className="h-10.5 w-full lg:w-80" />
+        </FilterBar.Trailing>
+      </FilterBar>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <Table>
+          <MembersHead />
+          <TableBody>
+            {Array.from({ length: 6 }, (_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
+              <TableRow key={index}>
+                <TableCell>
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="mt-1 h-4 w-48" />
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <Skeleton className="h-5 w-20" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-6 w-28" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -138,17 +134,17 @@ function MembersTableRoot() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Toolbar>
-          <SearchInput
-            value={search}
-            onChange={(value) => {
-              setSearch(value);
-              pagination.setPage(1);
-            }}
-            placeholder="Search by name or email"
-            className="sm:w-72"
-          />
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            pagination.setPage(1);
+          }}
+          placeholder="Search by name or email"
+          className="w-full lg:w-72"
+        />
+        <FilterBar.Trailing>
           <SegmentedFilter
             label="Filter by membership"
             value={status}
@@ -161,11 +157,16 @@ function MembersTableRoot() {
               { value: 'active', label: 'Active', count: countOf('active') },
               { value: 'inactive', label: 'Inactive', count: countOf('inactive') },
             ]}
+            className="w-full lg:w-auto"
           />
-        </Toolbar>
-        {filtered.length === 0 ? (
+        </FilterBar.Trailing>
+      </FilterBar>
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border bg-card">
           <EmptyState icon={SearchXIcon} title="No matches" description="Try another name, email or status." />
-        ) : (
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border bg-card">
           <Table>
             <MembersHead />
             <TableBody>
@@ -188,8 +189,8 @@ function MembersTableRoot() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
+        </div>
+      )}
       <Pagination
         page={pagination.page}
         pageCount={pagination.pageCount}

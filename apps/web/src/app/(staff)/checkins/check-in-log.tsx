@@ -2,10 +2,10 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { DoorOpenIcon, LockIcon, SearchXIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
 import { useAppAbility } from '@/abilities';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
 import { SegmentedFilter } from '@/components/segmented-filter';
@@ -45,38 +45,36 @@ function CheckInHead() {
   );
 }
 
-function Toolbar({ children }: { children: ReactNode }) {
-  return <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:px-6">{children}</div>;
-}
-
 function CheckInLogSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <Toolbar>
-        <Skeleton className="h-10 w-full sm:w-72" />
-      </Toolbar>
-      <Table>
-        <CheckInHead />
-        <TableBody>
-          {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
-            <TableRow key={index}>
-              <TableCell>
-                <Skeleton className="h-5 w-36" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-5 w-28" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-6 w-28" />
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <Skeleton className="h-5 w-48" />
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="flex flex-col gap-4">
+      <FilterBar>
+        <Skeleton className="h-10.5 w-full lg:w-72" />
+      </FilterBar>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <Table>
+          <CheckInHead />
+          <TableBody>
+            {Array.from({ length: SKELETON_ROWS }, (_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
+              <TableRow key={index}>
+                <TableCell>
+                  <Skeleton className="h-5 w-36" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-5 w-28" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-6 w-28" />
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <Skeleton className="h-5 w-48" />
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -141,28 +139,31 @@ function CheckInLogRoot() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Toolbar>
-          <SegmentedFilter
-            label="Filter by turnstile result"
-            value={result}
-            onChange={(value) => {
-              setResult(value);
-              pagination.setPage(1);
-            }}
-            options={[
-              { value: 'all', label: 'All', count: checkIns.length },
-              { value: 'failed', label: 'Did not open', count: failedCount },
-            ]}
-          />
-        </Toolbar>
-        {filtered.length === 0 ? (
+      <FilterBar>
+        <SegmentedFilter
+          label="Filter by turnstile result"
+          value={result}
+          onChange={(value) => {
+            setResult(value);
+            pagination.setPage(1);
+          }}
+          options={[
+            { value: 'all', label: 'All', count: checkIns.length },
+            { value: 'failed', label: 'Did not open', count: failedCount },
+          ]}
+          className="w-full lg:w-auto"
+        />
+      </FilterBar>
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border bg-card">
           <EmptyState
             icon={SearchXIcon}
             title="Every recent check-in opened the turnstile"
             description="Check-ins where the turnstile did not open would be listed here."
           />
-        ) : (
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border bg-card">
           <Table>
             <CheckInHead />
             <TableBody>
@@ -191,8 +192,8 @@ function CheckInLogRoot() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
+        </div>
+      )}
       <Pagination
         page={pagination.page}
         pageCount={pagination.pageCount}

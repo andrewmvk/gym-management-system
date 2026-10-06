@@ -3,7 +3,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, ClipboardListIcon, SearchXIcon } from 'lucide-react';
 import Link from 'next/link';
-import type { ReactNode } from 'react';
 import {
   filterQueue,
   matchesStatus,
@@ -20,6 +19,7 @@ import {
 } from '@/app/(staff)/reviews/queue-filter';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { Pagination } from '@/components/pagination';
 import { PlanStatusBadge } from '@/components/plan-status-badge';
 import { QueryError } from '@/components/query-error';
@@ -58,48 +58,42 @@ function QueueHead() {
   );
 }
 
-function Toolbar({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex flex-col gap-3 border-b px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-      {children}
-    </div>
-  );
-}
-
 function ReviewsQueueSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <Toolbar>
-        <Skeleton className="h-10 w-full sm:w-72" />
-        <div className="flex flex-col gap-3 lg:flex-row">
-          <Skeleton className="h-10 w-full sm:w-72" />
-          <Skeleton className="h-10 w-full sm:w-96" />
-        </div>
-      </Toolbar>
-      <Table>
-        <QueueHead />
-        <TableBody>
-          {Array.from({ length: 6 }, (_, index) => (
-            // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
-            <TableRow key={index}>
-              <TableCell>
-                <Skeleton className="h-5 w-36" />
-                <Skeleton className="mt-1 h-4 w-20 sm:hidden" />
-              </TableCell>
-              <TableCell className="hidden sm:table-cell">
-                <Skeleton className="h-5 w-24" />
-              </TableCell>
-              <TableCell>
-                <Skeleton className="h-6 w-28" />
-              </TableCell>
-              <TableCell className="hidden lg:table-cell">
-                <Skeleton className="h-5 w-56" />
-              </TableCell>
-              <TableCell />
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="flex flex-col gap-4">
+      <FilterBar>
+        <Skeleton className="h-10 w-full lg:w-72" />
+        <FilterBar.Trailing>
+          <Skeleton className="h-10.5 w-full lg:w-72" />
+          <Skeleton className="h-10.5 w-full lg:w-96" />
+        </FilterBar.Trailing>
+      </FilterBar>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <Table>
+          <QueueHead />
+          <TableBody>
+            {Array.from({ length: 6 }, (_, index) => (
+              // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
+              <TableRow key={index}>
+                <TableCell>
+                  <Skeleton className="h-5 w-36" />
+                  <Skeleton className="mt-1 h-4 w-20 sm:hidden" />
+                </TableCell>
+                <TableCell className="hidden sm:table-cell">
+                  <Skeleton className="h-5 w-24" />
+                </TableCell>
+                <TableCell>
+                  <Skeleton className="h-6 w-28" />
+                </TableCell>
+                <TableCell className="hidden lg:table-cell">
+                  <Skeleton className="h-5 w-56" />
+                </TableCell>
+                <TableCell />
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -155,44 +149,46 @@ function ReviewsQueueRoot() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="overflow-hidden rounded-lg border bg-card">
-        <Toolbar>
-          <SearchInput
-            value={search}
+      <FilterBar>
+        <SearchInput
+          value={search}
+          onChange={(value) => {
+            setSearch(value);
+            pagination.setPage(1);
+          }}
+          placeholder="Search by member"
+          className="w-full lg:w-72"
+        />
+        <FilterBar.Trailing>
+          <SegmentedFilter
+            label="Filter by plan date"
+            value={when}
             onChange={(value) => {
-              setSearch(value);
+              setWhenParam(value);
               pagination.setPage(1);
             }}
-            placeholder="Search by member"
-            className="sm:w-72"
+            options={WHEN_FILTERS.map((value) => ({ value, label: WHEN_LABELS[value] }))}
+            className="w-full lg:w-auto"
           />
-          <div className="flex flex-col gap-3 lg:flex-row">
-            <SegmentedFilter
-              label="Filter by plan date"
-              value={when}
-              onChange={(value) => {
-                setWhenParam(value);
-                pagination.setPage(1);
-              }}
-              options={WHEN_FILTERS.map((value) => ({ value, label: WHEN_LABELS[value] }))}
-            />
-            <SegmentedFilter
-              label="Filter by status"
-              value={status}
-              onChange={(value) => {
-                setStatus(value);
-                pagination.setPage(1);
-              }}
-              options={[
-                { value: 'all', label: 'All', count: countOf('all') },
-                { value: 'must_review', label: 'Must review', count: countOf('must_review') },
-                { value: 'ai_published', label: 'AI', count: countOf('ai_published') },
-                { value: 'trainer_edited', label: 'Trainer', count: countOf('trainer_edited') },
-              ]}
-            />
-          </div>
-        </Toolbar>
-        {filtered.length === 0 ? (
+          <SegmentedFilter
+            label="Filter by status"
+            value={status}
+            onChange={(value) => {
+              setStatus(value);
+              pagination.setPage(1);
+            }}
+            options={[
+              { value: 'all', label: 'All', count: countOf('all') },
+              { value: 'must_review', label: 'Must review', count: countOf('must_review') },
+              { value: 'ai_published', label: 'AI', count: countOf('ai_published') },
+              { value: 'trainer_edited', label: 'Trainer', count: countOf('trainer_edited') },
+            ]}
+            className="w-full lg:w-auto"
+          />
+        </FilterBar.Trailing>
+      </FilterBar>
+      {filtered.length === 0 ? (
+        <div className="rounded-lg border bg-card">
           <EmptyState
             icon={SearchXIcon}
             title="No matches"
@@ -206,7 +202,9 @@ function ReviewsQueueRoot() {
                     : `No plan${scopeSuffix} is in the queue for this status.`
             }
           />
-        ) : (
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-lg border bg-card">
           <Table>
             <QueueHead />
             <TableBody>
@@ -245,8 +243,8 @@ function ReviewsQueueRoot() {
               ))}
             </TableBody>
           </Table>
-        )}
-      </div>
+        </div>
+      )}
       <Pagination
         page={pagination.page}
         pageCount={pagination.pageCount}

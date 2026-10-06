@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { useAppAbility } from '@/abilities';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { MuscleSelector } from '@/components/muscle-map/muscle-selector';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
@@ -217,11 +218,13 @@ function CreateExerciseForm() {
 
 function ExerciseSectionSkeleton() {
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="border-b px-5 py-4 sm:px-6">
-        <Skeleton className="h-10 w-full sm:w-72" />
+    <div className="flex flex-col gap-4">
+      <FilterBar>
+        <Skeleton className="h-10 w-full lg:w-80" />
+      </FilterBar>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <ExerciseTableSkeleton />
       </div>
-      <ExerciseTableSkeleton />
     </div>
   );
 }
@@ -270,21 +273,23 @@ function ExerciseSectionRoot() {
   } else {
     list = (
       <div className="flex flex-col gap-4">
-        <div className="overflow-hidden rounded-lg border bg-card">
-          <div className="border-b px-5 py-4 sm:px-6">
-            <SearchInput
-              value={search}
-              onChange={(value) => {
-                setSearch(value);
-                pagination.setPage(1);
-              }}
-              placeholder="Search exercises or muscles"
-              className="sm:w-80"
-            />
-          </div>
-          {filtered.length === 0 ? (
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              pagination.setPage(1);
+            }}
+            placeholder="Search exercises or muscles"
+            className="w-full lg:w-80"
+          />
+        </FilterBar>
+        {filtered.length === 0 ? (
+          <div className="rounded-lg border bg-card">
             <EmptyState icon={SearchXIcon} title="No matches" description="Try another name or muscle." />
-          ) : (
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border bg-card">
             <Table>
               <ExerciseTableHead />
               <TableBody>
@@ -304,8 +309,8 @@ function ExerciseSectionRoot() {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </div>
+          </div>
+        )}
         <Pagination
           page={pagination.page}
           pageCount={pagination.pageCount}

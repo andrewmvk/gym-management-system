@@ -237,7 +237,7 @@ Sign-in and sign-up have no app header: a single centered card (max width 32rem)
 
 The header is 64px tall and sticky. With `scrollbar-gutter: stable`, the root background paints the ink band into the gutter so the header always reads full width.
 
-Tables scroll horizontally inside their card rather than breaking the page; low-priority columns hide below sm or lg.
+Tables scroll horizontally inside their card rather than breaking the page; low-priority columns hide below sm or lg. Search and filters for a list live above its card in the Filter Bar, not inside the card.
 
 ## Elevation & Depth
 
@@ -320,8 +320,12 @@ The wall-mounted check-in screen is the one surface with its own layout, because
 - **Date picker:** an input-styled trigger with a calendar icon opening a 288px month grid (40px day cells, numerals, today underlined in cobalt, selection filled cobalt), month/year selects for birthdates, Today/Clear in the footer.
 - **Date range picker:** the same input-styled trigger, showing the preset name when the range matches one (otherwise just the dates). It opens a popover with a column of presets (Today, Last 7 days, Last 30 days, This month, Last 3 months, Last 6 months, This year, Last 12 months; a scrollable row above the grid on phones) next to the same month grid. A preset applies and closes at once; on the grid the first click sets the start, the second completes the range, and the days between are tinted. Both ends are filled cobalt like a single selection.
 - **File dropzone:** a 2px dashed field that tints Cobalt Wash on hover and drag.
-- **Time input:** the opening-hours times are native time inputs in numerals, a "to" between open and close.
+- **Select:** an input-styled trigger (the same border, hover, 25% cobalt focus ring) with a chevron that turns over while open, and the border and ring stay cobalt for as long as the menu is open. The menu opens below the trigger, never over it, at least as wide as the trigger, in a Popover-shadow panel with 4px padding. Rows are at least 36px tall; the row under the pointer or keyboard is Bench Gray, the selected row is Cobalt Wash with a cobalt check on the right.
+- **Time picker:** the opening-hours times. An input-styled trigger with a clock icon and the time in numerals. Opening it floats an hours and a minutes wheel (minutes in steps of 5) over the trigger with no card or popover, on a flat Chalk wash at 90% that hides the page behind it, with no blur. Both columns loop, so 23 is followed by 00 and 55 by 00. The centre number is large and Kit Cobalt; the ones above and below shrink and fade out to nothing. The wheel moves with the mouse wheel, a drag or touch, a click on a number and the arrow keys (up and down move, left and right switch column). Clicking outside, Enter, Space or Tab confirms; Escape cancels. With reduced motion the numbers jump instead of easing.
 - **Searchable exercise picker:** the catalog is too long for a plain select, so the staff plan editor adds an exercise from an input-styled trigger ("Add an exercise from the catalog") that opens a popover with a search field above a scrollable list (max 16rem tall). The list filters as the trainer types, and an exercise that is out of service stays pickable but muted, with its "Out of service" badge.
+
+### Filter Bar
+Every page that is a filterable list (Members, Check-ins, Reviews, the catalog's Exercises, Policies' Users) puts its controls in one free row above the list, never inside the list's card. Below lg the controls stack at full width; from lg they sit in one row with 12px gaps: the search field (288px) first, then any selects, and the segmented filters pushed to the right edge as a trailing group. A page with a single filter and no search keeps it at the left. Below the row comes the list in its own bordered card (a table or a divided list), and the pagination under that, 16px apart. A search or filter with no match shows its empty state in the same bordered card, so the row never moves. The skeleton is the same stack: the row's blocks (a segmented filter is 42px tall, a field 40px), then the list card. The row is the shared `FilterBar` component, with `FilterBar.Trailing` for the right-hand group.
 
 ### Navigation
 - **Header:** a 64px sticky Locker Ink bar with the brand on the left, then nav links in Control typography at 1rem. Inactive links are Locker Ink Muted; the active one is full white with a 3px Pace Tape underline that grows from the left. Theme menu and user menu sit on the right. The user menu carries the membership badge ("Plan · Active", or "Plan · Inactive" in the neutral Secondary form, never struck). The member header lists Home, My plan, Metrics, Gym info and Health profile.
@@ -426,7 +430,7 @@ The admin's table of recent check-ins, in a card with a segmented filter ("All" 
 A Switch beside the membership badge, on each Members row and on the member page, for anyone allowed to change memberships; everyone else sees only the badge. Activating is one click and a toast confirms it. Deactivating opens a confirmation first because it signs the member out: "Deactivate <name>?", saying the member cannot log in until staff reactivate and that plans and history stay, with a destructive "Deactivate" button.
 
 ### Opening-Hours Form
-A card list, Monday to Sunday, one row per day: the day in Title type, a "Closed" switch and, when open, two time inputs in numerals with "to" between. A closed day reads "Closed all day". Errors (a close before the open) sit under the row. A "Save opening hours" button stays disabled until something changes, and a line beside it says the times use the gym's local clock and that the public gym page follows them.
+A card list, Monday to Sunday, one row per day: the day in Title type, a "Closed" switch and, when open, two time pickers (see Inputs / Fields) in numerals with "to" between. A closed day reads "Closed all day". Errors (a close before the open) sit under the row. A "Save opening hours" button stays disabled until something changes, and a line beside it says the times use the gym's local clock and that the public gym page follows them.
 
 ### Loading
 Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they replace. They wait 200ms before appearing, so fast loads never flash. When a parameter changes (a history date), the previous result stays until the new one arrives or 200ms pass.
@@ -447,6 +451,7 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 - **Do** explain a label with the shared HelpTip rather than a one-off tooltip.
 - **Do** show AI work with the Coach Mark and a label that says what is happening, and let the result arrive in parts (the reply, then each block; each exercise of a plan) instead of behind one wait.
 - **Do** keep coach controls out of the rows: a row is selected, then one bar offers the action.
+- **Do** put a list's search and filters in the Filter Bar above its card, and use the Time picker for times of day.
 
 ### Don't:
 - **Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.

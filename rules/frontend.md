@@ -28,6 +28,8 @@ While data loads, render the shadcn/ui `Skeleton` in place of the content it sta
 
 `react-hook-form` + `zodResolver`, using shadcn/ui's `Field` components (`Field`, `FieldLabel`, `FieldError`, `FieldGroup`) with react-hook-form's `Controller`; shadcn/ui no longer ships a `Form` component. Wherever a form's shape mirrors a tRPC procedure's input, import that zod schema from `packages/shared` rather than redefining it - client and server validation must never drift apart.
 
+Validate on submit: the default `react-hook-form` mode, never `onTouched` or `onBlur`, so a field that was only clicked into and left shows no error. After a failed submit the fields re-check as they change. Put an error under its field's label, and give a group with no input of its own (the muscle map) a `tabIndex={-1}` wrapper that `handleSubmit`'s second argument focuses. A choice of several is `MultiSelect` (`components/multi-select.tsx`), not a list of checkboxes; a popover opened from inside a `Sheet` or dialog takes `modal`, or the Sheet's focus trap closes it and its scroll lock stops it scrolling. A form that is a task of its own opens as a right-hand `Sheet` and is rendered once by its section (see "Form Sheet" in `DESIGN.md`), so a draft survives the list behind it loading.
+
 ## Client state
 
 There is no global client store (Zustand, Redux, Context-for-server-data, etc.) by default. Before adding one, confirm the state genuinely isn't server state and doesn't fit in local component state or the URL (search params, see "Filters and tabs" above) - most of this app's state is "a plan," "a profile," "a catalog," which React Query already owns.

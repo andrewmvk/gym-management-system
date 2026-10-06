@@ -16,7 +16,7 @@ export function SegmentedFilter<T extends string>({
   className,
 }: SegmentedFilterProps<T>) {
   return (
-    <div role="radiogroup" aria-label={label} className={cn('inline-flex rounded-md border bg-muted p-0.5', className)}>
+    <div role="radiogroup" aria-label={label} className={cn('inline-flex rounded-md border bg-muted', className)}>
       {options.map((option) => {
         const isActive = option.value === value;
         return (
@@ -27,7 +27,7 @@ export function SegmentedFilter<T extends string>({
             aria-checked={isActive}
             onClick={() => onChange(option.value)}
             className={cn(
-              'inline-flex h-9 flex-1 items-center justify-center gap-1.5 rounded-sm px-3 font-display text-sm font-semibold tracking-wider whitespace-nowrap uppercase transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
+              'inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm px-3 font-display text-sm font-semibold tracking-wider whitespace-nowrap uppercase transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
               isActive ? 'bg-card text-foreground shadow-raised' : 'text-muted-foreground hover:text-foreground',
             )}
           >

@@ -345,9 +345,14 @@ There is no separate muscle focus setting and no rebuild button for it. The memb
    - Configure the external turnstile REST API integration (method, URL,
      headers/credentials, optional body) used by the check-in flow, and
      test the saved request from the settings page.
-   - Manage the exercise/equipment catalog: add new exercises (tagging
-     their primary and supporting muscles by tapping a body, or choosing
-     from the list of muscle names; never by typing a name), add new
+   - Manage the exercise/equipment catalog: add new exercises (an "Add
+     exercise" button opens a side sheet; the muscles are tagged by
+     tapping a body, or by name from a searchable dropdown grouped by
+     region with a Primary/Supporting toggle per muscle, never by typing
+     a name; the equipment is picked from a dropdown with the picks shown
+     as chips; errors show only after "Add to catalog" is pressed, a name
+     already in the catalog is refused, Cancel discards the draft while
+     Esc and the close button keep it), add new
      gym equipment, and set whether a piece of equipment is currently
      available. Existing exercises can never be deleted - only added -
      so historical plans always resolve against a valid exercise.

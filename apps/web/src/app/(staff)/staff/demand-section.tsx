@@ -1,63 +1,179 @@
 'use client';
 
+import { type MuscleLoad, rankMuscles } from '@cadence/shared/schemas/muscle-heat';
+import { MUSCLE_IDS, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { UsersIcon } from 'lucide-react';
 import Link from 'next/link';
+import { type ReactNode, useCallback, useMemo, useState } from 'react';
+import { DemandChart } from '@/app/(staff)/staff/demand-chart';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
-import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
-import { PanelSection } from '@/components/panel-section';
+import { MuscleLegend } from '@/components/muscle-map/muscle-legend';
+import { MuscleMap } from '@/components/muscle-map/muscle-map';
+import { formatSets, marksFromLoad } from '@/components/muscle-map/muscle-marks';
 import { QueryError } from '@/components/query-error';
 import { SegmentedFilter } from '@/components/segmented-filter';
-import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
 import { useTRPC } from '@/lib/trpc';
-import { cn } from '@/lib/utils';
 
 const TITLE = "Today's demand";
 const DESCRIPTION = "What today's plans ask of the gym, so missing or crowded equipment is no surprise.";
 const EQUIPMENT_CATALOG_PATH = '/catalog?tab=equipment';
 const REFRESH_INTERVAL_MS = 60_000;
-const SKELETON_ROWS = 8;
+const SKELETON_ROWS = 10;
 
 const DEMAND_FILTERS = ['all', 'checked-in'] as const;
 type DemandFilter = (typeof DEMAND_FILTERS)[number];
 
-const HEADER_CELL_CLASS =
-  'sticky top-0 z-10 bg-card px-3 py-2 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase first:pl-5 last:pr-5 sm:first:pl-6 sm:last:pr-6';
-
-function plural(count: number, one: string, many: string) {
-  return count === 1 ? one : many;
-}
+// The map and the two charts take a third each from lg; below that the map sits above, the charts side by side.
+const BOARD_CLASS = 'grid gap-x-8 gap-y-8 md:grid-cols-2 lg:grid-cols-3';
 
 function DemandSkeleton() {
   return (
-    <PanelSection title={TITLE} description={DESCRIPTION}>
-      <div className="border-b px-5 py-3 sm:px-6">
-        <Skeleton className="h-5 w-80 max-w-full" />
+    <section className="flex flex-col gap-6 border-t pt-8">
+      <DemandHeading control={<Skeleton className="h-10 w-full sm:w-96" />} />
+      <div className={BOARD_CLASS}>
+        <MuscleMap.Skeleton isPaired className="md:col-span-2 lg:col-span-1" />
+        <DemandChart.Skeleton title="Muscles" caption="Plans per muscle" rows={SKELETON_ROWS} />
+        <DemandChart.Skeleton title="Equipment" caption="Plans per piece" rows={SKELETON_ROWS} />
       </div>
-      <div className="grid md:grid-cols-2">
-        <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
-          <Skeleton className="h-10 w-full sm:w-80" />
-          <MuscleLoadView.Skeleton breakdown="list" />
-        </div>
-        <div className="relative border-t md:border-t-0 md:border-l">
-          <div className="flex max-h-96 flex-col md:absolute md:inset-0 md:max-h-none">
-            <div className="flex shrink-0 flex-col gap-1 border-b px-5 py-4 sm:px-6">
-              <Skeleton className="h-7 w-28" />
-              <Skeleton className="h-5 w-52 max-w-full" />
-            </div>
-            <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-hidden px-5 py-3 sm:px-6">
-              {Array.from({ length: SKELETON_ROWS }, (_, index) => (
-                // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
-                <Skeleton key={index} className="h-10 w-full shrink-0" />
-              ))}
-            </div>
-          </div>
-        </div>
+    </section>
+  );
+}
+
+function DemandHeading({ control }: { control?: ReactNode }) {
+  return (
+    <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+      <div className="flex min-w-0 flex-col gap-1">
+        <h2 className="font-display text-2xl font-bold tracking-wide uppercase">{TITLE}</h2>
+        <p className="max-w-2xl text-sm text-pretty text-muted-foreground">{DESCRIPTION}</p>
       </div>
-    </PanelSection>
+      {control}
+    </div>
+  );
+}
+
+interface EquipmentDemand {
+  id: string;
+  name: string;
+  isAvailable: boolean;
+  planCount: number;
+  checkedInCount: number;
+}
+
+const UNIT_OF = (value: number) => (value === 1 ? 'plan' : 'plans');
+
+// The map and the two charts, and the hover they share. The hover lives here and nowhere above, and everything
+// the hover does not change is memoized, so pointing at a muscle redraws that muscle on the map, recolors one bar
+// and nothing else: the equipment chart, the other muscles and the page around them stay as they are.
+function DemandBoard({
+  load,
+  equipment,
+  isCheckedInOnly,
+}: {
+  load: MuscleLoad;
+  equipment: readonly EquipmentDemand[];
+  isCheckedInOnly: boolean;
+}) {
+  const [hovered, setHovered] = useState<MuscleId | null>(null);
+  const [selected, setSelected] = useState<MuscleId | null>(null);
+
+  const muscleData = useMemo(
+    () =>
+      [
+        ...rankMuscles(load),
+        ...MUSCLE_IDS.filter((muscle) => !load[muscle]).map((muscle) => ({ muscle, load: 0 })),
+      ].map(({ muscle, load: value }) => ({ key: muscle, name: muscleLabel(muscle), value })),
+    [load],
+  );
+
+  const marks = useMemo(() => {
+    const result = marksFromLoad(load);
+    for (const muscle of MUSCLE_IDS) {
+      const mark = result[muscle];
+      if (!mark) continue;
+      mark.value = `${formatSets(load[muscle] ?? 0)} ${UNIT_OF(load[muscle] ?? 0)}`;
+      if (!load[muscle]) mark.isGap = true;
+    }
+    return result;
+  }, [load]);
+
+  const equipmentData = useMemo(() => {
+    const countOf = (piece: EquipmentDemand) => (isCheckedInOnly ? piece.checkedInCount : piece.planCount);
+    return [...equipment]
+      .sort(
+        (a, b) =>
+          countOf(b) - countOf(a) || Number(a.isAvailable) - Number(b.isAvailable) || a.name.localeCompare(b.name),
+      )
+      .map((piece) => ({
+        key: piece.id,
+        name: piece.name,
+        value: countOf(piece),
+        isOutOfService: !piece.isAvailable,
+      }));
+  }, [equipment, isCheckedInOnly]);
+  const downCount = equipmentData.filter((piece) => piece.isOutOfService).length;
+
+  const hoverMuscle = useCallback((key: string | null) => setHovered(key as MuscleId | null), []);
+  const toggleSelected = useCallback(
+    (muscle: string) => setSelected((current) => (current === muscle ? null : (muscle as MuscleId))),
+    [],
+  );
+
+  return (
+    <>
+      {/* biome-ignore lint/a11y/noStaticElementInteractions: it only drops a hover the pointer has already left; every control inside is a real one. */}
+      <div className={BOARD_CLASS} onMouseLeave={() => setHovered(null)}>
+        <div className="flex flex-col h-full justify-end gap-3 md:col-span-2 lg:col-span-1">
+          <MuscleMap
+            isPaired
+            hasTooltip
+            marks={marks}
+            label={isCheckedInOnly ? 'Muscles trained by plans of members already checked in' : 'Muscles trained today'}
+            selected={selected}
+            highlighted={hovered}
+            onSelect={toggleSelected}
+            onHover={setHovered}
+          />
+          <MuscleLegend
+            lowLabel="Fewer plans"
+            highLabel="More plans"
+            hasGap
+            gapLabel="No plan trains it"
+            className="justify-center lg:justify-start"
+          />
+        </div>
+
+        <DemandChart
+          title="Muscles"
+          caption="Plans per muscle"
+          data={muscleData}
+          formatValue={formatSets}
+          activeKey={hovered ?? selected}
+          selectedKey={selected}
+          onHover={hoverMuscle}
+          onSelect={toggleSelected}
+        />
+
+        <DemandChart title="Equipment" caption="Plans per piece" data={equipmentData} formatValue={String} />
+      </div>
+
+      <p className="max-w-prose text-xs text-pretty text-muted-foreground">
+        Each number is how many plans train that muscle or need that piece of equipment. Exercises that cannot be done
+        now are not counted.
+        {downCount > 0 && (
+          <>
+            {' '}
+            <Link href={EQUIPMENT_CATALOG_PATH} className="font-semibold text-foreground underline">
+              {downCount} out of service
+            </Link>{' '}
+            (struck through).
+          </>
+        )}
+      </p>
+    </>
   );
 }
 
@@ -88,33 +204,23 @@ function DemandRoot() {
 
   if (planCount === 0) {
     return (
-      <PanelSection title={TITLE} description={DESCRIPTION}>
+      <section className="flex flex-col gap-2 border-t pt-8">
+        <DemandHeading />
         <EmptyState
           icon={UsersIcon}
           title="No plans dated today yet"
           description="Plans show up here as members build them for today."
         />
-      </PanelSection>
+      </section>
     );
   }
 
-  const pieces = [...equipment].sort(
-    (a, b) =>
-      Number(a.isAvailable) - Number(b.isAvailable) || b.planCount - a.planCount || a.name.localeCompare(b.name),
-  );
-  const busiest = Math.max(1, ...pieces.map((piece) => piece.planCount));
-  const downCount = pieces.filter((piece) => !piece.isAvailable).length;
   const isCheckedInOnly = filter === 'checked-in';
 
   return (
-    <PanelSection title={TITLE} description={DESCRIPTION}>
-      <p className="border-b px-5 py-3 text-sm sm:px-6" aria-live="polite">
-        <span className="numerals text-base font-bold">{planCount}</span> {plural(planCount, 'plan', 'plans')} dated
-        today, <span className="numerals text-base font-bold">{checkedInPlanCount}</span> of them from{' '}
-        {plural(checkedInPlanCount, 'a member', 'members')} already in the gym.
-      </p>
-      <div className="grid md:grid-cols-2">
-        <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
+    <section className="flex flex-col gap-6 border-t pt-8">
+      <DemandHeading
+        control={
           <SegmentedFilter
             label="Plans to count"
             value={filter}
@@ -123,104 +229,25 @@ function DemandRoot() {
               { value: 'all', label: 'All plans today', count: planCount },
               { value: 'checked-in', label: 'Already checked in', count: checkedInPlanCount },
             ]}
-            className="self-start"
+            className="w-full sm:w-auto"
           />
-          <MuscleLoadView
-            load={isCheckedInOnly ? muscleCheckedIn : musclePlans}
-            label={isCheckedInOnly ? 'Muscles trained by plans of members already checked in' : 'Muscles trained today'}
-            breakdown="list"
-            unit={{ singular: 'plan', plural: 'plans' }}
-            note="Each number is how many plans train that muscle. Exercises that cannot be done now are not counted."
-            legend={{ lowLabel: 'Fewer plans', highLabel: 'More plans', gapLabel: 'No plan trains it' }}
-            emptyNote={
-              isCheckedInOnly ? 'Nobody with a plan today has checked in yet.' : 'No muscle work in today’s plans.'
-            }
-            includeUntrained
-          />
-        </div>
+        }
+      />
 
-        {/* The list takes the height of the muscle column, so a long equipment list scrolls inside the card. */}
-        <div className="relative border-t md:border-t-0 md:border-l">
-          <div className="flex max-h-96 flex-col md:absolute md:inset-0 md:max-h-none">
-            <div className="flex shrink-0 flex-col gap-0.5 border-b px-5 py-4 sm:px-6">
-              <h3 className="font-display text-xl font-bold tracking-wide uppercase">Equipment</h3>
-              <p className="text-sm text-pretty text-muted-foreground">
-                Plans that need each piece, and how many of those members are in the gym.
-                {downCount > 0 && (
-                  <>
-                    {' '}
-                    <Link href={EQUIPMENT_CATALOG_PATH} className="font-semibold text-foreground underline">
-                      {downCount} out of service
-                    </Link>
-                    .
-                  </>
-                )}
-              </p>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <table className="w-full" aria-label="Equipment needed by today's plans">
-                <thead>
-                  <tr className="border-b">
-                    <th scope="col" className={cn(HEADER_CELL_CLASS, 'text-left')}>
-                      Equipment
-                    </th>
-                    <th scope="col" className={cn(HEADER_CELL_CLASS, 'w-28 text-right sm:w-40')}>
-                      Plans
-                    </th>
-                    <th scope="col" className={cn(HEADER_CELL_CLASS, 'w-20 text-right sm:w-24')}>
-                      In the gym
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pieces.map((piece) => (
-                    <tr key={piece.id} className="border-b last:border-b-0">
-                      <th
-                        scope="row"
-                        className="px-3 py-2.5 text-left align-middle font-normal first:pl-5 sm:first:pl-6"
-                      >
-                        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-                          {piece.isAvailable ? (
-                            <span className="font-semibold">{piece.name}</span>
-                          ) : (
-                            <>
-                              <Link
-                                href={EQUIPMENT_CATALOG_PATH}
-                                className="font-semibold text-muted-foreground line-through hover:text-foreground"
-                              >
-                                {piece.name}
-                              </Link>
-                              <Badge variant="unavailable">Out of service</Badge>
-                            </>
-                          )}
-                        </span>
-                      </th>
-                      <td className="px-3 py-2.5 align-middle">
-                        <div className="flex flex-col items-end gap-1">
-                          <span className="numerals text-xl leading-none font-bold">
-                            {piece.planCount}
-                            <span className="text-base text-muted-foreground"> of {planCount}</span>
-                          </span>
-                          <span className="h-1 w-full rounded-xs bg-muted" aria-hidden>
-                            <span
-                              className="block h-full rounded-xs bg-foreground/60"
-                              style={{ width: `${(piece.planCount / busiest) * 100}%` }}
-                            />
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-2.5 text-right align-middle last:pr-5 sm:last:pr-6">
-                        <span className="numerals text-xl leading-none font-bold">{piece.checkedInCount}</span>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>
-      </div>
-    </PanelSection>
+      {isCheckedInOnly && checkedInPlanCount === 0 ? (
+        <EmptyState
+          icon={UsersIcon}
+          title="Nobody with a plan has checked in yet"
+          description="The plans of members who are in the gym show up here once they check in."
+        />
+      ) : (
+        <DemandBoard
+          load={isCheckedInOnly ? muscleCheckedIn : musclePlans}
+          equipment={equipment}
+          isCheckedInOnly={isCheckedInOnly}
+        />
+      )}
+    </section>
   );
 }
 

@@ -2,7 +2,7 @@
 
 import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { TriangleAlertIcon } from 'lucide-react';
-import { type PointerEvent, useEffect, useId, useState } from 'react';
+import { memo, type PointerEvent, useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BACK_PATHS,
@@ -84,7 +84,117 @@ function emphasisOf(muscle: MuscleId, { marks, selected, highlighted }: BodyView
   return marks[muscle]?.isInjured ? 2 : 0;
 }
 
-function BodyView(props: BodyViewProps) {
+interface MuscleShapeProps {
+  muscle: MuscleId;
+  shapes: MusclePaths[MuscleId];
+  step: number;
+  hatchId: string;
+  isSkeleton?: boolean;
+  isSelected: boolean;
+  isHighlighted: boolean;
+  isInjured: boolean;
+  isLost: boolean;
+  isGap: boolean;
+  isInteractive: boolean;
+  hasTitle: boolean;
+  onSelect?: (muscle: MuscleId) => void;
+}
+
+// One muscle of the body. It is its own memoized component so that lighting a muscle redraws that muscle and the
+// one that was lit before, not the forty shapes of the body.
+const MuscleShape = memo(function MuscleShape({
+  muscle,
+  shapes,
+  step,
+  hatchId,
+  isSkeleton,
+  isSelected,
+  isHighlighted,
+  isInjured,
+  isLost,
+  isGap,
+  isInteractive,
+  hasTitle,
+  onSelect,
+}: MuscleShapeProps) {
+  const isOutlined = isSelected || isHighlighted || isInjured;
+  const isDashed = !isOutlined && isGap;
+  const outlineWidth = isSelected || (isInjured && !isHighlighted) ? 3 : 2;
+  const hasHalo = isSelected || isHighlighted || isInjured;
+  const hatchFill = `url(#${hatchId}-${step >= 3 ? 'card' : 'ink'})`;
+
+  return (
+    <g
+      aria-hidden
+      data-muscle={muscle}
+      className={cn(isInteractive && 'cursor-pointer')}
+      onClick={isInteractive ? () => onSelect?.(muscle) : undefined}
+    >
+      {hasTitle && <title>{isInjured ? `${muscleLabel(muscle)}, injured` : muscleLabel(muscle)}</title>}
+      {hasHalo &&
+        shapes?.map((shape, index) => (
+          <path
+            // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
+            key={index}
+            d={shape.d}
+            transform={shape.transform}
+            vectorEffect="non-scaling-stroke"
+            strokeWidth={outlineWidth + 3}
+            className="pointer-events-none fill-none stroke-card"
+          />
+        ))}
+      {shapes?.map((shape, index) => (
+        <path
+          // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
+          key={index}
+          d={shape.d}
+          transform={shape.transform}
+          vectorEffect="non-scaling-stroke"
+          strokeWidth={isOutlined ? outlineWidth : 1.5}
+          strokeDasharray={isDashed ? '4 3' : undefined}
+          className={cn(
+            'transition-[fill,stroke] duration-300 ease-out-expo',
+            isSkeleton ? 'fill-foreground/7' : HEAT_FILL[step],
+            isOutlined
+              ? isInjured && !isSelected && !isHighlighted
+                ? 'stroke-tape'
+                : 'stroke-primary'
+              : isDashed
+                ? 'stroke-foreground/45'
+                : step === 0 && !isSkeleton
+                  ? 'stroke-foreground/25'
+                  : 'stroke-card',
+          )}
+        />
+      ))}
+      {isInjured &&
+        shapes?.map((shape, index) => (
+          <path
+            // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
+            key={index}
+            d={shape.d}
+            transform={shape.transform}
+            fill={`url(#${hatchId}-tape)`}
+            className="pointer-events-none"
+          />
+        ))}
+      {isLost &&
+        shapes?.map((shape, index) => (
+          <path
+            // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
+            key={index}
+            d={shape.d}
+            transform={shape.transform}
+            fill={hatchFill}
+            className="pointer-events-none"
+          />
+        ))}
+    </g>
+  );
+});
+
+// Memoized: a pointer moving over the body updates the tooltip, and that must not redraw the body under it.
+const BodyView = memo(function BodyView(props: BodyViewProps) {
   const {
     marks,
     label,
@@ -154,92 +264,28 @@ function BodyView(props: BodyViewProps) {
       </defs>
       {muscles.map((muscle) => {
         const mark = marks[muscle];
-        const step = isSkeleton ? 0 : (mark?.step ?? 0);
-        const isSelected = muscle === selected;
-        const isHighlighted = lit.includes(muscle);
-        const isInjured = Boolean(mark?.isInjured) && !isSkeleton;
-        const isOutlined = isSelected || isHighlighted || isInjured;
-        const isDashed = !isOutlined && mark?.isGap && !isSkeleton;
-        const outlineWidth = isSelected || (isInjured && !isHighlighted) ? 3 : 2;
-        const hasHalo = isSelected || isHighlighted || isInjured;
-        const hatchFill = `url(#${hatchId}-${step >= 3 ? 'card' : 'ink'})`;
-
         return (
-          <g
+          <MuscleShape
             key={muscle}
-            aria-hidden
-            data-muscle={muscle}
-            className={cn(isInteractive && 'cursor-pointer')}
-            onClick={isInteractive ? () => onSelect?.(muscle) : undefined}
-          >
-            {isInteractive && !onPointer && (
-              <title>{isInjured ? `${muscleLabel(muscle)}, injured` : muscleLabel(muscle)}</title>
-            )}
-            {hasHalo &&
-              paths[muscle]?.map((shape, index) => (
-                <path
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
-                  key={index}
-                  d={shape.d}
-                  transform={shape.transform}
-                  vectorEffect="non-scaling-stroke"
-                  strokeWidth={outlineWidth + 3}
-                  className="pointer-events-none fill-none stroke-card"
-                />
-              ))}
-            {paths[muscle]?.map((shape, index) => (
-              <path
-                // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
-                key={index}
-                d={shape.d}
-                transform={shape.transform}
-                vectorEffect="non-scaling-stroke"
-                strokeWidth={isOutlined ? outlineWidth : 1.5}
-                strokeDasharray={isDashed ? '4 3' : undefined}
-                className={cn(
-                  'transition-[fill,stroke] duration-300 ease-out-expo',
-                  isSkeleton ? 'fill-foreground/7' : HEAT_FILL[step],
-                  isOutlined
-                    ? isInjured && !isSelected && !isHighlighted
-                      ? 'stroke-tape'
-                      : 'stroke-primary'
-                    : isDashed
-                      ? 'stroke-foreground/45'
-                      : step === 0 && !isSkeleton
-                        ? 'stroke-foreground/25'
-                        : 'stroke-card',
-                )}
-              />
-            ))}
-            {isInjured &&
-              paths[muscle]?.map((shape, index) => (
-                <path
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
-                  key={index}
-                  d={shape.d}
-                  transform={shape.transform}
-                  fill={`url(#${hatchId}-tape)`}
-                  className="pointer-events-none"
-                />
-              ))}
-            {mark?.isLost &&
-              !isSkeleton &&
-              paths[muscle]?.map((shape, index) => (
-                <path
-                  // biome-ignore lint/suspicious/noArrayIndexKey: a muscle's shapes are static and never reordered.
-                  key={index}
-                  d={shape.d}
-                  transform={shape.transform}
-                  fill={hatchFill}
-                  className="pointer-events-none"
-                />
-              ))}
-          </g>
+            muscle={muscle}
+            shapes={paths[muscle]}
+            step={isSkeleton ? 0 : (mark?.step ?? 0)}
+            hatchId={hatchId}
+            isSkeleton={isSkeleton}
+            isSelected={muscle === selected}
+            isHighlighted={lit.includes(muscle)}
+            isInjured={Boolean(mark?.isInjured) && !isSkeleton}
+            isLost={Boolean(mark?.isLost) && !isSkeleton}
+            isGap={Boolean(mark?.isGap) && !isSkeleton}
+            isInteractive={isInteractive}
+            hasTitle={isInteractive && !onPointer}
+            onSelect={onSelect}
+          />
         );
       })}
     </svg>
   );
-}
+});
 
 // The Popover pattern: Card-colored, Hairline border, Popover shadow. It follows the pointer and never
 // takes it, so the muscle under it keeps receiving hover.
@@ -293,13 +339,13 @@ function MuscleMapRoot({
     if (next) setView(next.value);
   }
 
-  const trackPointer = (event: PointerEvent<SVGSVGElement>, muscle: MuscleId | null) => {
+  const trackPointer = useCallback((event: PointerEvent<SVGSVGElement>, muscle: MuscleId | null) => {
     if (!muscle || event.pointerType === 'touch') {
       setPointer(null);
       return;
     }
     setPointer({ muscle, x: event.clientX, y: event.clientY });
-  };
+  }, []);
 
   // The tooltip sits at the pointer on the screen, so it must go when the page moves under a pointer that does
   // not: a scroll, or the window losing focus, fires no pointerleave.

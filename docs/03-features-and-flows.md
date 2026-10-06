@@ -504,23 +504,26 @@ The page is public (no sign-in needed) and is linked from the public header, the
      configured" when no turnstile is set up. It opens the check-in log
      filtered to the ones that did not open, or the turnstile settings when
      it is not configured. It refreshes every 60 seconds.
-3. Below the lines, one full-width "Today's demand" card (FR-29), so
+3. Below the lines, one full-width "Today's demand" section (FR-29), so
    trainers are not surprised by missing or over-demanded equipment.
    Everything is counted in plans (distinct plans), never in exercise rows
-   or sets, and each count says what it counts. The card has two halves:
-   - Muscles: a body map and a ranked list with numbers: how many of
-     today's plans train each muscle through an exercise that can be done
-     now, with the heat scaled to the busiest muscle. A filter switches
-     between "All plans today" and "Already checked in" (plans of members
-     who have checked in today). It states facts only.
-   - Equipment: a table with out-of-service pieces first, then the busiest
-     first. "Plans" is how many of today's plans need the piece (with a quiet
-     bar scaled to the busiest piece); "In the gym" is how many of those
-     plans belong to members who have already checked in today. A piece that
-     is down carries an "Out of service" badge and links to the catalog
-     Equipment tab. A plan counts toward a down piece only through an
-     exercise that has no working alternative.
-   The card refreshes every 60 seconds.
+   or sets, and each count says what it counts. A filter switches between
+   "All plans today" and "Already checked in" (plans of members who have
+   checked in today) and applies to everything in the section, which has
+   three parts side by side:
+   - A body map: how many of today's plans train each muscle through an
+     exercise that can be done now, with the heat scaled to the busiest
+     muscle. It states facts only.
+   - Muscles: a ranked bar chart of the same numbers, busiest first, every
+     muscle listed. Pointing at a muscle in the chart or on the map lights
+     it up in both.
+   - Equipment: a ranked bar chart of how many of the filtered plans need
+     each piece of equipment, busiest first. A piece that is down is struck
+     through and counted in a note that links to the catalog Equipment tab.
+     A plan counts toward a down piece only through an exercise that has no
+     working alternative.
+   The two charts scroll inside windows of the same height. The section
+   refreshes every 60 seconds.
 4. When nothing needs attention, the lines say so in one calm sentence.
 ```
 

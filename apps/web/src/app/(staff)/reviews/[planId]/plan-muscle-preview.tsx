@@ -46,7 +46,13 @@ function PlanMusclePreviewRoot({ planLoad, recentLoad, injured }: PlanMusclePrev
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
-        <SegmentedFilter label="Muscle map source" value={view} options={VIEWS} onChange={setView} className="w-full" />
+        <SegmentedFilter
+          label="Muscle map source"
+          value={view}
+          options={VIEWS}
+          onChange={setView}
+          className="w-full sm:w-fit"
+        />
         <MuscleLoadView
           isPaired
           includeUntrained

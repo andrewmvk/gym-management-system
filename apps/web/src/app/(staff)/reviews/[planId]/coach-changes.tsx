@@ -83,8 +83,8 @@ function Diff({ change }: { change: CoachChange }) {
 // themselves. Oldest first, like the review history.
 export function CoachChanges({ changes }: { changes: readonly CoachChange[] }) {
   return (
-    <Card className="gap-0">
-      <CardHeader className="border-b">
+    <Card>
+      <CardHeader>
         <CardTitle>Changed through the coach</CardTitle>
         <CardDescription>
           What the member changed on this plan themselves. The plan was published as they left it.

@@ -11,23 +11,33 @@ interface DetailLayoutProps {
   heading: ReactNode;
   navigation?: ReactNode;
   context: ReactNode;
-  editor: ReactNode;
+  alerts?: ReactNode;
   preview: ReactNode;
+  editor: ReactNode;
   history: ReactNode;
 }
 
-// On phones the order is context, exercises, muscles, history, so what the AI knew sits above the exercises.
-// From lg the exercises take the two-column side and the other three stack in the third.
-function DetailLayoutRoot({ heading, navigation, context, editor, preview, history }: DetailLayoutProps) {
+// The work is in the wide column, three fifths of the page: what needs a look, the muscle balance the plan
+// adds up to, then the exercises to change. The two fifths beside it are what the trainer judges them against
+// (what the AI knew) and what other trainers already did. On phones the order is context, alerts, muscles,
+// exercises, history, so what the AI knew sits above the exercises.
+function DetailLayoutRoot({ heading, navigation, context, alerts, preview, editor, history }: DetailLayoutProps) {
   return (
     <PageContainer>
       {heading}
       {navigation}
-      <div className="grid items-start gap-6 lg:grid-cols-3">
-        <div className="min-w-0 lg:col-start-3 lg:row-start-1">{context}</div>
-        <div className="min-w-0 lg:col-span-2 lg:col-start-1 lg:row-span-3 lg:row-start-1">{editor}</div>
-        <div className="min-w-0 lg:col-start-3 lg:row-start-2">{preview}</div>
-        <div className="min-w-0 lg:col-start-3 lg:row-start-3">{history}</div>
+      {/* Two independent columns from lg, so neither column's height pushes the other's items around. Below lg the
+          side wrapper dissolves (contents) and `order` interleaves its two cards around the main column. */}
+      <div className="flex flex-col gap-6 lg:flex-row lg:items-start">
+        <div className="contents lg:flex lg:min-w-0 lg:flex-2 lg:flex-col lg:gap-6">
+          <div className="order-1 min-w-0 lg:order-none">{context}</div>
+          <div className="order-3 min-w-0 lg:order-none">{history}</div>
+        </div>
+        <div className="order-2 flex min-w-0 flex-col gap-6 lg:order-first lg:flex-3">
+          {alerts}
+          {preview}
+          {editor}
+        </div>
       </div>
     </PageContainer>
   );

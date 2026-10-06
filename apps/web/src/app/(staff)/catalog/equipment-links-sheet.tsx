@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LinkIcon, TriangleAlertIcon } from 'lucide-react';
+import { LinkIcon, PlusIcon, TriangleAlertIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import { SearchInput } from '@/components/search-input';
@@ -21,6 +21,11 @@ interface EquipmentLinksSheetProps {
   equipmentId: string;
   equipmentName: string;
   exercises: readonly LinkableExercise[];
+  // Hands over to the New exercise sheet with this piece already ticked, for an exercise that is not in the list.
+  onCreateExercise?: () => void;
+  // Given together, the caller opens and closes the sheet and no trigger button is drawn.
+  isOpen?: boolean;
+  onOpenChange?: (isOpen: boolean) => void;
 }
 
 function exerciseCount(count: number) {
@@ -31,6 +36,7 @@ function LinksForm({
   equipmentId,
   equipmentName,
   exercises,
+  onCreateExercise,
   onDone,
 }: EquipmentLinksSheetProps & { onDone: () => void }) {
   const trpc = useTRPC();
@@ -91,7 +97,17 @@ function LinksForm({
         </p>
       </div>
       <ul aria-label="Exercises" className="min-h-0 flex-1 divide-y overflow-y-auto">
-        {matches.length === 0 && <li className="px-5 py-4 text-sm text-muted-foreground">No exercise matches.</li>}
+        {matches.length === 0 && (
+          <li className="flex flex-col items-start gap-3 px-5 py-4 text-sm text-muted-foreground">
+            No exercise matches.
+            {onCreateExercise && (
+              <Button variant="outline" size="sm" onClick={onCreateExercise}>
+                <PlusIcon data-icon="inline-start" />
+                New exercise with {equipmentName}
+              </Button>
+            )}
+          </li>
+        )}
         {matches.map((exercise) => (
           <li key={exercise.id}>
             <label
@@ -120,42 +136,69 @@ function LinksForm({
             </p>
           </div>
         )}
-        <Button
-          disabled={!isChanged || save.isPending}
-          onClick={() => save.mutate({ equipmentId, exerciseIds: [...selected] })}
-        >
-          {save.isPending ? 'Saving...' : 'Save links'}
-        </Button>
+        <div className="grid gap-2 sm:flex sm:justify-end">
+          {onCreateExercise && (
+            <Button variant="outline" onClick={onCreateExercise} disabled={save.isPending}>
+              <PlusIcon data-icon="inline-start" />
+              New exercise
+            </Button>
+          )}
+          <Button
+            disabled={!isChanged || save.isPending}
+            onClick={() => save.mutate({ equipmentId, exerciseIds: [...selected] })}
+          >
+            {save.isPending ? 'Saving...' : 'Save links'}
+          </Button>
+        </div>
       </div>
     </>
   );
 }
 
 // The editor that decides which exercises depend on a piece of equipment; only users who manage the catalog see it.
-export function EquipmentLinksSheet({ equipmentId, equipmentName, exercises }: EquipmentLinksSheetProps) {
-  const [isOpen, setIsOpen] = useState(false);
+export function EquipmentLinksSheet({
+  equipmentId,
+  equipmentName,
+  exercises,
+  onCreateExercise,
+  isOpen: controlledIsOpen,
+  onOpenChange,
+}: EquipmentLinksSheetProps) {
+  const [ownIsOpen, setOwnIsOpen] = useState(false);
+  const isControlled = controlledIsOpen !== undefined && onOpenChange !== undefined;
+  const isOpen = isControlled ? controlledIsOpen : ownIsOpen;
+  const setIsOpen = isControlled ? onOpenChange : setOwnIsOpen;
   const linkedCount = exercises.filter((exercise) =>
     exercise.equipment.some((piece) => piece.id === equipmentId),
   ).length;
 
   return (
     <Sheet open={isOpen} onOpenChange={setIsOpen}>
-      <SheetTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          aria-label={`Linked exercises of ${equipmentName}, ${exerciseCount(linkedCount)}`}
-        >
-          <LinkIcon data-icon="inline-start" />
-          <span className="numerals text-base">{linkedCount}</span>
-          <span className="hidden sm:inline">linked</span>
-        </Button>
-      </SheetTrigger>
+      {!isControlled && (
+        <SheetTrigger asChild>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-label={`Linked exercises of ${equipmentName}, ${exerciseCount(linkedCount)}`}
+          >
+            <LinkIcon data-icon="inline-start" />
+            <span className="numerals text-base">{linkedCount}</span>
+            <span className="hidden sm:inline">linked</span>
+          </Button>
+        </SheetTrigger>
+      )}
       <SheetContent className="w-full sm:max-w-md">
         <LinksForm
           equipmentId={equipmentId}
           equipmentName={equipmentName}
           exercises={exercises}
+          onCreateExercise={
+            onCreateExercise &&
+            (() => {
+              setIsOpen(false);
+              onCreateExercise();
+            })
+          }
           onDone={() => setIsOpen(false)}
         />
       </SheetContent>

@@ -14,7 +14,7 @@ interface ReviewEntry {
 
 function Header() {
   return (
-    <CardHeader className="border-b">
+    <CardHeader>
       <CardTitle>Review history</CardTitle>
       <CardDescription>
         Every trainer&apos;s notes and edits, in order. Any staff member can read them, the member cannot, and none
@@ -26,7 +26,7 @@ function Header() {
 
 function ReviewHistorySkeleton() {
   return (
-    <Card className="gap-0">
+    <Card>
       <Header />
       <CardContent className="flex flex-col gap-4 py-4">
         {Array.from({ length: 2 }, (_, index) => (
@@ -46,7 +46,7 @@ function ReviewHistorySkeleton() {
 
 function ReviewHistoryRoot({ reviews }: { reviews: readonly ReviewEntry[] }) {
   return (
-    <Card className="gap-0">
+    <Card>
       <Header />
       <CardContent className="py-2">
         {reviews.length === 0 && <p className="py-4 text-sm text-muted-foreground">No notes or edits yet.</p>}

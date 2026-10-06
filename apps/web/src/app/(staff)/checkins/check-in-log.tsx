@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/empty-state';
 import { FilterBar } from '@/components/filter-bar';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
+import { SearchInput } from '@/components/search-input';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -49,7 +50,10 @@ function CheckInLogSkeleton() {
   return (
     <div className="flex flex-col gap-4">
       <FilterBar>
-        <Skeleton className="h-10.5 w-full lg:w-72" />
+        <Skeleton className="h-10 w-full lg:w-72" />
+        <FilterBar.Trailing>
+          <Skeleton className="h-10.5 w-full lg:w-56" />
+        </FilterBar.Trailing>
       </FilterBar>
       <div className="overflow-hidden rounded-lg border bg-card">
         <Table>
@@ -90,9 +94,13 @@ function CheckInLogRoot() {
   });
   const [result, setResult] = useUrlState<ResultFilter>('result', 'all', oneOf(RESULT_FILTERS));
 
+  const [search, setSearch] = useUrlState<string>('q', '');
+
   const checkIns = query.data ?? [];
-  const failedCount = checkIns.filter((entry) => entry.turnstileStatus === 'failed').length;
-  const filtered = result === 'failed' ? checkIns.filter((entry) => entry.turnstileStatus === 'failed') : checkIns;
+  const term = search.trim().toLowerCase();
+  const matching = checkIns.filter((entry) => !term || entry.memberName.toLowerCase().includes(term));
+  const failedCount = matching.filter((entry) => entry.turnstileStatus === 'failed').length;
+  const filtered = result === 'failed' ? matching.filter((entry) => entry.turnstileStatus === 'failed') : matching;
   const pagination = usePagination(filtered, PAGE_SIZE);
 
   if (!canRead) {
@@ -140,27 +148,42 @@ function CheckInLogRoot() {
   return (
     <div className="flex flex-col gap-4">
       <FilterBar>
-        <SegmentedFilter
-          label="Filter by turnstile result"
-          value={result}
+        <SearchInput
+          value={search}
           onChange={(value) => {
-            setResult(value);
+            setSearch(value);
             pagination.setPage(1);
           }}
-          options={[
-            { value: 'all', label: 'All', count: checkIns.length },
-            { value: 'failed', label: 'Did not open', count: failedCount },
-          ]}
-          className="w-full lg:w-auto"
+          placeholder="Search members"
+          className="w-full lg:w-72"
         />
+        <FilterBar.Trailing>
+          <SegmentedFilter
+            label="Filter by turnstile result"
+            value={result}
+            onChange={(value) => {
+              setResult(value);
+              pagination.setPage(1);
+            }}
+            options={[
+              { value: 'all', label: 'All', count: matching.length },
+              { value: 'failed', label: 'Did not open', count: failedCount },
+            ]}
+            className="w-full lg:w-auto"
+          />
+        </FilterBar.Trailing>
       </FilterBar>
       {filtered.length === 0 ? (
         <div className="rounded-lg border bg-card">
-          <EmptyState
-            icon={SearchXIcon}
-            title="Every recent check-in opened the turnstile"
-            description="Check-ins where the turnstile did not open would be listed here."
-          />
+          {term ? (
+            <EmptyState icon={SearchXIcon} title="No matches" description="Try another member name." />
+          ) : (
+            <EmptyState
+              icon={SearchXIcon}
+              title="Every recent check-in opened the turnstile"
+              description="Check-ins where the turnstile did not open would be listed here."
+            />
+          )}
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border bg-card">

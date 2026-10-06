@@ -34,12 +34,19 @@ type CreateExerciseInput = z.infer<typeof CreateExerciseSchema>;
 interface CreateExerciseSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onCreated: (name: string) => void;
+  onCreated?: (name: string) => void;
+  // A piece of equipment ticked each time the sheet opens, for exercises started from that piece's row.
+  presetEquipmentId?: string | null;
 }
 
 // Rendered once by the section, never inside a button, a loading state or an empty state, so the draft survives
 // the list finishing its load. Cancel discards it; Esc and the close button keep it for the next time it opens.
-export function CreateExerciseSheet({ isOpen, onOpenChange, onCreated }: CreateExerciseSheetProps) {
+export function CreateExerciseSheet({
+  isOpen,
+  onOpenChange,
+  onCreated,
+  presetEquipmentId = null,
+}: CreateExerciseSheetProps) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const equipmentQuery = useQuery(trpc.catalog.listEquipment.queryOptions());
@@ -65,15 +72,24 @@ export function CreateExerciseSheet({ isOpen, onOpenChange, onCreated }: CreateE
     }
   }, [isOpen, form]);
 
+  useEffect(() => {
+    if (!isOpen || !presetEquipmentId) return;
+    const current = form.getValues('equipmentIds');
+    if (!current.includes(presetEquipmentId)) {
+      form.setValue('equipmentIds', [...current, presetEquipmentId]);
+    }
+  }, [isOpen, presetEquipmentId, form]);
+
   const create = useMutation(
     trpc.catalog.createExercise.mutationOptions({
       onSuccess: (_result, variables) => {
         queryClient.invalidateQueries({ queryKey: trpc.catalog.list.queryKey() });
         form.reset();
         onOpenChange(false);
-        toast.success(`${variables.name} added to the catalog.`, {
-          action: { label: 'Show it', onClick: () => onCreated(variables.name) },
-        });
+        toast.success(
+          `${variables.name} added to the catalog.`,
+          onCreated && { action: { label: 'Show it', onClick: () => onCreated(variables.name) } },
+        );
       },
       onError: (error) => toast.error(serverMessage(error, "Couldn't add the exercise. Try again.")),
     }),

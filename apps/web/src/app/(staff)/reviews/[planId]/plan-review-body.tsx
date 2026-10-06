@@ -243,12 +243,18 @@ export function PlanReviewBody({ planId }: { planId: string }) {
       }
       navigation={<PlanNeighbors planId={planId} />}
       context={memberContext && <MemberContextCard memberId={plan.userId} context={memberContext} />}
+      alerts={
+        (blocked.length > 0 || risks.length > 0) && (
+          <>
+            {blocked.length > 0 && <BlockedBanner blocked={blocked} />}
+            {risks.length > 0 && <RiskBanner risks={risks} />}
+          </>
+        )
+      }
       editor={
-        <div className="flex flex-col gap-6">
-          {blocked.length > 0 && <BlockedBanner blocked={blocked} />}
-          {risks.length > 0 && <RiskBanner risks={risks} />}
-          <Card className="gap-0 pb-0">
-            <CardHeader className="border-b">
+        <>
+          <Card>
+            <CardHeader>
               <CardTitle>Exercises</CardTitle>
               <CardDescription>
                 {readOnlyMessage ?? 'Changes publish to the member as soon as you save.'}
@@ -402,7 +408,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
               </CardFooter>
             )}
           </Card>
-        </div>
+        </>
       }
       preview={<PlanMusclePreview planLoad={planLoad} recentLoad={recentMuscleLoad} injured={injured} />}
       history={

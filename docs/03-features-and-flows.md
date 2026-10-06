@@ -353,8 +353,11 @@ There is no separate muscle focus setting and no rebuild button for it. The memb
      as chips; errors show only after "Add to catalog" is pressed, a name
      already in the catalog is refused, Cancel discards the draft while
      Esc and the close button keep it), add new
-     gym equipment, and set whether a piece of equipment is currently
-     available. Existing exercises can never be deleted - only added -
+     gym equipment (an "Add equipment" button above the equipment table
+     opens a small popover with one field, the name; a duplicate name is
+     refused and the toast offers "Link exercises"), and set whether a
+     piece of equipment is currently available. The equipment table has
+     column headers and a search by name. Existing exercises can never be deleted - only added -
      so historical plans always resolve against a valid exercise.
      - Switching a piece OFF first shows its impact in a confirmation: how
        many plans dated today or later would become must-review plans
@@ -362,15 +365,17 @@ There is no separate muscle focus setting and no rebuild button for it. The memb
        only after the admin confirms.
      - A piece's linked exercises can be edited. Removing an exercise's last
        link makes it count as needing no equipment, so the editor warns
-       first.
+       first. From the same editor the admin can start a new exercise with
+       that piece already selected.
      - "Out of service" is the one phrase used for unavailable equipment.
    - Read the catalog's Coverage tab (FR-52): a front and back heat map of
      how many exercises train each muscle, in three views (whole catalog,
-     available now, lost to out-of-service equipment). A muscle no
-     exercise trains is marked as a gap. Selecting a muscle lists its
-     exercises and equipment. Selecting an out-of-service piece of
-     equipment redraws the map with only the muscles it hurts and lists
-     the exercises it removes. The Equipment tab also says what each
+     available now, out of service). A muscle no exercise trains is marked
+     as a gap. Selecting a muscle lists its exercises and equipment, beside
+     the map without making the card taller. In the out-of-service view a
+     row of chips ("All pieces" and one per out-of-service piece) narrows
+     the map to the muscles that piece hurts and lists the exercises it
+     removes. The Equipment tab also says what each
      out-of-service piece takes out.
    - Watch the gym's demand on the Overview (flow 12) and the Gym info page
      (flow 8).
@@ -555,7 +560,8 @@ The page is public (no sign-in needed) and is linked from the public header, the
    is a technical failure of the door, drawn dashed, and the visit still
    counts. A reason is shown beside it: not configured, timed out, the
    turnstile answered with an error, could not be reached, or unknown. A
-   filter switches between All and Did not open. The Overview's Turnstile
+   filter switches between All and Did not open, and a search finds a
+   member by name among the latest 100 check-ins. The Overview's Turnstile
    line (flow 12) summarizes today's failures and links here.
 2. The opening hours editor (FR-62) shows one row per weekday. The admin sets
    an open and a close time or marks the day closed, and the close time must

@@ -64,6 +64,9 @@ export const CoachSendInputSchema = z.object({
   message: z.string().trim().min(1).max(2000),
   mentions: z.array(MentionSchema).max(COACH_MAX_MENTIONS).default([]),
   draft: CoachDraftSchema.optional(),
+  // The day of the plan the member has on screen. Without a draft it is the plan the coach talks about, so
+  // pointing at an exercise or the muscle distribution of a day ahead is read against that day, not today.
+  date: z.iso.date().optional(),
   history: z.array(HistoryTurnSchema).max(COACH_HISTORY_TURNS).default([]),
 });
 export type CoachSendInput = z.infer<typeof CoachSendInputSchema>;

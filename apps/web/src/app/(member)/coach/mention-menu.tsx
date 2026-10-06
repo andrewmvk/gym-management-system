@@ -3,7 +3,7 @@
 import { CheckIcon, MousePointerClickIcon } from 'lucide-react';
 import { Fragment, useEffect, useRef } from 'react';
 import { mentionKey } from '@/app/(member)/coach/coach-context';
-import { type MentionOption, SECTION_LABELS } from '@/app/(member)/coach/mention-options';
+import type { MentionOption } from '@/app/(member)/coach/mention-options';
 import { cn } from '@/lib/utils';
 
 export type MentionMenuEntry = { kind: 'point' } | { kind: 'option'; option: MentionOption };
@@ -60,9 +60,9 @@ export function MentionMenu({
             const isMentioned = entry.kind === 'option' && mentionedKeys.has(mentionKey(entry.option.chip));
             return (
               <Fragment key={entry.kind === 'point' ? 'point' : mentionKey(entry.option.chip)}>
-                {isNewSection && section && (
+                {isNewSection && entry.kind === 'option' && (
                   <li className="px-3 pt-2 pb-1 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-                    {SECTION_LABELS[section]}
+                    {entry.option.sectionLabel}
                   </li>
                 )}
                 <li className={cn(entry.kind === 'point' && 'border-b')}>

@@ -18,6 +18,8 @@ import { useCoachDraft } from '@/app/(member)/coach/use-coach-draft';
 import { isDockedViewport } from '@/app/(member)/coach/viewport';
 import { AiMark } from '@/components/ai-mark';
 import { Button } from '@/components/ui/button';
+import { toIsoDate } from '@/lib/calendar-date';
+import { formatPlanDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -35,9 +37,12 @@ export function CoachPanel() {
   const trpc = useTRPC();
   const ability = useAppAbility();
   const coach = useCoach();
-  const draftApi = useCoachDraft();
-  const chat = useCoachChat({ onProposal: draftApi.receiveProposal });
-  const todayQuery = useQuery({ ...trpc.plans.getToday.queryOptions(), enabled: coach.isOpen });
+  const draftApi = useCoachDraft(coach.viewedDate);
+  const chat = useCoachChat({ onProposal: draftApi.receiveProposal, viewedDate: coach.viewedDate });
+  // The exercises the coach can be pointed at, and the starters, come from the plan on screen: the day the
+  // member picked on the plan page, or today's anywhere else.
+  const planDate = coach.viewedDate ?? toIsoDate(new Date());
+  const planQuery = useQuery({ ...trpc.plans.getByDate.queryOptions({ date: planDate }), enabled: coach.isOpen });
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   // Kept here, not in the composer, so the half-written message survives the chat closing for pointing mode.
@@ -53,9 +58,10 @@ export function CoachPanel() {
 
   const lastRequest = [...chat.messages].reverse().find((message) => message.role === 'member')?.text ?? '';
   const lastMessageId = chat.messages.at(-1)?.id;
-  const planExercises = todayQuery.data?.exercises ?? [];
+  const planExercises = planQuery.data?.exercises ?? [];
   const mentionOptions = buildMentionOptions(
     planExercises.map((exercise) => ({ exerciseId: exercise.exerciseId, name: exercise.exerciseName })),
+    coach.viewedDate && coach.viewedDate !== toIsoDate(new Date()) ? formatPlanDate(planDate) : null,
   );
   const starters = planExercises[0] ? [`How do I do ${planExercises[0].exerciseName}?`, ...STARTERS] : STARTERS;
   const openDraft = draftApi.openDraft;

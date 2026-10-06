@@ -102,6 +102,9 @@ function MuscleRadarChartRoot({
     <ChartContainer
       config={{}}
       aria-hidden
+      // The points are redrawn as the active one changes and a redrawn node loses its mouseleave, so leaving the
+      // chart is what clears the group in every case.
+      onMouseLeave={() => onHover(null)}
       className={cn(
         'mx-auto aspect-4/3 w-full max-w-80 [&_*]:outline-hidden [&_.recharts-wrapper]:outline-hidden',
         className,

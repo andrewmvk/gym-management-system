@@ -39,6 +39,10 @@ interface CoachContextValue {
   stopPointing: () => void;
   // A screen calls this while it shows things the member can point at, and the returned function when it goes.
   registerTargets: () => () => void;
+  // The day of the plan the member has on screen (YYYY-MM-DD), or null when no plan that can still be done is
+  // shown. The coach reads the plan, the pointed-at exercises and the muscle distribution against this day.
+  viewedDate: string | null;
+  setViewedDate: (date: string | null) => void;
 }
 
 const CoachContext = createContext<CoachContextValue | null>(null);
@@ -48,6 +52,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
   const [mentions, setMentions] = useState<MentionChip[]>([]);
   const [isPointing, setIsPointing] = useState(false);
   const [targetScreens, setTargetScreens] = useState(0);
+  const [viewedDate, setViewedDate] = useState<string | null>(null);
 
   const addMention = useCallback((chip: MentionChip) => {
     setMentions((current) =>
@@ -98,6 +103,8 @@ export function CoachProvider({ children }: { children: ReactNode }) {
       startPointing,
       stopPointing,
       registerTargets,
+      viewedDate,
+      setViewedDate,
     }),
     [
       isOpen,
@@ -111,6 +118,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
       startPointing,
       stopPointing,
       registerTargets,
+      viewedDate,
     ],
   );
 

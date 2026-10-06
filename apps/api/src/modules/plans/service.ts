@@ -609,8 +609,8 @@ export function listPlanDates(userId: string, from: string, to: string): Promise
   return repository.findPlanDatesInRange(userId, from, to);
 }
 
-export function listUpcomingPlans(userId: string, today: string = todayLocal()) {
-  return repository.findUpcomingPlans(userId, today);
+export function listPlanDays(userId: string, from: string, to: string) {
+  return repository.findPlanDays(userId, from, to);
 }
 
 // Thin wrapper so the router can resolve the real owner (never the caller's own claimed id) before

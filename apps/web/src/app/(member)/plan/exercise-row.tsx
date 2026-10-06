@@ -2,6 +2,7 @@
 
 import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { AtSignIcon, CheckIcon } from 'lucide-react';
+import { ExerciseNote } from '@/app/(member)/plan/exercise-note';
 import { PrescriptionFields, type PrescriptionNumbers } from '@/components/prescription-fields';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -33,7 +34,7 @@ interface ExerciseRowProps {
   isEditPending?: boolean;
 }
 
-// onToggle is only passed for today's plan; history rows omit it and render read-only.
+// onToggle is only passed for today's plan; the rows of other days omit it and render read-only or locked.
 function ExerciseRowRoot({
   index,
   name,
@@ -112,14 +113,17 @@ function ExerciseRowRoot({
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <span
-              className={cn(
-                'strike-wipe block w-fit text-base leading-6 font-semibold transition-colors duration-300',
-                completed && 'text-muted-foreground',
-              )}
-            >
-              {name}
-            </span>
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'strike-wipe block w-fit text-base leading-6 font-semibold transition-colors duration-300',
+                  completed && 'text-muted-foreground',
+                )}
+              >
+                {name}
+              </span>
+              {notes && <ExerciseNote name={name} notes={notes} />}
+            </div>
             <span className="block font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               {primaryLabels.join(', ')}
               {secondaryLabels.length > 0 && (
@@ -148,12 +152,6 @@ function ExerciseRowRoot({
           </Badge>
         )}
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">{instructions}</p>
-        {notes && (
-          <p className="max-w-prose rounded-sm bg-accent/60 px-3 py-2 text-sm text-pretty">
-            <span className="font-semibold">Note: </span>
-            {notes}
-          </p>
-        )}
       </div>
     </div>
   );

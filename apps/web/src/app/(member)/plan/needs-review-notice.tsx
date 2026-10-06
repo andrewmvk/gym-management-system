@@ -14,12 +14,14 @@ interface NoticeExercise {
 
 interface NeedsReviewNoticeProps {
   exercises: readonly NoticeExercise[];
+  // Only today's plan can be rebuilt from here; a day ahead is changed through the coach.
+  canRebuild?: boolean;
   className?: string;
 }
 
 // Pace Tape means "look at this": a plan with an exercise that cannot be done is flagged for the trainers
 // too, and the member can skip the wait by rebuilding it from what is available.
-export function NeedsReviewNotice({ exercises, className }: NeedsReviewNoticeProps) {
+export function NeedsReviewNotice({ exercises, canRebuild = true, className }: NeedsReviewNoticeProps) {
   const rebuild = useRebuildPlan({ successMessage: "Your plan was rebuilt without what can't be done." });
   const blocked = exercises.filter((exercise) => !exercise.isPerformable);
 
@@ -50,15 +52,17 @@ export function NeedsReviewNotice({ exercises, className }: NeedsReviewNoticePro
           </ul>
         </div>
       </div>
-      <AiButton
-        variant="outline"
-        className="shrink-0"
-        isPending={rebuild.isPending}
-        pendingLabel="Rebuilding..."
-        onClick={rebuild.requestRebuild}
-      >
-        Rebuild today without them
-      </AiButton>
+      {canRebuild && (
+        <AiButton
+          variant="outline"
+          className="shrink-0"
+          isPending={rebuild.isPending}
+          pendingLabel="Rebuilding..."
+          onClick={rebuild.requestRebuild}
+        >
+          Rebuild today without them
+        </AiButton>
+      )}
       {rebuild.dialog}
     </section>
   );

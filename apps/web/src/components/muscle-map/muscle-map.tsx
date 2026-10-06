@@ -2,7 +2,7 @@
 
 import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { TriangleAlertIcon } from 'lucide-react';
-import { type PointerEvent, useId, useState } from 'react';
+import { type PointerEvent, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import {
   BACK_PATHS,
@@ -73,7 +73,7 @@ interface BodyViewProps extends Omit<MuscleMapProps, 'className' | 'hasTooltip'>
   paths: MusclePaths;
   box: { width: number; height: number };
   viewLabel: string;
-  onPointer?: (event: PointerEvent<SVGGElement>, muscle: MuscleId | null) => void;
+  onPointer?: (event: PointerEvent<SVGSVGElement>, muscle: MuscleId | null) => void;
   isSkeleton?: boolean;
   className?: string;
 }
@@ -106,12 +106,26 @@ function BodyView(props: BodyViewProps) {
   // Drawn last so its outline is never covered by a neighbor's stroke.
   const muscles = (Object.keys(paths) as MuscleId[]).sort((a, b) => emphasisOf(a, props) - emphasisOf(b, props));
 
+  // Hover is read from the one svg, which never moves, and not from each muscle: lighting a muscle reorders the
+  // shapes under the pointer, and a node that is moved away takes its pointerleave with it, which left the
+  // muscle lit and the tooltip standing.
+  const setHovered = (event: PointerEvent<SVGSVGElement>, muscle: MuscleId | null) => {
+    onHover?.(muscle);
+    onPointer?.(event, muscle);
+  };
+  const trackHover = (event: PointerEvent<SVGSVGElement>) => {
+    const owner = event.target instanceof Element ? event.target.closest<SVGGElement>('[data-muscle]') : null;
+    setHovered(event, (owner?.dataset.muscle as MuscleId | undefined) ?? null);
+  };
+
   return (
     <svg
       viewBox={`0 0 ${box.width} ${box.height}`}
       role="img"
       aria-label={`${label}, ${viewLabel.toLowerCase()} view`}
       className={cn('h-auto w-full', className)}
+      onPointerMove={isInteractive ? trackHover : undefined}
+      onPointerLeave={isInteractive ? (event) => setHovered(event, null) : undefined}
     >
       <defs>
         {/* Ink hatch reads on the pale steps, card-colored hatch on the dark ones, in both themes. */}
@@ -154,18 +168,9 @@ function BodyView(props: BodyViewProps) {
           <g
             key={muscle}
             aria-hidden
+            data-muscle={muscle}
             className={cn(isInteractive && 'cursor-pointer')}
             onClick={isInteractive ? () => onSelect?.(muscle) : undefined}
-            onPointerEnter={isInteractive ? () => onHover?.(muscle) : undefined}
-            onPointerMove={isInteractive && onPointer ? (event) => onPointer(event, muscle) : undefined}
-            onPointerLeave={
-              isInteractive
-                ? (event) => {
-                    onHover?.(null);
-                    onPointer?.(event, null);
-                  }
-                : undefined
-            }
           >
             {isInteractive && !onPointer && (
               <title>{isInjured ? `${muscleLabel(muscle)}, injured` : muscleLabel(muscle)}</title>
@@ -288,13 +293,31 @@ function MuscleMapRoot({
     if (next) setView(next.value);
   }
 
-  const trackPointer = (event: PointerEvent<SVGGElement>, muscle: MuscleId | null) => {
+  const trackPointer = (event: PointerEvent<SVGSVGElement>, muscle: MuscleId | null) => {
     if (!muscle || event.pointerType === 'touch') {
       setPointer(null);
       return;
     }
     setPointer({ muscle, x: event.clientX, y: event.clientY });
   };
+
+  // The tooltip sits at the pointer on the screen, so it must go when the page moves under a pointer that does
+  // not: a scroll, or the window losing focus, fires no pointerleave.
+  const { onHover } = props;
+  const hasPointer = pointer !== null;
+  useEffect(() => {
+    if (!hasPointer) return;
+    const clear = () => {
+      setPointer(null);
+      onHover?.(null);
+    };
+    window.addEventListener('scroll', clear, { capture: true, passive: true });
+    window.addEventListener('blur', clear);
+    return () => {
+      window.removeEventListener('scroll', clear, { capture: true });
+      window.removeEventListener('blur', clear);
+    };
+  }, [hasPointer, onHover]);
 
   const hiddenBelowSm = isSingleView ? 'hidden' : 'hidden sm:block';
 

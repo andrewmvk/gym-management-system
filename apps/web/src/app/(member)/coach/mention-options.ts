@@ -4,11 +4,7 @@ import { mentionLabel } from '@/app/(member)/coach/mention-chips';
 
 export type MentionSection = 'plan' | 'groups' | 'muscles';
 
-export const SECTION_LABELS: Record<MentionSection, string> = {
-  plan: "Today's plan",
-  groups: 'Muscle groups',
-  muscles: 'Muscles',
-};
+const STATIC_SECTION_LABELS = { groups: 'Muscle groups', muscles: 'Muscles' } as const;
 
 export interface MentionOption {
   chip: MentionChip;
@@ -16,11 +12,18 @@ export interface MentionOption {
   // The word beside the name: what kind of thing it is, or the group a muscle belongs to.
   hint: string;
   section: MentionSection;
+  // The heading the menu shows above the first option of its section.
+  sectionLabel: string;
 }
 
 // Everything the coach can be pointed at, wherever the member is in the app. The coach checks every id itself,
-// so an exercise outside today's plan costs nothing worse than being ignored.
-export function buildMentionOptions(planExercises: readonly { exerciseId: string; name: string }[]): MentionOption[] {
+// so an exercise outside the plan on screen costs nothing worse than being ignored. `planDay` names the day of
+// that plan when it is not today's.
+export function buildMentionOptions(
+  planExercises: readonly { exerciseId: string; name: string }[],
+  planDay: string | null,
+): MentionOption[] {
+  const planLabel = planDay ? `Plan for ${planDay}` : "Today's plan";
   const distribution: MentionChip = { type: 'distribution' };
   return [
     {
@@ -28,14 +31,21 @@ export function buildMentionOptions(planExercises: readonly { exerciseId: string
       label: mentionLabel(distribution),
       hint: 'whole plan',
       section: 'plan',
+      sectionLabel: planLabel,
     },
     ...planExercises.map((exercise) => {
       const chip: MentionChip = { type: 'exercise', exerciseId: exercise.exerciseId, name: exercise.name };
-      return { chip, label: exercise.name, hint: 'exercise', section: 'plan' as const };
+      return { chip, label: exercise.name, hint: 'exercise', section: 'plan' as const, sectionLabel: planLabel };
     }),
     ...MUSCLE_GROUPS.map((group) => {
       const chip: MentionChip = { type: 'group', group: group.id };
-      return { chip, label: group.label, hint: `${group.muscles.length} muscles`, section: 'groups' as const };
+      return {
+        chip,
+        label: group.label,
+        hint: `${group.muscles.length} muscles`,
+        section: 'groups' as const,
+        sectionLabel: STATIC_SECTION_LABELS.groups,
+      };
     }),
     ...MUSCLES.map((muscle) => {
       const chip: MentionChip = { type: 'muscle', muscle: muscle.id };
@@ -44,6 +54,7 @@ export function buildMentionOptions(planExercises: readonly { exerciseId: string
         label: muscle.label,
         hint: muscleGroupLabel(muscleGroupOf(muscle.id)),
         section: 'muscles' as const,
+        sectionLabel: STATIC_SECTION_LABELS.muscles,
       };
     }),
   ];

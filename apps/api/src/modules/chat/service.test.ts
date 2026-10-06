@@ -8,7 +8,7 @@ import {
   fTrainingPlans,
 } from '@api/db/schema';
 import { seedBase } from '@api/db/seed';
-import { todayLocal } from '@api/lib/dates';
+import { localDateString, todayLocal } from '@api/lib/dates';
 import type { AiResult } from '@api/modules/ai';
 import { eventsFromObject } from '@api/modules/ai/json-stream';
 import { assembleChatContext, buildChatUserPrompt, summarizeOlderEvents } from '@api/modules/chat/context';
@@ -825,6 +825,27 @@ describe('chat', () => {
 
       expect(prompt.split('Available exercise catalog')[0]).toContain('torn ligament from years ago');
       expect(prompt).toContain('5 older events not shown in detail: 5 life_event.');
+    });
+
+    it('discusses the day the member is looking at, and a draft still wins over it', async () => {
+      const member = await createMember();
+      const nextWeek = new Date();
+      nextWeek.setDate(nextWeek.getDate() + 7);
+      const viewed = localDateString(nextWeek);
+      await createPlan(member.id, todayLocal(), ['Barbell Back Squat']);
+      await createPlan(member.id, viewed, ['Push-Up']);
+
+      const context = await assembleChatContext(member.id, message('Is this balanced?', { date: viewed }));
+      const prompt = buildChatUserPrompt(context, message('Is this balanced?', { date: viewed }));
+      const withDraft = await assembleChatContext(
+        member.id,
+        message('Hi', { date: viewed, draft: { date: todayLocal(), exercises: [] } }),
+      );
+
+      expect(context.planDate).toBe(viewed);
+      expect(prompt).toContain(`Plan for ${viewed} as saved`);
+      expect(prompt).toContain('Push-Up');
+      expect(withDraft.planDate).toBe(todayLocal());
     });
 
     it('reports no plan and no events gracefully', async () => {

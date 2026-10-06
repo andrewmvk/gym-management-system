@@ -13,7 +13,7 @@ export function useUpdateExerciseNumbers() {
       onSuccess: () => {
         queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
         queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.plans.listUpcoming.queryKey() });
+        queryClient.invalidateQueries({ queryKey: trpc.plans.listDays.queryKey() });
         toast.message('Saved. Your coach will remember this change.');
       },
       onError: () => toast.error("We couldn't save that change. Nothing was changed. Try again."),

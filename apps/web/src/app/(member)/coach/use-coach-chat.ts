@@ -30,6 +30,8 @@ interface SendInput {
 
 interface UseCoachChatOptions {
   onProposal: (block: PlanProposalBlock, request: string) => void;
+  // The day of the plan on screen, so the coach reads what the member points at against that day.
+  viewedDate: string | null;
 }
 
 // The coach receives the ids only; the name on an exercise chip is for the screen.
@@ -44,7 +46,7 @@ const FAILED_MESSAGE = "We couldn't finish that reply. Nothing was changed. Try 
 
 // FR-25/FR-26: messages live only in this hook's state, so a reload forgets them. Durability lives in the
 // facts the coach asks the member to confirm and in the plans the member applies.
-export function useCoachChat({ onProposal }: UseCoachChatOptions) {
+export function useCoachChat({ onProposal, viewedDate }: UseCoachChatOptions) {
   const trpc = useTRPC();
   const client = useTRPCClient();
   const queryClient = useQueryClient();
@@ -52,6 +54,8 @@ export function useCoachChat({ onProposal }: UseCoachChatOptions) {
   const lastSentRef = useRef<{ text: string; mentions: MentionChip[] } | null>(null);
   const onProposalRef = useRef(onProposal);
   onProposalRef.current = onProposal;
+  const viewedDateRef = useRef(viewedDate);
+  viewedDateRef.current = viewedDate;
 
   const patchAssistant = (id: string, patch: (message: CoachMessage) => CoachMessage) =>
     setMessages((current) => current.map((message) => (message.id === id ? patch(message) : message)));
@@ -63,6 +67,7 @@ export function useCoachChat({ onProposal }: UseCoachChatOptions) {
         history,
         mentions: mentions.map(toApiMention),
         draft,
+        date: viewedDateRef.current ?? undefined,
       }),
     onEvent: (event, input) => {
       if (event.type === 'text') {

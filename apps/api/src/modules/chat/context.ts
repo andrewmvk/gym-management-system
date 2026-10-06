@@ -195,7 +195,8 @@ function draftSnapshot(draft: CoachDraft, catalog: readonly CatalogEntry[]): Dis
 
 export async function assembleChatContext(userId: string, input: CoachSendInput): Promise<ChatContext> {
   const today = todayLocal();
-  const planDate = input.draft?.date ?? today;
+  // A draft the member is reviewing wins, then the day they are looking at on the plan page, then today.
+  const planDate = input.draft?.date ?? input.date ?? today;
   const [user, onboardingSubmissions, profileEvents, catalog, aggregate] = await Promise.all([
     findUserById(userId),
     findSubmissionsByUserId(userId),

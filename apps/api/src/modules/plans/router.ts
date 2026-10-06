@@ -36,10 +36,11 @@ export const plansRouter = router({
     return service.listPlanDates(ctx.user.id, input.from, input.to);
   }),
 
-  // Today and later dates that already hold a plan, soonest first, so the member can reach a future plan.
-  listUpcoming: authedProcedure.query(({ ctx }) => {
+  // The days in the range that hold a plan, oldest first, each with its exercise and done counts, so the member
+  // sees a week of the plan page at a glance.
+  listDays: authedProcedure.input(ListDatesInputSchema).query(({ ctx, input }) => {
     assertCan(ctx.ability, 'read', subject('TrainingPlan', { userId: ctx.user.id }));
-    return service.listUpcomingPlans(ctx.user.id);
+    return service.listPlanDays(ctx.user.id, input.from, input.to);
   }),
 
   // The member's own correction of sets, reps or weight, for a plan that can still be done.

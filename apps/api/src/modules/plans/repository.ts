@@ -135,29 +135,42 @@ export function findDemandRowsForDate(
     .where(and(eq(fTrainingPlans.planDate, planDate), ne(fTrainingPlans.userId, excludeUserId)));
 }
 
-export interface UpcomingPlanRow {
+export interface PlanDayRow {
   planDate: string;
   status: TrainingPlan['status'];
   exerciseCount: number;
+  completedCount: number;
 }
 
-export async function findUpcomingPlans(
+// The member's plans in [fromDate, toDate], oldest first, each with how much of it is done: the day strip of
+// the plan page reads a whole week off this without opening each plan.
+export function findPlanDays(
   userId: string,
   fromDate: string,
+  toDate: string,
   executor: DatabaseExecutor = db,
-): Promise<UpcomingPlanRow[]> {
-  const rows = await executor
+): Promise<PlanDayRow[]> {
+  return executor
     .select({
       planDate: fTrainingPlans.planDate,
       status: fTrainingPlans.status,
       exerciseCount: count(fTrainingPlanExercises.id),
+      completedCount:
+        sql<number>`count(${fTrainingPlanExercises.id}) filter (where ${fTrainingPlanExercises.completed})`.mapWith(
+          Number,
+        ),
     })
     .from(fTrainingPlans)
     .leftJoin(fTrainingPlanExercises, eq(fTrainingPlanExercises.trainingPlanId, fTrainingPlans.id))
-    .where(and(eq(fTrainingPlans.userId, userId), gte(fTrainingPlans.planDate, fromDate)))
+    .where(
+      and(
+        eq(fTrainingPlans.userId, userId),
+        gte(fTrainingPlans.planDate, fromDate),
+        lte(fTrainingPlans.planDate, toDate),
+      ),
+    )
     .groupBy(fTrainingPlans.id, fTrainingPlans.planDate, fTrainingPlans.status)
     .orderBy(asc(fTrainingPlans.planDate));
-  return rows;
 }
 
 export interface MemberPlanSummary {

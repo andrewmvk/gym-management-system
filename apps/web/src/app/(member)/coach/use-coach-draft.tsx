@@ -55,7 +55,9 @@ function toRow(option: PickerOption): ProposalRow {
   };
 }
 
-export function useCoachDraft() {
+// `viewedDate` is the day of the plan on screen: an exercise added or swapped from a picker lands in the draft
+// the member is already reviewing, or else in the plan of that day, and in today's when none is on screen.
+export function useCoachDraft(viewedDate: string | null) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<CoachDraftState | null>(null);
@@ -65,7 +67,7 @@ export function useCoachDraft() {
   const invalidatePlanQueries = () => {
     queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
     queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
-    queryClient.invalidateQueries({ queryKey: trpc.plans.listUpcoming.queryKey() });
+    queryClient.invalidateQueries({ queryKey: trpc.plans.listDays.queryKey() });
   };
 
   const applyMutation = useMutation(
@@ -159,8 +161,12 @@ export function useCoachDraft() {
     };
   }
 
+  function targetDate() {
+    return draft?.status === 'open' ? draft.date : (viewedDate ?? toIsoDate(new Date()));
+  }
+
   async function addExercise(option: PickerOption, request: string) {
-    const base = await ensureDraft(toIsoDate(new Date()), request);
+    const base = await ensureDraft(targetDate(), request);
     if (base.rows.some((row) => row.exerciseId === option.exerciseId)) {
       setDraft(base);
       setIsPanelOpen(isDockedViewport());
@@ -174,7 +180,7 @@ export function useCoachDraft() {
   }
 
   async function swapExercise(fromExerciseId: string, option: PickerOption, request: string) {
-    const base = await ensureDraft(toIsoDate(new Date()), request);
+    const base = await ensureDraft(targetDate(), request);
     const rows = base.rows.filter((row) => row.exerciseId !== fromExerciseId);
     if (!rows.some((row) => row.exerciseId === option.exerciseId)) rows.push(toRow(option));
     setDraft({

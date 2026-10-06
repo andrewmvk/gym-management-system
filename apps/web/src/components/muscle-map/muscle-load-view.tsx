@@ -215,7 +215,14 @@ function MuscleLoadViewRoot({
   );
 
   return (
-    <div className={cn('@container', className)}>
+    // biome-ignore lint/a11y/noStaticElementInteractions: it only drops a hover the pointer has already left; every control inside is a real one.
+    <div
+      className={cn('@container', className)}
+      onMouseLeave={() => {
+        setHovered(null);
+        setHoveredGroup(null);
+      }}
+    >
       <div className="flex flex-col gap-5 @xl:grid @xl:grid-cols-2 @xl:items-start">
         <div className="flex flex-col gap-3">
           <MuscleMap

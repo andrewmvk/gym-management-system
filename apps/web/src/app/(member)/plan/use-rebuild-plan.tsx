@@ -39,7 +39,7 @@ export function useRebuildPlan({ successMessage, isErrorInline }: UseRebuildPlan
       }
       queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() });
       queryClient.invalidateQueries({ queryKey: trpc.plans.getByDate.queryKey() });
-      queryClient.invalidateQueries({ queryKey: trpc.plans.listUpcoming.queryKey() });
+      queryClient.invalidateQueries({ queryKey: trpc.plans.listDays.queryKey() });
       if (successMessage) toast.message(successMessage);
     },
     onError: () => {

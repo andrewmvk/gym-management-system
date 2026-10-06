@@ -129,14 +129,21 @@ Notes:
 ```
 0. Member logs in and lands on the Now screen (flow 10); the full plan, its
    muscle map and its history live on the plan page below.
-1. Member opens the plan page, sees today's plan (exercises from the curated library:
-   sets/reps/equipment) and can mark exercises as completed. An exercise
+1. Member opens the plan page. A day strip at the top shows the current
+   week, Monday to Sunday, one quiet tile per day with what the day holds
+   (a segment per exercise, filled when done, a check when the whole plan
+   is done, dashed for a day ahead), and today is chosen. Below it is the
+   plan of the chosen day (exercises from the curated library:
+   sets/reps/equipment), whose header shows the day's completion, and the
+   member can mark today's exercises as completed. An exercise
    only shows as currently performable if it needs no equipment or at
    least one of its linked equipment items is available.
-   Beside the plan sits a muscle map (FR-50): a front and back body where
-   each muscle is shaded by its weighted sets in today's plan, plus a radar
-   of the six muscle groups (chest, shoulders, back, arms, core, legs). The
-   panel follows the plan down the page on a wide screen. Hovering a muscle
+   An exercise's own note is behind a note icon on its row: hovering shows
+   it on a mouse, a click or a tap keeps it open.
+   Inside the plan, above the exercises, sits a muscle map (FR-50): a front
+   and back body where each muscle is shaded by its weighted sets in the
+   chosen day's plan, with a radar of the six muscle groups (chest,
+   shoulders, back, arms, core, legs) beside it. Hovering a muscle
    or a radar point lights up the other and shows its name and value in a
    tooltip; selecting a muscle (on the body) shows the exercises that train
    it, as primary or supporting, and dims the other exercises in the plan.
@@ -157,11 +164,16 @@ Notes:
    asked about anything on the page by pointing at it (FR-64): the @ button
    in the chat, then "Pick from the page" lights up every exercise, muscle,
    muscle group and the whole distribution; tapping them adds them to the
-   message, and nothing is sent until the member sends it.
-2. The plan page's "Other days" tab lets the member browse plan history by
-   date and see upcoming plans: the days from today onwards that already hold
-   a plan appear as date chips with their exercise count. Each day shows its
-   own muscle map and the same drilldown, read-only (ticks included).
+   message, and nothing is sent until the member sends it. The coach reads
+   what is pointed at against the day on screen, today or a day ahead.
+2. The same page covers every other day: the arrows move the strip a week
+   at a time, "Today" comes back, and a date picker jumps to any date.
+   A past day is shown as it was and is read-only; a day ahead shows its
+   plan with the ticks switched off (a plan can only be ticked on the day)
+   and can still be pointed at and changed through the coach; a day with no
+   plan opens an empty state ("Rest day" in the past, an "ask your coach"
+   button for a day ahead). Each day shows its own muscle map and the same
+   drilldown.
 3. Member opens the AI chat (a dialog; no persistent visible thread) and can:
    - Report they skipped/modified an exercise on a given day.
    - Report a physical state change (injury, soreness, medication change).

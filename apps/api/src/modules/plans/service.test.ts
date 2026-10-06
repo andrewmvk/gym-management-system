@@ -20,7 +20,7 @@ import {
   generatePlaceholderExercises,
   getPlanForDate,
   getTodayAggregate,
-  listUpcomingPlans,
+  listPlanDays,
 } from '@api/modules/plans/service';
 import { resetTestDatabase } from '@api/test/database';
 import { and, eq } from 'drizzle-orm';
@@ -329,21 +329,37 @@ describe('plans', () => {
       expect(todayView?.muscleLoad).toEqual({});
     });
 
-    it('can fetch a future plan and lists the upcoming dates with their exercise counts', async () => {
+    it('can fetch a future plan', async () => {
       const member = await createMember();
       const tomorrow = dateOffset(todayLocal(), 1);
-      const later = dateOffset(todayLocal(), 5);
-      await createPlanWithExercises(member.id, dateOffset(todayLocal(), -1), ['Push-Up']);
-      await createPlanWithExercises(member.id, later, ['Push-Up', 'Plank', 'Pull-Up']);
       await createPlanWithExercises(member.id, tomorrow, ['Push-Up', 'Plank']);
 
       const view = await getPlanForDate(member.id, tomorrow);
-      const upcoming = await listUpcomingPlans(member.id);
 
       expect(view?.planDate).toBe(tomorrow);
-      expect(upcoming).toEqual([
-        { planDate: tomorrow, status: 'ai_published', exerciseCount: 2 },
-        { planDate: later, status: 'ai_published', exerciseCount: 3 },
+      expect(view?.exercises).toHaveLength(2);
+    });
+
+    it('lists the days in a range with their exercise and done counts', async () => {
+      const member = await createMember();
+      const other = await createMember('days-other@example.com');
+      const yesterday = dateOffset(todayLocal(), -1);
+      const tomorrow = dateOffset(todayLocal(), 1);
+      const outside = dateOffset(todayLocal(), 9);
+      const past = await createPlanWithExercises(member.id, yesterday, ['Push-Up', 'Plank', 'Pull-Up']);
+      await db
+        .update(fTrainingPlanExercises)
+        .set({ completed: true })
+        .where(and(eq(fTrainingPlanExercises.trainingPlanId, past.id), eq(fTrainingPlanExercises.orderIndex, 0)));
+      await createPlanWithExercises(member.id, tomorrow, ['Push-Up', 'Plank']);
+      await createPlanWithExercises(member.id, outside, ['Push-Up']);
+      await createPlanWithExercises(other.id, tomorrow, ['Push-Up']);
+
+      const days = await listPlanDays(member.id, yesterday, dateOffset(todayLocal(), 6));
+
+      expect(days).toEqual([
+        { planDate: yesterday, status: 'ai_published', exerciseCount: 3, completedCount: 1 },
+        { planDate: tomorrow, status: 'ai_published', exerciseCount: 2, completedCount: 0 },
       ]);
     });
   });

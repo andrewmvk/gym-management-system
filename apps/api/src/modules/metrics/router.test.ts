@@ -31,7 +31,7 @@ async function callerFor(token?: string) {
 async function createMember(email: string) {
   const [member] = await db
     .insert(dUsers)
-    .values({ email, name: email, aptitudeStatus: 'cleared', membershipStatus: 'active', membershipPlan: 'Standard' })
+    .values({ email, name: email, membershipStatus: 'active', membershipPlan: 'Standard' })
     .returning();
   await db.insert(fUserPolicyGroupOnUser).values({ userId: member!.id, groupId: MEMBER_GROUP });
   return member!;
@@ -103,9 +103,11 @@ describe('metrics router', () => {
     const { member, first, second } = await seedKnownDataSet();
     const submission = {
       userId: member.id,
+      heightCm: 175,
+      weightKg: 70,
       medications: [],
       physicalConditions: { conditions: [] },
-      examAttachmentPaths: [],
+      exams: [],
     };
     await db.insert(fOnboardingSubmissions).values([
       { ...submission, goals: 'Old goal', submittedAt: new Date('2026-01-01T10:00:00') },

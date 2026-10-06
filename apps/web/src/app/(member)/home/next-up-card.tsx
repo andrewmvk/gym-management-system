@@ -1,17 +1,20 @@
 'use client';
 
 import { muscleLabel } from '@cadence/shared/schemas/muscles';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, DumbbellIcon, SparklesIcon, TriangleAlertIcon } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
+import { CheckIcon, DumbbellIcon, TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
-import { toast } from 'sonner';
+import { PlanBuildProgress } from '@/app/(member)/plan/plan-build-progress';
+import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
 import { useToggleExercise } from '@/app/(member)/plan/use-toggle-exercise';
+import { AiButton } from '@/components/ai-button';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { formatWeight } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 
 function CardShell({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
@@ -45,16 +48,9 @@ function NextUpCardSkeleton() {
 
 function NextUpCardRoot() {
   const trpc = useTRPC();
-  const queryClient = useQueryClient();
   const todayQuery = useQuery(trpc.plans.getToday.queryOptions());
   const toggle = useToggleExercise();
-
-  const generate = useMutation(
-    trpc.plans.generateToday.mutationOptions({
-      onSuccess: () => queryClient.invalidateQueries({ queryKey: trpc.plans.getToday.queryKey() }),
-      onError: () => toast.error("We couldn't generate your plan. Try again."),
-    }),
-  );
+  const generate = useRebuildPlan({ isErrorInline: true });
 
   if (todayQuery.isPending) {
     return (
@@ -79,17 +75,31 @@ function NextUpCardRoot() {
   if (!plan) {
     return (
       <CardShell>
-        <EmptyState
-          icon={DumbbellIcon}
-          title="No plan yet for today"
-          description="Your plan is built from your health profile and everything you've told your coach."
-          action={
-            <Button size="lg" disabled={generate.isPending} onClick={() => generate.mutate({})}>
-              <SparklesIcon data-icon="inline-start" />
-              {generate.isPending ? 'Building your plan...' : 'Build my plan'}
-            </Button>
-          }
-        />
+        {generate.isError ? (
+          <QueryError
+            title="We couldn't build your plan right now"
+            onRetry={generate.requestRebuild}
+            className="m-5 sm:m-6"
+          />
+        ) : (
+          <EmptyState
+            icon={DumbbellIcon}
+            title="No plan yet for today"
+            description="Your plan is built from your health profile and everything you've told your coach."
+            action={
+              <AiButton
+                size="lg"
+                isPending={generate.isPending}
+                pendingLabel="Building your plan..."
+                onClick={generate.requestRebuild}
+              >
+                Build my plan
+              </AiButton>
+            }
+          />
+        )}
+        {generate.isPending && generate.streamed.length > 0 && <PlanBuildProgress exercises={generate.streamed} />}
+        {generate.dialog}
       </CardShell>
     );
   }
@@ -149,7 +159,8 @@ function NextUpCardRoot() {
         </div>
       }
     >
-      <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
+      {/* Ticking an exercise off brings the next one in, so the card reads as moving on, not as a rewrite. */}
+      <div key={next.id} className="flex animate-block-in flex-col gap-4 px-5 py-5 sm:px-6">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="font-display text-xl font-bold tracking-wide uppercase">Next up</h2>
           <p className="numerals text-xl font-bold text-muted-foreground">
@@ -171,9 +182,11 @@ function NextUpCardRoot() {
           {next.sets}
           <span className="px-1 text-muted-foreground">&times;</span>
           {next.reps}
-          {next.load && <span className="mt-2 block text-2xl font-bold text-muted-foreground">{next.load}</span>}
+          {next.load ? (
+            <span className="mt-2 block text-2xl font-bold text-muted-foreground">{formatWeight(next.load)}</span>
+          ) : null}
         </p>
-        <details>
+        <details className="[&[open]>:not(summary)]:animate-in [&[open]>:not(summary)]:duration-200 [&[open]>:not(summary)]:fade-in-0">
           <summary className="flex min-h-11 w-fit items-center text-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/45">
             How to do it
           </summary>

@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 import { DateRangePicker } from '@/components/date-range-picker';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { HelpTip } from '@/components/help-tip';
 import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
 import { PanelSection as Section } from '@/components/panel-section';
 import { QueryError } from '@/components/query-error';
@@ -28,10 +29,13 @@ function rangeOfLastDays(days: number) {
 
 const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 
-function Figure({ label, value, unit }: { label: string; value: string; unit: string }) {
+function Figure({ label, value, unit, help }: { label: string; value: string; unit: string; help: string }) {
   return (
     <div className="flex flex-col gap-1 px-5 py-4 sm:px-6">
-      <dt className="font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase">{label}</dt>
+      <dt className="flex items-center gap-1 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase">
+        {label}
+        <HelpTip text={help} />
+      </dt>
       <dd className="flex items-baseline gap-1.5">
         <span className="numerals font-display text-4xl leading-none font-bold">{value}</span>
         <span className="text-sm text-muted-foreground">{unit}</span>
@@ -203,19 +207,35 @@ function MemberMetricsRoot() {
           >
             <dl className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
               <div className="bg-card">
-                <Figure label="Days trained" value={String(metrics.daysTrained)} unit="days" />
+                <Figure
+                  label="Days trained"
+                  value={String(metrics.daysTrained)}
+                  unit="days with a check-in"
+                  help="Days with a check-in at the gym door in this range. Plans and ticks do not count."
+                />
               </div>
               <div className="bg-card">
-                <Figure label="Frequency" value={numberFormat.format(metrics.trainingFrequency)} unit="days / week" />
+                <Figure
+                  label="Frequency"
+                  value={numberFormat.format(metrics.trainingFrequency)}
+                  unit="days trained per week"
+                  help="Days trained divided by the number of weeks in this range."
+                />
               </div>
               <div className="bg-card">
-                <Figure label="Volume" value={numberFormat.format(metrics.trainingVolume)} unit="total reps" />
+                <Figure
+                  label="Reps completed"
+                  value={numberFormat.format(metrics.trainingVolume)}
+                  unit="reps in total"
+                  help="Sets times reps of every exercise you ticked off in this range, added up. The load is not counted."
+                />
               </div>
               <div className="bg-card">
                 <Figure
                   label="Plan completed"
                   value={`${Math.round(goalProgress.completionRate * 100)}%`}
-                  unit={`${goalProgress.completedExercises} of ${goalProgress.plannedExercises}`}
+                  unit={`${goalProgress.completedExercises} of ${goalProgress.plannedExercises} exercises`}
+                  help="Exercises you ticked off divided by the exercises in your plans in this range."
                 />
               </div>
             </dl>
@@ -233,7 +253,10 @@ function MemberMetricsRoot() {
                 <BreakdownTable heading="Exercise" rows={exerciseBreakdown.byExercise} />
               )}
             </Section>
-            <Section title="Muscles worked" description="Weighted sets from the exercises you completed.">
+            <Section
+              title="Muscles worked"
+              description="Counted in weighted sets, not reps: a completed set counts once for a primary muscle and half for a supporting one."
+            >
               {Object.keys(exerciseBreakdown.muscleLoad).length === 0 ? (
                 <EmptyState
                   icon={ChartNoAxesColumnIcon}

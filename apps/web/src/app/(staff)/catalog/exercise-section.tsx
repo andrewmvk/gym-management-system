@@ -1,42 +1,26 @@
 'use client';
 
-import { type ExerciseMuscle, ExerciseMusclesSchema, muscleLabel } from '@cadence/shared/schemas/muscles';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
+import { useQuery } from '@tanstack/react-query';
 import { DumbbellIcon, PlusIcon, SearchXIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
-import { Controller, useForm } from 'react-hook-form';
-import { toast } from 'sonner';
-import { z } from 'zod';
+import { type ReactNode, useState } from 'react';
 import { useAppAbility } from '@/abilities';
+import { CreateExerciseSheet } from '@/app/(staff)/catalog/create-exercise-sheet';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
-import { MuscleSelector } from '@/components/muscle-map/muscle-selector';
+import { FilterBar } from '@/components/filter-bar';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
 import { SearchInput } from '@/components/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Textarea } from '@/components/ui/textarea';
 import { useUrlState } from '@/hooks/use-url-state';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
 const PAGE_SIZE = 12;
-
-const CreateExerciseSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required'),
-  instructions: z.string().trim().min(1, 'Instructions are required'),
-  muscles: ExerciseMusclesSchema,
-  equipmentIds: z.array(z.string()),
-});
-type CreateExerciseInput = z.infer<typeof CreateExerciseSchema>;
 
 // Primary muscles by name, with a count of the supporting ones so the cell stays one line.
 function describeMuscles(muscles: readonly ExerciseMuscle[]) {
@@ -82,146 +66,16 @@ function ExerciseTableSkeleton() {
   );
 }
 
-function CreateExerciseForm() {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
-  const equipmentQuery = useQuery(trpc.catalog.listEquipment.queryOptions());
-
-  const form = useForm<CreateExerciseInput>({
-    resolver: zodResolver(CreateExerciseSchema),
-    defaultValues: { name: '', instructions: '', muscles: [], equipmentIds: [] },
-  });
-
-  const create = useMutation(
-    trpc.catalog.createExercise.mutationOptions({
-      onSuccess: (_result, variables) => {
-        queryClient.invalidateQueries({ queryKey: trpc.catalog.list.queryKey() });
-        form.reset();
-        toast.message(`${variables.name} added to the catalog.`);
-      },
-      onError: () => toast.error("Couldn't add the exercise. Try again."),
-    }),
-  );
-
+function ExerciseSectionSkeleton({ action }: { action?: ReactNode }) {
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Add exercise</CardTitle>
-        <CardDescription>Exercises can't be deleted later, so past plans always resolve.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form noValidate onSubmit={form.handleSubmit((values) => create.mutate(values))}>
-          <FieldGroup>
-            <Controller
-              name="name"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="exercise-name">Name</FieldLabel>
-                  <Input
-                    {...field}
-                    id="exercise-name"
-                    placeholder="e.g. Incline dumbbell press"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
-              name="instructions"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="exercise-instructions">Instructions</FieldLabel>
-                  <Textarea
-                    {...field}
-                    id="exercise-instructions"
-                    className="min-h-16"
-                    aria-invalid={fieldState.invalid}
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
-              name="muscles"
-              control={form.control}
-              render={({ field, fieldState }) => (
-                <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel id="exercise-muscles-label">Muscles trained</FieldLabel>
-                  <MuscleSelector
-                    value={field.value}
-                    onChange={field.onChange}
-                    isInvalid={fieldState.invalid}
-                    labelledBy="exercise-muscles-label"
-                  />
-                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
-                </Field>
-              )}
-            />
-            <Controller
-              name="equipmentIds"
-              control={form.control}
-              render={({ field }) => (
-                <fieldset className="flex flex-col gap-2">
-                  <legend className="mb-2 text-sm font-medium">
-                    Equipment needed <span className="font-normal text-muted-foreground">(none for bodyweight)</span>
-                  </legend>
-                  {equipmentQuery.isPending && (
-                    <Deferred>
-                      {Array.from({ length: 3 }, (_, index) => (
-                        // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
-                        <Skeleton key={index} className="h-5 w-32" />
-                      ))}
-                    </Deferred>
-                  )}
-                  {equipmentQuery.isError && (
-                    <p className="text-sm text-destructive">We couldn&apos;t load the equipment list.</p>
-                  )}
-                  {equipmentQuery.isSuccess && (
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      {equipmentQuery.data.map((item) => (
-                        <label
-                          key={item.id}
-                          htmlFor={`exercise-equipment-${item.id}`}
-                          className="flex items-center gap-2.5 rounded-md border px-3 py-2 text-sm transition-colors hover:bg-muted/60 has-data-checked:border-primary/50 has-data-checked:bg-accent/50"
-                        >
-                          <Checkbox
-                            id={`exercise-equipment-${item.id}`}
-                            checked={field.value.includes(item.id)}
-                            onCheckedChange={(checked) =>
-                              field.onChange(
-                                checked ? [...field.value, item.id] : field.value.filter((id) => id !== item.id),
-                              )
-                            }
-                          />
-                          <span className="truncate">{item.name}</span>
-                        </label>
-                      ))}
-                    </div>
-                  )}
-                </fieldset>
-              )}
-            />
-            <Button type="submit" disabled={create.isPending}>
-              <PlusIcon data-icon="inline-start" />
-              {create.isPending ? 'Adding...' : 'Add exercise'}
-            </Button>
-          </FieldGroup>
-        </form>
-      </CardContent>
-    </Card>
-  );
-}
-
-function ExerciseSectionSkeleton() {
-  return (
-    <div className="overflow-hidden rounded-lg border bg-card">
-      <div className="border-b px-5 py-4 sm:px-6">
-        <Skeleton className="h-10 w-full sm:w-72" />
+    <div className="flex flex-col gap-4">
+      <FilterBar>
+        <Skeleton className="h-10 w-full lg:w-80" />
+        {action && <FilterBar.Trailing>{action}</FilterBar.Trailing>}
+      </FilterBar>
+      <div className="overflow-hidden rounded-lg border bg-card">
+        <ExerciseTableSkeleton />
       </div>
-      <ExerciseTableSkeleton />
     </div>
   );
 }
@@ -232,6 +86,7 @@ function ExerciseSectionRoot() {
   const canManage = ability.can('manage', 'Catalog');
   const query = useQuery(trpc.catalog.list.queryOptions());
   const [search, setSearch] = useUrlState<string>('q', '');
+  const [isCreating, setIsCreating] = useState(false);
 
   const term = search.trim().toLowerCase();
   const filtered = (query.data ?? []).filter(
@@ -241,12 +96,18 @@ function ExerciseSectionRoot() {
       exercise.muscles.some((entry) => muscleLabel(entry.muscle).toLowerCase().includes(term)),
   );
   const pagination = usePagination(filtered, PAGE_SIZE);
+  const addAction = canManage ? (
+    <Button onClick={() => setIsCreating(true)}>
+      <PlusIcon data-icon="inline-start" />
+      Add exercise
+    </Button>
+  ) : undefined;
 
   let list: ReactNode;
   if (query.isPending) {
     list = (
       <Deferred>
-        <ExerciseSectionSkeleton />
+        <ExerciseSectionSkeleton action={addAction} />
       </Deferred>
     );
   } else if (query.isError) {
@@ -263,28 +124,32 @@ function ExerciseSectionRoot() {
         <EmptyState
           icon={DumbbellIcon}
           title="No exercises yet"
-          description={canManage ? 'Add the first one with the form.' : 'An admin adds exercises here.'}
+          description={canManage ? 'Add the first one to start building plans.' : 'An admin adds exercises here.'}
+          action={addAction}
         />
       </div>
     );
   } else {
     list = (
       <div className="flex flex-col gap-4">
-        <div className="overflow-hidden rounded-lg border bg-card">
-          <div className="border-b px-5 py-4 sm:px-6">
-            <SearchInput
-              value={search}
-              onChange={(value) => {
-                setSearch(value);
-                pagination.setPage(1);
-              }}
-              placeholder="Search exercises or muscles"
-              className="sm:w-80"
-            />
-          </div>
-          {filtered.length === 0 ? (
+        <FilterBar>
+          <SearchInput
+            value={search}
+            onChange={(value) => {
+              setSearch(value);
+              pagination.setPage(1);
+            }}
+            placeholder="Search exercises or muscles"
+            className="w-full lg:w-80"
+          />
+          {addAction && <FilterBar.Trailing>{addAction}</FilterBar.Trailing>}
+        </FilterBar>
+        {filtered.length === 0 ? (
+          <div className="rounded-lg border bg-card">
             <EmptyState icon={SearchXIcon} title="No matches" description="Try another name or muscle." />
-          ) : (
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border bg-card">
             <Table>
               <ExerciseTableHead />
               <TableBody>
@@ -297,15 +162,15 @@ function ExerciseSectionRoot() {
                     <TableCell className="hidden sm:table-cell">{describeMuscles(exercise.muscles)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={exercise.isAvailable ? 'live' : 'unavailable'}>
-                        {exercise.isAvailable ? 'Available' : 'Unavailable'}
+                        {exercise.isAvailable ? 'Available' : 'Out of service'}
                       </Badge>
                     </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
-          )}
-        </div>
+          </div>
+        )}
         <Pagination
           page={pagination.page}
           pageCount={pagination.pageCount}
@@ -319,9 +184,18 @@ function ExerciseSectionRoot() {
   }
 
   return (
-    <div className={canManage ? 'grid items-start gap-6 lg:grid-cols-3' : undefined}>
-      <div className="min-w-0 lg:col-span-2">{list}</div>
-      {canManage && <CreateExerciseForm />}
+    <div className="min-w-0">
+      {list}
+      {canManage && (
+        <CreateExerciseSheet
+          isOpen={isCreating}
+          onOpenChange={setIsCreating}
+          onCreated={(name) => {
+            setSearch(name);
+            pagination.setPage(1);
+          }}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ Covers: FR-10, FR-11
 MVP: 2
 Artifacts: apps/api/src/modules/onboarding/ (invite subscriber), the (member) layout redirect in apps/web
 Evidence: Vitest: activating a member sends exactly one e-mail containing the onboarding link, and a failing e-mail provider does not break activation; manual: a member without an onboarding submission is redirected to /onboarding
+Status: Partly superseded by P-31 (audit-log item 20): the e-mail is sent when registration completes and links to the login page, not to the onboarding form, and after login the onboarding gate is required for everyone (FR-10 and FR-11 are rewritten). The code stays until P-31 lands
 
 Task: send the onboarding invite e-mail when a member is activated, and make the in-app onboarding page a guaranteed step.
 

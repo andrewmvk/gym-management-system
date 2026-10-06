@@ -13,7 +13,7 @@
 - `PascalCase` - types, interfaces, classes, enums, React components, zod schema constants that represent a type (`PlanSchema`).
 - `UPPER_SNAKE_CASE` - true constants and env var names (`OPENROUTER_MODEL`, `KIOSK_API_KEY`).
 - Booleans prefixed `is`/`has`/`should`/`can` (`isPending`, `hasLinkedEquipment`), never a bare adjective or negation (`disabled` not `notEnabled`).
-- No abbreviations that aren't already domain terms from `docs/05-data-model.md` (e.g. `aptitudeStatus`, not `apStat`).
+- No abbreviations that aren't already domain terms from `docs/05-data-model.md` (e.g. `membershipStatus`, not `memStat`).
 
 ## Database
 
@@ -30,11 +30,11 @@ When adding a new table, classify it the same way before naming it: does it desc
 userId: uuid('user_id').references(() => dUsers.id)
 ```
 
-One exception to `uuid` primary keys: `d_user_policy.id` and `d_user_policy_group.id` are `text` slugs (`manage_onboarding`, `read_aptitude`, `admin`, …), since it's referenced directly as a stable identifier in code rather than looked up - see `rules/database.md`.
+One exception to `uuid` primary keys: `d_user_policy.id` and `d_user_policy_group.id` are `text` slugs (`manage_own_onboarding`, `read_checkins`, `admin`, …), since it's referenced directly as a stable identifier in code rather than looked up - see `rules/database.md`.
 
 ## tRPC routers and procedures
 
-Resource-first, verb-second: `plans.getToday`, `plans.adjust`, `certificates.review`, `checkins.submit`, `catalog.toggleEquipment`, `policies.list`, `policies.grant`, `policies.revoke`. Router files live in their domain module (see `rules/backend.md`) and are named after the resource, not the verb.
+Resource-first, verb-second: `plans.getToday`, `plans.adjust`, `reviews.editPlan`, `checkins.listRecent`, `catalog.setEquipmentAvailability`, `policies.list`, `policies.grant`, `policies.revoke`. Router files live in their domain module (see `rules/backend.md`) and are named after the resource, not the verb.
 
 ## Branches and commits
 

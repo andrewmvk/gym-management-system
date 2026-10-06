@@ -1,5 +1,5 @@
 import { type ExerciseMuscle, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
-import { FocusStepper } from '@/app/(member)/plan/focus-stepper';
+import { TriangleAlertIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -14,21 +14,29 @@ export interface PanelExercise {
 interface MuscleDetailProps {
   muscle: MuscleId;
   exercises: readonly PanelExercise[];
-  bias?: number;
-  onBias?: (bias: number) => void;
-  isBiasDisabled?: boolean;
+  // What the member reported about this muscle, when an injury names it.
+  injury?: string;
 }
 
-// What one muscle does in a plan: the exercises that hit it, and, when editable, the member's focus for it.
-export function MuscleDetail({ muscle, exercises, bias, onBias, isBiasDisabled }: MuscleDetailProps) {
+// What one muscle does in a plan: the exercises that hit it.
+export function MuscleDetail({ muscle, exercises, injury }: MuscleDetailProps) {
   const hits = exercises.flatMap((exercise) => {
     const entry = exercise.muscles.find((candidate) => candidate.muscle === muscle);
     return entry ? [{ exercise, role: entry.role }] : [];
   });
 
   return (
-    <section aria-label={muscleLabel(muscle)} className="flex flex-col gap-3 border-y py-4">
+    <section aria-label={muscleLabel(muscle)} className="flex flex-col gap-3 border-t py-4">
       <h3 className="font-display text-xl font-bold tracking-wide uppercase">{muscleLabel(muscle)}</h3>
+      {injury && (
+        <p className="flex items-start gap-2 rounded-sm bg-tape/20 px-3 py-2 text-sm text-pretty">
+          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <span>
+            <span className="font-semibold">You reported: </span>
+            {injury}
+          </span>
+        </p>
+      )}
       {hits.length === 0 ? (
         <p className="text-sm text-muted-foreground">Nothing in this plan trains it.</p>
       ) : (
@@ -45,13 +53,6 @@ export function MuscleDetail({ muscle, exercises, bias, onBias, isBiasDisabled }
             </li>
           ))}
         </ul>
-      )}
-      {onBias && (
-        <div className="flex flex-col gap-2 pt-1">
-          <p className="text-sm font-semibold">Focus for this muscle</p>
-          <FocusStepper muscle={muscle} value={bias ?? 0} onChange={onBias} disabled={isBiasDisabled} />
-          <p className="text-xs text-muted-foreground">Used the next time your coach builds a plan.</p>
-        </div>
       )}
     </section>
   );

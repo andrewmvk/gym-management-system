@@ -1,118 +1,204 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useState } from 'react';
-import { toast } from 'sonner';
-import { type Attachment, ExamAttachmentsField } from '@/app/(member)/onboarding/exam-attachments-field';
+import { type ExamEntry, OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Controller, useForm } from 'react-hook-form';
+import { ExamEntriesField } from '@/app/(member)/onboarding/exam-entries-field';
+import type { OnboardingFormInput, OnboardingFormOutput } from '@/app/(member)/onboarding/onboarding-form-types';
 import { StringListField } from '@/app/(member)/onboarding/string-list-field';
+import { AiButton } from '@/components/ai-button';
 import { Button } from '@/components/ui/button';
-import { Field, FieldDescription, FieldGroup, FieldLabel, FieldLegend, FieldSet } from '@/components/ui/field';
+import {
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  FieldLegend,
+  FieldSet,
+} from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { useTRPC } from '@/lib/trpc';
+
+export interface OnboardingInitialValues {
+  heightCm: number;
+  weightKg: number;
+  goals: string;
+  medications: string[];
+  conditions: string[];
+  otherNotes?: string;
+  exams: ExamEntry[];
+}
 
 interface OnboardingFormProps {
   isUpdate: boolean;
-  onSubmitted: () => void;
+  initialValues?: OnboardingInitialValues;
+  isSubmitting: boolean;
+  onSubmit: (values: OnboardingFormOutput) => void;
   onCancel?: () => void;
 }
 
-export function OnboardingForm({ isUpdate, onSubmitted, onCancel }: OnboardingFormProps) {
-  const trpc = useTRPC();
-  const queryClient = useQueryClient();
+function toNumber(value: string) {
+  return value === '' ? undefined : Number(value);
+}
 
-  const [medications, setMedications] = useState<string[]>([]);
-  const [conditions, setConditions] = useState<string[]>([]);
-  const [otherNotes, setOtherNotes] = useState('');
-  const [goals, setGoals] = useState('');
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
-  const [isGoalsMissing, setIsGoalsMissing] = useState(false);
-
-  const submit = useMutation(
-    trpc.onboarding.submit.mutationOptions({
-      onSuccess: () => {
-        queryClient.invalidateQueries({ queryKey: trpc.onboarding.getStatus.queryKey() });
-        queryClient.invalidateQueries({ queryKey: trpc.onboarding.listMine.queryKey() });
-        onSubmitted();
-      },
-      onError: () => toast.error("We couldn't submit your information. Try again."),
-    }),
-  );
-
-  function handleSubmit() {
-    if (!goals.trim()) {
-      setIsGoalsMissing(true);
-      document.getElementById('onboarding-goals')?.focus();
-      return;
-    }
-    submit.mutate({
-      medications,
-      physicalConditions: { conditions, otherNotes: otherNotes.trim() || undefined },
-      goals: goals.trim(),
-      attachments,
-    });
-  }
+export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit, onCancel }: OnboardingFormProps) {
+  const form = useForm<OnboardingFormInput, unknown, OnboardingFormOutput>({
+    resolver: zodResolver(OnboardingSubmitInputSchema),
+    defaultValues: {
+      heightCm: initialValues?.heightCm,
+      weightKg: initialValues?.weightKg,
+      goals: initialValues?.goals ?? '',
+      medications: initialValues?.medications ?? [],
+      physicalConditions: { conditions: initialValues?.conditions ?? [], otherNotes: initialValues?.otherNotes },
+      exams: initialValues?.exams ?? [],
+    },
+  });
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card">
+    <form noValidate onSubmit={form.handleSubmit(onSubmit)} className="overflow-hidden rounded-lg border bg-card">
       <div className="grid gap-10 p-5 sm:p-8 lg:grid-cols-5 lg:gap-12">
-        <FieldSet className="min-w-0 lg:col-span-2">
-          <FieldLegend>Goals</FieldLegend>
-          <Field data-invalid={isGoalsMissing}>
-            <FieldLabel htmlFor="onboarding-goals">What do you want to achieve?</FieldLabel>
-            <Textarea
-              id="onboarding-goals"
-              value={goals}
-              aria-invalid={isGoalsMissing}
-              onChange={(e) => {
-                setGoals(e.target.value);
-                if (e.target.value.trim()) setIsGoalsMissing(false);
-              }}
-              placeholder="e.g. Run a 10k by March, get stronger without hurting my back"
+        <div className="flex min-w-0 flex-col gap-10 lg:col-span-2">
+          <FieldSet>
+            <FieldLegend>About you</FieldLegend>
+            <FieldDescription>
+              {isUpdate
+                ? 'Filled in from your last update. Change what is different.'
+                : 'Your coach sizes the load of your plan to these.'}
+            </FieldDescription>
+            <FieldGroup className="grid grid-cols-2 gap-4">
+              <Controller
+                name="heightCm"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="onboarding-height">Height (cm)</FieldLabel>
+                    <Input
+                      id="onboarding-height"
+                      ref={field.ref}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      type="number"
+                      inputMode="numeric"
+                      aria-invalid={fieldState.invalid}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(toNumber(event.target.value))}
+                      placeholder="e.g. 175"
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+              <Controller
+                name="weightKg"
+                control={form.control}
+                render={({ field, fieldState }) => (
+                  <Field data-invalid={fieldState.invalid}>
+                    <FieldLabel htmlFor="onboarding-weight">Weight (kg)</FieldLabel>
+                    <Input
+                      id="onboarding-weight"
+                      ref={field.ref}
+                      name={field.name}
+                      onBlur={field.onBlur}
+                      type="number"
+                      inputMode="decimal"
+                      step="0.1"
+                      aria-invalid={fieldState.invalid}
+                      value={field.value ?? ''}
+                      onChange={(event) => field.onChange(toNumber(event.target.value))}
+                      placeholder="e.g. 72.5"
+                    />
+                    {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                  </Field>
+                )}
+              />
+            </FieldGroup>
+          </FieldSet>
+
+          <FieldSet>
+            <FieldLegend>Goals</FieldLegend>
+            <Controller
+              name="goals"
+              control={form.control}
+              render={({ field, fieldState }) => (
+                <Field data-invalid={fieldState.invalid}>
+                  <FieldLabel htmlFor="onboarding-goals">What do you want to achieve?</FieldLabel>
+                  <Textarea
+                    {...field}
+                    id="onboarding-goals"
+                    aria-invalid={fieldState.invalid}
+                    placeholder="e.g. Run a 10k by March, get stronger without hurting my back"
+                  />
+                  {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
+                </Field>
+              )}
             />
-            {isGoalsMissing && <p className="text-sm text-destructive">Tell us your goals before submitting.</p>}
-          </Field>
-        </FieldSet>
+          </FieldSet>
+        </div>
 
         <FieldSet className="min-w-0 lg:col-span-3">
           <FieldLegend>Health</FieldLegend>
-          <FieldDescription>Only what applies to you. You can add more later by telling your coach.</FieldDescription>
+          <FieldDescription>
+            Only what applies to you. Leave a list empty if you have none. You can add more later by telling your coach.
+          </FieldDescription>
           <FieldGroup>
-            <StringListField
-              id="onboarding-medications"
-              label="Medications"
-              placeholder="e.g. Ibuprofen"
-              values={medications}
-              onChange={setMedications}
+            <Controller
+              name="medications"
+              control={form.control}
+              render={({ field }) => (
+                <StringListField
+                  id="onboarding-medications"
+                  label="Medications"
+                  placeholder="e.g. Ibuprofen"
+                  values={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
             />
-            <StringListField
-              id="onboarding-conditions"
-              label="Physical conditions and limitations"
-              placeholder="e.g. Left knee injury"
-              values={conditions}
-              onChange={setConditions}
+            <Controller
+              name="physicalConditions.conditions"
+              control={form.control}
+              render={({ field }) => (
+                <StringListField
+                  id="onboarding-conditions"
+                  label="Physical conditions and limitations"
+                  placeholder="e.g. Left knee injury"
+                  values={field.value ?? []}
+                  onChange={field.onChange}
+                />
+              )}
             />
-            <Field>
-              <FieldLabel htmlFor="onboarding-other-notes">Anything else we should know?</FieldLabel>
-              <Textarea
-                id="onboarding-other-notes"
-                value={otherNotes}
-                onChange={(e) => setOtherNotes(e.target.value)}
-              />
-            </Field>
-            <ExamAttachmentsField values={attachments} onChange={setAttachments} />
+            <ExamEntriesField form={form} />
+            <Controller
+              name="physicalConditions.otherNotes"
+              control={form.control}
+              render={({ field }) => (
+                <Field>
+                  <FieldLabel htmlFor="onboarding-other-notes">Anything else we should know?</FieldLabel>
+                  <Textarea
+                    id="onboarding-other-notes"
+                    ref={field.ref}
+                    name={field.name}
+                    onBlur={field.onBlur}
+                    value={field.value ?? ''}
+                    onChange={(event) => field.onChange(event.target.value.trim() ? event.target.value : undefined)}
+                  />
+                </Field>
+              )}
+            />
           </FieldGroup>
         </FieldSet>
       </div>
       <div className="flex flex-col-reverse gap-2 border-t bg-muted/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-8">
         {onCancel && (
-          <Button variant="ghost" disabled={submit.isPending} onClick={onCancel}>
+          <Button type="button" variant="ghost" disabled={isSubmitting} onClick={onCancel}>
             Cancel
           </Button>
         )}
-        <Button disabled={submit.isPending} onClick={handleSubmit}>
-          {submit.isPending ? 'Submitting...' : isUpdate ? 'Save update' : 'Build my plan'}
-        </Button>
+        <AiButton type="submit" isPending={isSubmitting} pendingLabel="Saving and building your plan...">
+          {isUpdate ? 'Save and update my plan' : 'Save and build my plan'}
+        </AiButton>
       </div>
-    </div>
+    </form>
   );
 }

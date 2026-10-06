@@ -1,6 +1,12 @@
 'use client';
 
-import { LOCKOUT_PROTECTED_POLICY_IDS, type POLICY_EFFECTS } from '@cadence/shared/auth';
+import {
+  type Action,
+  LOCKOUT_PROTECTED_POLICY_IDS,
+  type POLICY_EFFECTS,
+  type Scope,
+  type Subject,
+} from '@cadence/shared/auth';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -41,8 +47,44 @@ export interface GroupOption {
   policyIds: string[];
 }
 
+// Typed over every subject and action, so adding one to the shared auth types is a compile error here until it has a
+// readable name, instead of a raw identifier like "GymSettings" reaching the screen.
+const SUBJECT_LABELS: Record<Subject, string> = {
+  TrainingPlan: 'training plans',
+  PlanReview: 'plan reviews',
+  Catalog: 'the catalog',
+  Onboarding: 'onboarding',
+  ProfileEvent: 'remembered facts',
+  CheckIn: 'check-ins',
+  TurnstileConfig: 'turnstile settings',
+  GymInfo: 'gym information',
+  GymSettings: 'gym settings',
+  Metrics: 'metrics',
+  Member: 'members',
+  UserPolicyAssignment: 'policy assignments',
+  MemberApp: 'the member app',
+  StaffApp: 'the staff app',
+};
+
+const ACTION_LABELS: Record<Action, string> = {
+  create: 'Create',
+  read: 'Read',
+  update: 'Update',
+  delete: 'Delete',
+  manage: 'Manage',
+};
+
+const SCOPE_LABELS: Record<Scope, string> = {
+  self: 'their own only',
+  all: 'everyone',
+};
+
+// The policy's permission in words. An identifier the maps do not know falls back to itself, so a policy is never hidden.
 export function policyMeta(policy: Pick<PolicyOption, 'operation' | 'resource' | 'scope'>) {
-  return `${policy.operation} ${policy.resource}, ${policy.scope}`;
+  const action = ACTION_LABELS[policy.operation as Action] ?? policy.operation;
+  const subject = SUBJECT_LABELS[policy.resource as Subject] ?? policy.resource;
+  const scope = SCOPE_LABELS[policy.scope as Scope] ?? policy.scope;
+  return `${action} ${subject}, ${scope}`;
 }
 
 export function groupLabel(groupId: string) {

@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-03T18:00:00Z",
+  "generatedAt": "2026-10-05T21:00:00Z",
   "title": "Design System: Cadence",
   "extensions": {
     "colorMeta": {
@@ -129,6 +129,22 @@
       "description": "Plan row with numerals; checking it strikes the name left to right.",
       "html": "<label class=\"ds-row\"><input type=\"checkbox\" class=\"ds-check\" checked /><span class=\"ds-row-index\">1</span><span class=\"ds-row-body\"><span class=\"ds-row-name\">Goblet squat</span><span class=\"ds-row-group\">Legs</span></span><span class=\"ds-row-numbers\">4<span class=\"ds-row-x\">&times;</span>8<span class=\"ds-row-load\">16 kg</span></span></label>",
       "css": ".ds-row { display: flex; align-items: flex-start; gap: 16px; padding: 16px 24px; background: oklch(1 0 0); border: 1px solid oklch(0.89 0.006 265); border-radius: 8px; font-family: 'Barlow', sans-serif; cursor: pointer; } .ds-check { width: 24px; height: 24px; margin: 2px 0 0; accent-color: oklch(0.5 0.25 266); } .ds-row-index { width: 24px; font-family: 'Barlow Condensed', sans-serif; font-size: 1.25rem; font-weight: 700; color: oklch(0.46 0.016 265); } .ds-row-body { display: flex; flex: 1; flex-direction: column; } .ds-row-name { position: relative; width: fit-content; font-weight: 600; color: oklch(0.18 0.014 265); } .ds-row-name::after { content: ''; position: absolute; left: 0; right: 0; top: 55%; height: 2px; background: currentColor; transform: scaleX(0); transform-origin: left; transition: transform 420ms cubic-bezier(0.16, 1, 0.3, 1); } .ds-row:has(.ds-check:checked) .ds-row-name { color: oklch(0.46 0.016 265); } .ds-row:has(.ds-check:checked) .ds-row-name::after { transform: scaleX(1); } .ds-row-group { font-family: 'Barlow Condensed', sans-serif; font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.46 0.016 265); } .ds-row-numbers { text-align: right; font-family: 'Barlow Condensed', sans-serif; font-size: 1.875rem; line-height: 1; font-weight: 700; font-variant-numeric: tabular-nums; color: oklch(0.18 0.014 265); } .ds-row-x { padding: 0 2px; color: oklch(0.46 0.016 265); } .ds-row-load { display: block; margin-top: 4px; font-size: 0.875rem; font-weight: 600; color: oklch(0.46 0.016 265); }"
+    },
+    {
+      "name": "Day Tile",
+      "kind": "custom",
+      "refersTo": "card",
+      "description": "One day of the plan page's week strip: quiet until chosen, with a segment per exercise (solid when done, dashed for a day ahead) and a check or count under it.",
+      "html": "<div class=\"ds-days\"><button class=\"ds-tile\"><span class=\"ds-tile-day\">Mon</span><span class=\"ds-tile-date\">5</span><span class=\"ds-tile-under\"><span class=\"ds-segs\"><i class=\"on\"></i><i class=\"on\"></i><i></i><i></i></span><span class=\"ds-tile-count\">2/4</span></span></button><button class=\"ds-tile ds-tile-chosen\"><span class=\"ds-tile-day\">Tue</span><span class=\"ds-tile-date ds-tile-today\">6</span><span class=\"ds-tile-under\"><span class=\"ds-segs\"><i class=\"on\"></i><i class=\"on\"></i><i class=\"on\"></i></span><svg class=\"ds-tile-check\" viewBox=\"0 0 24 24\" width=\"14\" height=\"14\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"3\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M20 6 9 17l-5-5\"/></svg></span></button><button class=\"ds-tile\"><span class=\"ds-tile-day\">Wed</span><span class=\"ds-tile-date\">7</span><span class=\"ds-tile-under\"><span class=\"ds-segs ds-segs-ahead\"><i></i><i></i><i></i><i></i></span></span></button></div>",
+      "css": ".ds-days { display: grid; grid-template-columns: repeat(3, 72px); gap: 8px; font-family: 'Barlow Condensed', sans-serif; } .ds-tile { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 8px; background: transparent; color: oklch(0.18 0.014 265); border: 1px solid transparent; border-radius: 6px; cursor: pointer; transition: background-color 150ms; } .ds-tile:hover { background: oklch(0.945 0.005 265); } .ds-tile:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.5 0.25 266) 45%, transparent); } .ds-tile-chosen { background: oklch(0.94 0.03 266); color: oklch(0.38 0.2 266); border-color: oklch(0.5 0.25 266); } .ds-tile-chosen:hover { background: oklch(0.94 0.03 266); } .ds-tile-day { font-size: 0.75rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: oklch(0.46 0.016 265); } .ds-tile-chosen .ds-tile-day { color: oklch(0.38 0.2 266); } .ds-tile-date { font-size: 1.5rem; line-height: 1; font-weight: 600; font-variant-numeric: tabular-nums lining-nums; } .ds-tile-today { text-decoration: underline; text-decoration-color: oklch(0.5 0.25 266); text-decoration-thickness: 2px; text-underline-offset: 4px; } .ds-tile-under { display: flex; flex-direction: column; align-items: center; gap: 4px; width: 100%; height: 24px; margin-top: 4px; } .ds-segs { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 2px; width: 100%; } .ds-segs i { height: 6px; transform: skewX(-12deg); border-radius: 2px; background: color-mix(in oklch, oklch(0.18 0.014 265) 15%, transparent); } .ds-segs i.on { background: oklch(0.5 0.25 266); } .ds-segs-ahead i { background: transparent; border: 1px dashed color-mix(in oklch, oklch(0.18 0.014 265) 35%, transparent); } .ds-tile-count { font-size: 0.75rem; line-height: 1; color: oklch(0.46 0.016 265); font-variant-numeric: tabular-nums; } .ds-tile-check { color: oklch(0.5 0.25 266); }"
+    },
+    {
+      "name": "Exercise Note",
+      "kind": "custom",
+      "refersTo": "popover",
+      "description": "A 28px Cobalt Wash tile with a sticky-note icon beside an exercise name; hover peeks on a mouse, a click or tap keeps the note open, and the open tile fills Kit Cobalt.",
+      "html": "<div class=\"ds-note-demo\"><span class=\"ds-note-name\">Goblet squat</span><button class=\"ds-note-tile\" aria-label=\"Note for Goblet squat\"><svg viewBox=\"0 0 24 24\" width=\"16\" height=\"16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8z\"/><path d=\"M15 3v4a2 2 0 0 0 2 2h4\"/></svg></button><div class=\"ds-note-bubble\"><b>Note: </b>Keep the heels down and stop at parallel while the knee settles.</div></div>",
+      "css": ".ds-note-demo { position: relative; display: flex; align-items: center; gap: 8px; font-family: 'Barlow', sans-serif; } .ds-note-name { font-weight: 600; color: oklch(0.18 0.014 265); } .ds-note-tile { display: inline-flex; align-items: center; justify-content: center; width: 28px; height: 28px; border: none; border-radius: 4px; background: oklch(0.94 0.03 266); color: oklch(0.38 0.2 266); cursor: pointer; transition: background-color 150ms; } .ds-note-tile:hover { background: color-mix(in oklch, oklch(0.94 0.03 266) 60%, transparent); } .ds-note-tile:focus-visible { outline: none; box-shadow: 0 0 0 3px color-mix(in oklch, oklch(0.5 0.25 266) 45%, transparent); } .ds-note-bubble { position: absolute; top: 36px; left: 0; width: 18rem; max-width: 100%; padding: 12px; background: oklch(1 0 0); color: oklch(0.18 0.014 265); border: 1px solid oklch(0.89 0.006 265); border-radius: 6px; font-size: 0.875rem; box-shadow: 0 12px 32px -12px oklch(0 0 0 / 0.35); }"
     }
   ],
   "narrative": {
@@ -137,14 +153,16 @@
     "keyCharacteristics": [
       "Condensed uppercase display type and tabular numerals carry the energy; the body face stays quiet.",
       "One team color (Kit Cobalt) for actions and live state; Pace Tape only for attention.",
-      "Locker Ink panels for kit moments: the header, today's plan header, the auth card top, the kiosk.",
+      "Locker Ink panels for kit moments: the header, the Home hero, the plan header of the chosen day, the auth card top, the kiosk.",
       "Status is carried by form as well as hue: solid, dashed, struck.",
       "Tight, confident corners (4 to 8px), flat surfaces, shadows only for things that float."
     ],
     "rules": [
       { "name": "The Team Color Rule", "body": "Kit Cobalt marks what you can do or what is live. If an element is neither an action nor live state, it doesn't get cobalt.", "section": "colors" },
-      { "name": "The Tape Means Look Rule", "body": "Pace Tape is reserved for \"notice this\": edits by someone else, where you are in a sequence, who you are. Never use it for a primary action inside the app.", "section": "colors" },
+      { "name": "The Tape Means Look Rule", "body": "Pace Tape is reserved for \"notice this\": edits by someone else, where you are in a sequence, who you are, a plan that must be reviewed because an exercise in it cannot be done or because the member accepted a safety warning (the Must Review badge, the plan notice and the review banner), a safety warning on an exercise, and a muscle the member reported as injured. Never use it for a primary action inside the app, except the one \"Apply\" that commits a coach proposal.", "section": "colors" },
       { "name": "The Achromatic Reading Field Rule", "body": "Paragraphs, tables and forms sit on Chalk or Card White with ink and gray text. Color lives at the edges: badges, buttons, kit panels.", "section": "colors" },
+      { "name": "The Form-Not-Hue Rule", "body": "Status is carried by form as well as hue: solid is a settled determination, dashed is pending or a technical failure, struck is unavailable. A technical failure (a turnstile that did not open, a request that failed) is never drawn as a settled negative.", "section": "colors" },
+      { "name": "The Quiet Heat Rule", "body": "Data heat is never colored. The muscle map ramp is ink on gray in both themes, so Kit Cobalt stays reserved for what you can do (hover, select, set a focus) and a heat step is never mistaken for an action.", "section": "colors" },
       { "name": "The Jersey Number Rule", "body": "Any count, measure or date component the user scans is set as numerals (condensed, tabular). Never set sets/reps/load in the body face.", "section": "typography" },
       { "name": "The Scale-Only Rule", "body": "Sizes, tracking and leading come from the Tailwind scale (`text-xs`, `tracking-widest`, `leading-none`), never bracket values. One-off sizes are how a system stops looking like one.", "section": "typography" },
       { "name": "The Float-Only Shadow Rule", "body": "If it doesn't float, it doesn't cast. A card on the page uses a border, never a shadow.", "section": "elevation" }
@@ -156,17 +174,28 @@
       "**Do** give every state its own form: solid for settled, dashed for pending or failed, struck for unavailable.",
       "**Do** keep every page in the same 72rem container as the header.",
       "**Do** design both themes at once; every color is a role token that `.dark` redefines.",
-      "**Do** build charts with the shadcn Chart component and the role tokens (`var(--primary)`, ink at 60%), and give each one a text summary."
+      "**Do** build charts with the shadcn Chart component and the role tokens (`var(--primary)`, ink at 60%), and give each one a text summary.",
+      "**Do** draw any muscle visual with the shared Muscle Map and the `--heat-*` tokens, and keep the ranked list in the page (visible, or visually hidden beside the radar) so it works without pointing at a shape.",
+      "**Do** say what a count counts, in the number's own sentence or header (plans, members, check-ins), and count the same unit across a card.",
+      "**Do** say \"Out of service\" for unavailable equipment, everywhere a person reads it.",
+      "**Do** explain a label with the shared HelpTip rather than a one-off tooltip.",
+      "**Do** show AI work with the Coach Mark and a label that says what is happening, and let the result arrive in parts (the reply, then each block; each exercise of a plan) instead of behind one wait.",
+      "**Do** keep coach controls out of the rows: a row is selected, then one bar offers the action."
     ],
     "donts": [
       "**Don't** run stripes or tape across the full width of the header or a panel; the kit appears as the corner sleeve stripes and the brand mark only.",
+      "**Don't** use the sleeve stripes as a background or on a large surface (the kiosk page has none); they are a subtle corner detail of a compact ink strip, once per screen.",
       "**Don't** use bracket values for size, tracking, leading, radius or borders (`text-[10px]`, `tracking-[0.04em]`); use the Tailwind scale.",
-      "**Don't** show a technical failure (`pending_retry`, a failed turnstile call) with the solid red \"not cleared\" form.",
+      "**Don't** show a technical failure (a failed turnstile call, a failed request, a run of missed face matches) with a solid red form; solid red is for a settled decision such as \"Access not available\".",
+      "**Don't** show a membership that staff switched off as struck or red; \"Inactive\" is the neutral Secondary badge.",
+      "**Don't** show another person's name on the kiosk, or any developer text on the wall.",
       "**Don't** put a shadow on a card that sits on the page.",
       "**Don't** use Pace Tape for a primary in-app action, or Kit Cobalt for decoration.",
       "**Don't** show the app header on sign-in or sign-up, or a theme toggle there; those pages follow the system theme.",
-      "**Don't** use spinners or \"Loading...\" text for data; use matching skeletons behind the 200ms delay.",
-      "**Don't** leave a broken image icon where an uploaded file is missing; show the dashed \"File not found\" tile."
+      "**Don't** use spinners or \"Loading...\" text for data; use matching skeletons behind the 200ms delay. A running action uses the Coach Mark in its button, never a spinner.",
+      "**Don't** let the coach write to a plan or remember a fact on its own: it proposes, the member applies or saves.",
+      "**Don't** draw anything the model wrote as markup: the coach only chooses a block type and supplies data.",
+      "**Don't** color data heat (no red-to-green or cobalt ramp) or tell left from right on the muscle map; cobalt outlines are for hover, selection and what the member is pointing the coach at only."
     ]
   }
 }

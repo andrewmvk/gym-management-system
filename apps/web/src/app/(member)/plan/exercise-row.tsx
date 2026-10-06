@@ -1,7 +1,9 @@
 'use client';
 
 import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
-import { CheckIcon } from 'lucide-react';
+import { AtSignIcon, CheckIcon } from 'lucide-react';
+import { ExerciseNote } from '@/app/(member)/plan/exercise-note';
+import { PrescriptionFields, type PrescriptionNumbers } from '@/components/prescription-fields';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -15,16 +17,24 @@ interface ExerciseRowProps {
   instructions: string;
   sets: number;
   reps: number;
-  load: string | null;
+  load: number | null;
   notes: string | null;
   completed: boolean;
   isPerformable: boolean;
   equipmentDown?: readonly string[];
   onToggle?: (completed: boolean) => void;
   disabled?: boolean;
+  // A day that has not come yet shows the same box as today's plan, switched off.
+  isTickLocked?: boolean;
+  // The coach's pointing mode: the whole row becomes one target that adds this exercise to the message.
+  pointing?: { isActive: boolean; isMarked: boolean; onPoint: () => void };
+  // The member's own correction of sets, reps or weight, made in place. It resolves when saved and rejects when
+  // it failed, so the fields fall back to what is stored.
+  onEditNumbers?: (numbers: PrescriptionNumbers) => Promise<unknown>;
+  isEditPending?: boolean;
 }
 
-// onToggle is only passed for today's plan; history rows omit it and render read-only.
+// onToggle is only passed for today's plan; the rows of other days omit it and render read-only or locked.
 function ExerciseRowRoot({
   index,
   name,
@@ -40,27 +50,50 @@ function ExerciseRowRoot({
   equipmentDown,
   onToggle,
   disabled,
+  isTickLocked,
+  pointing,
+  onEditNumbers,
+  isEditPending,
 }: ExerciseRowProps) {
   const primaryLabels = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
   const secondaryLabels = muscles
     .filter((entry) => entry.role === 'secondary')
     .map((entry) => muscleLabel(entry.muscle));
+  const isEditable = Boolean(onEditNumbers) && !completed && isPerformable;
 
   return (
     <div
       data-done={completed}
       className={cn(
-        'flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 sm:gap-4 sm:px-6',
+        'relative flex items-start gap-3 border-b px-5 py-4 transition-[color,background-color,opacity] duration-300 last:border-b-0 data-[done=true]:bg-muted/50 sm:gap-4 sm:px-6',
         isDimmed && 'opacity-45',
+        pointing?.isActive && 'outline-2 -outline-offset-2 outline-primary/60 outline-dashed',
+        pointing?.isMarked && 'bg-accent/50 outline-solid outline-primary',
       )}
     >
-      {onToggle ? (
+      {pointing?.isActive && (
+        <button
+          type="button"
+          onClick={pointing.onPoint}
+          aria-pressed={pointing.isMarked}
+          className="absolute inset-0 z-10 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
+        >
+          <span className="sr-only">Point the coach at {name}</span>
+        </button>
+      )}
+      {pointing?.isMarked && (
+        <span className="absolute top-2 right-3 z-10 flex h-6 items-center gap-1 rounded-sm bg-primary px-2 font-display text-xs font-semibold tracking-widest text-primary-foreground uppercase">
+          <AtSignIcon className="size-3" aria-hidden />
+          Pointed at
+        </span>
+      )}
+      {onToggle || isTickLocked ? (
         <Checkbox
           checked={completed}
-          disabled={!isPerformable || disabled}
-          onCheckedChange={(checked) => onToggle(checked === true)}
-          className="mt-0.5 size-6 [&_svg]:size-4.5!"
-          aria-label={`Mark ${name} as completed`}
+          disabled={isTickLocked || !isPerformable || disabled}
+          onCheckedChange={(checked) => onToggle?.(checked === true)}
+          className="mt-0.5 size-6 after:-inset-2.5 [&_svg]:size-4.5!"
+          aria-label={isTickLocked ? `${name}, can be ticked on the day` : `Mark ${name} as completed`}
         />
       ) : (
         <span
@@ -80,48 +113,45 @@ function ExerciseRowRoot({
       <div className="flex min-w-0 flex-1 flex-col gap-2">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p
-              className={cn(
-                'strike-wipe w-fit text-base leading-6 font-semibold transition-colors duration-300',
-                completed && 'text-muted-foreground',
-              )}
-            >
-              {name}
-            </p>
-            <p className="font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'strike-wipe block w-fit text-base leading-6 font-semibold transition-colors duration-300',
+                  completed && 'text-muted-foreground',
+                )}
+              >
+                {name}
+              </span>
+              {notes && <ExerciseNote name={name} notes={notes} />}
+            </div>
+            <span className="block font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
               {primaryLabels.join(', ')}
               {secondaryLabels.length > 0 && (
                 <span className="font-sans tracking-normal normal-case"> + {secondaryLabels.join(', ')}</span>
               )}
-            </p>
+            </span>
           </div>
-          <p
-            className={cn(
-              'numerals shrink-0 text-right text-3xl leading-none font-bold transition-opacity duration-300',
-              completed && 'opacity-45',
-              !isPerformable && 'text-muted-foreground line-through decoration-2',
-            )}
-          >
-            {sets}
-            <span className="px-0.5 text-muted-foreground">&times;</span>
-            {reps}
-            {load && <span className="mt-1 block text-sm font-semibold text-muted-foreground">{load}</span>}
-          </p>
+          <PrescriptionFields
+            name={name}
+            size="lg"
+            sets={sets}
+            reps={reps}
+            load={load}
+            isEditable={isEditable}
+            isPending={isEditPending}
+            isStruck={!isPerformable}
+            onCommit={onEditNumbers}
+            className={cn('duration-300', completed && 'opacity-45')}
+          />
         </div>
         {!isPerformable && (
           <Badge variant="outline" className="text-muted-foreground">
             {equipmentDown?.length
               ? `${equipmentDown.join(', ')} ${equipmentDown.length === 1 ? 'is' : 'are'} out of service`
-              : 'Equipment unavailable right now'}
+              : 'Out of service'}
           </Badge>
         )}
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">{instructions}</p>
-        {notes && (
-          <p className="max-w-prose rounded-sm bg-accent/60 px-3 py-2 text-sm text-pretty">
-            <span className="font-semibold">Note: </span>
-            {notes}
-          </p>
-        )}
       </div>
     </div>
   );

@@ -1,26 +1,29 @@
 Blocked by: P-02, P-05
 Covers: FR-31, FR-32
 MVP: 3
-Artifacts: apps/api/src/modules/checkins/{kiosk-routes.ts (kiosk key middleware and embeddings endpoint), kiosk-routes.test.ts, repository.ts (embeddings query)}, packages/shared/src/faces/{match.ts, match.test.ts}, packages/shared/package.json (./faces/* export)
-Evidence: Vitest: the endpoint rejects a missing or wrong key and returns only { memberId, embedding }; the matching function rejects an ambiguous top-two instead of guessing (RN-08)
+Artifacts: apps/api/src/modules/checkins/{kiosk-routes.ts (kiosk key middleware, embeddings endpoint, the `reason` on the 403 answers), kiosk-routes.test.ts, repository.ts (embeddings query)}, packages/shared/src/faces/{match.ts, match.test.ts}, packages/shared/package.json (./faces/* export)
+Evidence: Vitest: the endpoint rejects a missing or wrong key and returns only { memberId, embedding }, and it leaves out anyone without a password or an embedding; the kiosk check-in route's 403 answers carry the `reason` field (`not_cleared`, `membership_inactive`); the matching function rejects an ambiguous top-two instead of guessing (RN-08)
+Status: Partly superseded by P-31 (audit-log item 20): the dataset is every registered member with a stored embedding, so the `aptitude_status` cleared condition is removed. The code and its tests still carry it until P-31 is executed
 
 Task: implement the kiosk-authenticated embeddings dataset endpoint and the pure 1:N matching decision.
 
 Context:
 - FR-31 and FR-32 in docs/02-requirements.md, docs/04-architecture.md §5, rules/backend.md (the kiosk is a separate trust boundary gated by KIOSK_API_KEY and must not reuse the user ability middleware), and rule RN-08 in docs/06-business-rules.md.
 - Embeddings are 128-number vectors compared by Euclidean distance (face-api.js convention).
+- The dataset is every registered member with a stored embedding, including a member whose membership is inactive (FR-40). That is deliberate: the kiosk still recognizes them, and the check-in route (P-20) answers `membership_inactive`, so the person is told to see the front desk instead of looping on "try again".
 
 Permitted scope:
 - Only the files in Artifacts and the route registration in apps/api/src/app.ts. No new dependencies.
 
 Functional requirements:
 1. requireKioskKey middleware: the x-kiosk-key header must equal KIOSK_API_KEY, compared in constant time. Export it for reuse by P-20.
-2. GET /kiosk/embeddings returns [{ memberId, embedding }] only for users that are cleared, have a password, and have an embedding. It returns no photo, name, or other field. The Drizzle query lives in the module's repository.ts, not in the route file (rules/backend.md).
+2. GET /kiosk/embeddings returns [{ memberId, embedding }] only for registered members: users that have a password and an embedding (FR-31). It returns no photo, name, or other field, and sends `Cache-Control: private, no-store`. The Drizzle query lives in the module's repository.ts, not in the route file (rules/backend.md). Until P-31 lands the query also requires `aptitude_status` cleared; P-31 removes that condition and nothing else changes.
 3. packages/shared/src/faces/match.ts exports DEFAULT_MATCH_THRESHOLD = 0.6, DEFAULT_MATCH_MARGIN = 0.1 and matchFace(probe, gallery, options?), returning { status: "match", memberId, distance }, { status: "ambiguous" } or { status: "no_match" }. The best candidate must be at or under the threshold; if the second best is also under the threshold and the gap is smaller than the margin, the result is ambiguous. An empty gallery is no_match, and a vector of the wrong length throws a TypeError. The function is pure and does not import face-api.js.
 4. packages/shared/package.json exports "./faces/*" so the kiosk (P-21) can import `@cadence/shared/faces/match`.
+5. Every 403 the kiosk routes answer carries a machine-readable `reason` next to the error text (`not_cleared` and `membership_inactive`, both produced by the check-in route of P-20), so the kiosk panel can tell the refusals apart without parsing text.
 
 Acceptance criteria:
-- The endpoint answers 401 without the right key and never includes rejected or pending users.
+- The endpoint answers 401 without the right key and never includes a user without a password or an embedding (and, until P-31, anyone who is not cleared).
 - matchFace gives the right status for: empty gallery, best above the threshold, one clear match, two close candidates, two far-apart candidates, and a single candidate under the threshold.
 
 Tests:

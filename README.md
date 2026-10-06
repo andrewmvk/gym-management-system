@@ -57,7 +57,7 @@ pnpm dev        # web on :3000 and api on :4000
 | `pnpm db:studio` | Open Drizzle Studio |
 | `pnpm db:generate` | Generate a migration from schema changes |
 
-The demo data is fake: members `demo1@example.com` to `demo25@example.com` (every fifth one has an inactive membership), four certificate applicants `demo-applicant1@example.com` to `demo-applicant4@example.com`, 21 days of check-ins and plans, and a few check-ins in the last 90 minutes. The embeddings come from the deterministic stub and there are no reference photos. The recent check-ins age out of the occupancy window after 90 minutes, so run `pnpm db:seed:demo` again before a demo.
+The demo data is fake: members `demo1@example.com` to `demo25@example.com`, all of whom have completed registration (every fifth one is a lapsed member with an inactive membership who stopped checking in about 10 days ago and cannot log in or check in), 21 days of check-ins and plans, remembered facts (one marked no longer true), trainer notes on today's plans, and a few check-ins in the last 90 minutes. There are no applicants and no certificates: accepting a person happens in person at the gym and leaves no record in the system. The embeddings come from the deterministic stub and there are no reference photos. The recent check-ins age out of the occupancy window after 90 minutes, so run `pnpm db:seed:demo` again before a demo.
 
 ## Demo credentials
 
@@ -69,6 +69,8 @@ The passwords are the ones you set in `.env`.
 | Admin | `admin@example.com` | `SEED_ADMIN_PASSWORD` |
 | Student (member) | `student@example.com` | `SEED_STUDENT_PASSWORD` |
 | Demo members | `demo1@example.com` to `demo25@example.com` | `SEED_STUDENT_PASSWORD` |
+
+The inactive demo members (`demo5`, `demo10`, `demo15`, `demo20` and `demo25`) cannot log in until an admin reactivates them on the Members page. To try a new registration, open `/signup`: in a real gym staff would accept the person in person first and send them there, but that restriction is not enforced in this academic project.
 
 ## Environment variables
 
@@ -86,11 +88,10 @@ Set in `.env` (see [`.env.example`](./.env.example)). The API stops at boot and 
 | `JWT_SECRET` | Signing secret of the auth JWT |
 | `KIOSK_API_KEY` | Authenticates the kiosk's fetch of the face embeddings |
 | `UPLOADS_DIR` | Where uploaded files are stored |
-| `AI_MODE` | `live` calls OpenRouter, `mock` returns fixtures without network |
+| `AI_MODE` | `live` calls OpenRouter, `mock` returns fixtures without network (plan and chat only) |
 | `OPENROUTER_API_KEY` / `OPENROUTER_MODEL` | Required when `AI_MODE` is `live` |
-| `AI_MOCK_APTITUDE` / `AI_MOCK_CERTIFICATE` | Mock verdict: `cleared`, `not_cleared` or `unavailable` |
-| `PLAN_GENERATOR` | `ai` or `placeholder` (defaults to `placeholder` in mock mode) |
-| `EMAIL_MODE` | `resend` sends e-mail, `log` writes it to the API log |
+| `PLAN_GENERATOR` | `ai` or `placeholder` (defaults to `placeholder` in mock mode). With `ai`, an AI failure fails plan generation and saves no plan; only `placeholder` builds a deterministic plan |
+| `EMAIL_MODE` | `resend` sends e-mail (the registration-completed message with the login link), `log` writes it to the API log |
 | `RESEND_API_KEY` / `EMAIL_FROM` | Resend credentials and sender (key required when `EMAIL_MODE` is `resend`) |
 | `FACE_EMBEDDING_MODE` | `stub` (deterministic) or `real` (face-api.js model) |
 | `NEXT_PUBLIC_API_URL` | Backend base URL used by the web app |

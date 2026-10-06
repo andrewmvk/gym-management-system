@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { useAppAbility } from '@/abilities';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { HelpTip } from '@/components/help-tip';
 import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -123,14 +124,6 @@ function TurnstileSettingsRoot() {
     );
   }
 
-  if (configQuery.isPending || !config) {
-    return (
-      <Deferred>
-        <TurnstileSettingsSkeleton />
-      </Deferred>
-    );
-  }
-
   if (configQuery.isError) {
     return (
       <QueryError
@@ -138,6 +131,14 @@ function TurnstileSettingsRoot() {
         onRetry={() => configQuery.refetch()}
         isRetrying={configQuery.isRefetching}
       />
+    );
+  }
+
+  if (configQuery.isPending || !config) {
+    return (
+      <Deferred>
+        <TurnstileSettingsSkeleton />
+      </Deferred>
     );
   }
 
@@ -260,7 +261,7 @@ function TurnstileSettingsRoot() {
                         name={`headers.${index}.secret`}
                         control={form.control}
                         render={({ field: secretField }) => (
-                          <div className="flex items-center gap-2" title="Hidden once saved">
+                          <div className="flex items-center gap-2">
                             <Switch
                               id={`turnstile-header-secret-${item.id}`}
                               checked={secretField.value}
@@ -274,6 +275,7 @@ function TurnstileSettingsRoot() {
                             <label htmlFor={`turnstile-header-secret-${item.id}`} className="text-sm">
                               Secret
                             </label>
+                            <HelpTip text="A secret value is hidden once saved and shows only its last four characters." />
                           </div>
                         )}
                       />
@@ -309,7 +311,7 @@ function TurnstileSettingsRoot() {
                 variant="outline"
                 size="xs"
                 disabled={method === 'GET'}
-                title="Insert at the end of the body"
+                aria-label={`Insert {{${name}}} at the end of the body`}
                 className="font-mono tracking-normal normal-case"
                 onClick={() =>
                   form.setValue('bodyTemplate', `${form.getValues('bodyTemplate')}{{${name}}}`, {
@@ -342,18 +344,14 @@ function TurnstileSettingsRoot() {
           <Button type="submit" disabled={save.isPending}>
             {save.isPending ? 'Saving...' : 'Save settings'}
           </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={!canTest || test.isPending}
-            title="Sends the saved request for real, so the turnstile opens. No check-in is recorded."
-            onClick={() => test.mutate()}
-          >
+          <Button type="button" variant="outline" disabled={!canTest || test.isPending} onClick={() => test.mutate()}>
             <PlayIcon data-icon="inline-start" />
             {test.isPending ? 'Testing...' : 'Test connection'}
           </Button>
           <span className="text-sm text-muted-foreground">
-            {config.isConfigured && !canTest ? 'Save your changes to test them.' : 'The test opens the turnstile.'}
+            {config.isConfigured && !canTest
+              ? 'Save your changes to test them.'
+              : 'The test sends the saved request for real, so the turnstile opens. No check-in is recorded.'}
           </span>
         </div>
 

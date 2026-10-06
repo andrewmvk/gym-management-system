@@ -14,7 +14,6 @@ const optionalText = z
   .trim()
   .transform((value) => value || undefined)
   .optional();
-const mockVerdict = z.enum(['cleared', 'not_cleared', 'unavailable']);
 
 const EnvSchema = z
   .object({
@@ -32,8 +31,6 @@ const EnvSchema = z
     AI_MODE: z.enum(['live', 'mock']).default('mock'),
     OPENROUTER_API_KEY: optionalText,
     OPENROUTER_MODEL: optionalText,
-    AI_MOCK_APTITUDE: mockVerdict.default('cleared'),
-    AI_MOCK_CERTIFICATE: mockVerdict.default('cleared'),
     // Unset defaults to "placeholder" when AI_MODE is mock (the AI module's own plan fixture is
     // deliberately empty, see mock-fixtures.ts) and to "ai" otherwise - see effectivePlanGenerator().
     PLAN_GENERATOR: z.enum(['ai', 'placeholder']).optional(),

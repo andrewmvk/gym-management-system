@@ -1,14 +1,13 @@
-import { dExercises, muscle } from '@api/db/schema/catalog';
+import { dExercises } from '@api/db/schema/catalog';
 import { dUsers } from '@api/db/schema/users';
 import {
   boolean,
   date,
+  doublePrecision,
   integer,
   jsonb,
   pgEnum,
   pgTable,
-  primaryKey,
-  smallint,
   text,
   timestamp,
   unique,
@@ -24,8 +23,10 @@ export const profileEventType = pgEnum('profile_event_type', [
   'life_event',
   'state_update',
   'plan_adjustment_request',
-  'muscle_focus_changed',
+  'manual_plan_edit',
 ]);
+
+export const planChangeKind = pgEnum('plan_change_kind', ['coach', 'member_edit']);
 
 // One row per member per date (FR-15/FR-18). Regenerating replaces this row in place rather than
 // appending a new one for the same date - see plans/repository.ts.
@@ -74,7 +75,8 @@ export const fTrainingPlanExercises = pgTable('f_training_plan_exercises', {
     .references(() => dExercises.id),
   sets: integer('sets').notNull(),
   reps: integer('reps').notNull(),
-  load: text('load'),
+  // The weight in kilograms; null for an exercise done without added weight.
+  load: doublePrecision('load'),
   orderIndex: integer('order_index').notNull(),
   completed: boolean('completed').notNull().default(false),
   notes: text('notes'),
@@ -93,24 +95,33 @@ export const fProfileEvents = pgTable('f_profile_events', {
   payload: jsonb('payload').notNull(),
   sourceMessage: text('source_message'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  // A fact the coach extracted from chat waits here until the member confirms it; a pending fact never
+  // reaches a prompt. Facts written by the system itself are confirmed on insert.
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }).defaultNow(),
+  // Set when the member says the fact no longer applies (an injury that healed) or dismisses a pending
+  // one; resolved events stay as history but never reach a prompt.
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
 });
 
 export type ProfileEvent = typeof fProfileEvents.$inferSelect;
 
-// The member's current muscle emphasis (-2 much less to +2 much more). A missing row means normal, so
-// resetting a muscle deletes its row. Each change is also appended to f_profile_events so the history
-// the AI reasons from stays complete.
-export const fMemberMuscleFocus = pgTable(
-  'f_member_muscle_focus',
-  {
-    userId: uuid('user_id')
-      .notNull()
-      .references(() => dUsers.id),
-    muscle: muscle('muscle').notNull(),
-    bias: smallint('bias').notNull(),
-    updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-  },
-  (table) => [primaryKey({ columns: [table.userId, table.muscle] })],
-);
+// What changed on a plan through the coach or the member's own number edits, kept for trainer review.
+// before and after are exercise lists as the member saw them; acknowledgedWarnings holds the safety
+// warnings the member accepted before applying.
+export const fPlanChanges = pgTable('f_plan_changes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  trainingPlanId: uuid('training_plan_id')
+    .notNull()
+    .references(() => fTrainingPlans.id),
+  userId: uuid('user_id')
+    .notNull()
+    .references(() => dUsers.id),
+  kind: planChangeKind('kind').notNull(),
+  request: text('request'),
+  before: jsonb('before').notNull(),
+  after: jsonb('after').notNull(),
+  acknowledgedWarnings: jsonb('acknowledged_warnings').notNull().default([]),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
 
-export type MemberMuscleFocusRow = typeof fMemberMuscleFocus.$inferSelect;
+export type PlanChange = typeof fPlanChanges.$inferSelect;

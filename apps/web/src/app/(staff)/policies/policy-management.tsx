@@ -9,6 +9,7 @@ import { groupLabel, type PolicyDialogState, PolicyDialogs } from '@/app/(staff)
 import { hasException, PolicyUserRow } from '@/app/(staff)/policies/policy-user-row';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
+import { FilterBar } from '@/components/filter-bar';
 import { Pagination } from '@/components/pagination';
 import { QueryError } from '@/components/query-error';
 import { SearchInput } from '@/components/search-input';
@@ -57,12 +58,14 @@ function PolicyManagementSkeleton() {
     <PolicyTabs
       users={
         <div className="flex flex-col gap-4">
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+          <FilterBar>
             <Skeleton className="h-10 w-full lg:w-72" />
             <Skeleton className="h-10 w-full lg:w-44" />
             <Skeleton className="h-10 w-full lg:w-56" />
-            <Skeleton className="h-11 w-full lg:ml-auto lg:w-72" />
-          </div>
+            <FilterBar.Trailing>
+              <Skeleton className="h-10.5 w-full lg:w-72" />
+            </FilterBar.Trailing>
+          </FilterBar>
           <ul className="divide-y overflow-hidden rounded-lg border bg-card">
             {Array.from({ length: 3 }, (_, index) => (
               // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
@@ -160,7 +163,7 @@ function PolicyManagementRoot() {
         onValueChange={(value) => setTab(value as PolicyTab)}
         users={
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <FilterBar>
               <SearchInput
                 value={search}
                 onChange={(value) => {
@@ -208,20 +211,22 @@ function PolicyManagementRoot() {
                   ))}
                 </SelectContent>
               </Select>
-              <SegmentedFilter
-                label="Filter users"
-                value={filter}
-                onChange={(value) => {
-                  setFilter(value);
-                  pagination.setPage(1);
-                }}
-                options={[
-                  { value: 'all', label: 'All', count: matchingSearch.length },
-                  { value: 'attention', label: 'Needs attention', count: attentionCount },
-                ]}
-                className="w-full lg:ml-auto lg:w-auto"
-              />
-            </div>
+              <FilterBar.Trailing>
+                <SegmentedFilter
+                  label="Filter users"
+                  value={filter}
+                  onChange={(value) => {
+                    setFilter(value);
+                    pagination.setPage(1);
+                  }}
+                  options={[
+                    { value: 'all', label: 'All', count: matchingSearch.length },
+                    { value: 'attention', label: 'Needs attention', count: attentionCount },
+                  ]}
+                  className="w-full lg:w-auto"
+                />
+              </FilterBar.Trailing>
+            </FilterBar>
 
             {users.length === 0 ? (
               <div className="rounded-lg border bg-card">

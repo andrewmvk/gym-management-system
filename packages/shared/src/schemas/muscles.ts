@@ -42,6 +42,45 @@ export const MUSCLE_IDS = MUSCLES.map((muscle) => muscle.id) as [MuscleId, ...Mu
 
 export const MuscleIdSchema = z.enum(MUSCLE_IDS);
 
+interface MuscleGroupDefinition {
+  id: string;
+  label: string;
+  muscles: readonly MuscleId[];
+}
+
+// Six regions a member thinks in. Every muscle belongs to exactly one, so a group's load is the plain sum
+// of its muscles'.
+export const MUSCLE_GROUPS = [
+  { id: 'chest', label: 'Chest', muscles: ['chest'] },
+  {
+    id: 'shoulders',
+    label: 'Shoulders',
+    muscles: ['front-deltoid', 'lateral-deltoid', 'rear-deltoid', 'rotator-cuff'],
+  },
+  { id: 'back', label: 'Back', muscles: ['neck', 'trapezius', 'lats', 'lower-back'] },
+  { id: 'arms', label: 'Arms', muscles: ['biceps', 'triceps', 'forearm-flexors', 'forearm-extensors'] },
+  { id: 'core', label: 'Core', muscles: ['abs', 'abs-lower', 'obliques'] },
+  { id: 'legs', label: 'Legs', muscles: ['glutes', 'abductors', 'quads', 'quads-outer', 'hamstrings', 'calves'] },
+] as const satisfies readonly MuscleGroupDefinition[];
+
+export type MuscleGroupId = (typeof MUSCLE_GROUPS)[number]['id'];
+
+export const MUSCLE_GROUP_IDS = MUSCLE_GROUPS.map((group) => group.id) as [MuscleGroupId, ...MuscleGroupId[]];
+
+export const MuscleGroupIdSchema = z.enum(MUSCLE_GROUP_IDS);
+
+export function muscleGroupLabel(group: MuscleGroupId): string {
+  return MUSCLE_GROUPS.find((entry) => entry.id === group)?.label ?? group;
+}
+
+const GROUP_OF_MUSCLE = Object.fromEntries(
+  MUSCLE_GROUPS.flatMap((group) => group.muscles.map((muscle) => [muscle, group.id])),
+) as Record<MuscleId, MuscleGroupId>;
+
+export function muscleGroupOf(muscle: MuscleId): MuscleGroupId {
+  return GROUP_OF_MUSCLE[muscle];
+}
+
 const MUSCLE_LABELS: Record<MuscleId, string> = Object.fromEntries(
   MUSCLES.map((muscle) => [muscle.id, muscle.label]),
 ) as Record<MuscleId, string>;
@@ -68,20 +107,3 @@ export const ExerciseMusclesSchema = z
   .refine((muscles) => new Set(muscles.map((entry) => entry.muscle)).size === muscles.length, {
     message: 'A muscle can only be listed once',
   });
-
-export const FOCUS_BIAS_MIN = -2;
-export const FOCUS_BIAS_MAX = 2;
-export const FOCUS_BIASES = [-2, -1, 0, 1, 2] as const;
-
-export const FocusBiasSchema = z.number().int().min(FOCUS_BIAS_MIN).max(FOCUS_BIAS_MAX);
-
-export const FOCUS_BIAS_LABELS: Record<number, string> = {
-  '-2': 'Much less',
-  '-1': 'Less',
-  '0': 'Normal',
-  '1': 'More',
-  '2': 'Much more',
-};
-
-export const MemberMuscleFocusSchema = z.object({ muscle: MuscleIdSchema, bias: FocusBiasSchema });
-export type MemberMuscleFocus = z.infer<typeof MemberMuscleFocusSchema>;

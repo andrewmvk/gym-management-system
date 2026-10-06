@@ -32,13 +32,17 @@ export default function HomePage() {
         <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pt-12 pb-16 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:pt-20 lg:pb-24">
           <div className="flex flex-col gap-6">
             <h1 className="font-display text-6xl leading-none font-extrabold text-balance uppercase sm:text-7xl lg:text-8xl">
-              Train on a plan that <span className="text-primary">remembers</span> you.
+              Train on a plan that remembers you.
             </h1>
             <p className="max-w-xl text-lg text-pretty text-muted-foreground">
               Cadence checks you in with your face and writes each day&apos;s training plan from your accumulated
               history, not a single interview at the front desk.
             </p>
-            <div className="flex flex-wrap gap-3">
+            <p className="max-w-xl text-pretty text-muted-foreground">
+              Joining happens in person at the gym: a staff member checks your workout restrictions first, then you
+              register on site and fill in your health profile.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
                 <Link href="/signup">
                   Join Cadence
@@ -47,6 +51,9 @@ export default function HomePage() {
               </Button>
               <Button asChild size="lg" variant="outline">
                 <Link href={LOGIN_PATH}>Sign in</Link>
+              </Button>
+              <Button asChild size="lg" variant="ghost">
+                <Link href="/gym">Gym info</Link>
               </Button>
             </div>
           </div>
@@ -60,7 +67,7 @@ export default function HomePage() {
                 key={step.title}
                 className="flex gap-5 border-b py-8 last:border-b-0 md:border-b-0 md:border-l md:px-8 md:first:border-l-0 md:first:pl-0"
               >
-                <span className="numerals text-5xl leading-none font-extrabold text-primary">{index + 1}</span>
+                <span className="numerals text-5xl leading-none font-extrabold">{index + 1}</span>
                 <div className="flex flex-col gap-2">
                   <p className="flex items-center gap-2 font-display text-xl font-bold tracking-wide uppercase">
                     <step.icon className="size-5 text-muted-foreground" />

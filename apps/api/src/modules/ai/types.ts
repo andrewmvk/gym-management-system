@@ -1,9 +1,8 @@
-import { z } from 'zod';
+import type { JsonStreamEvent } from '@api/modules/ai/json-stream';
+import type { z } from 'zod';
 
-export const AI_PURPOSES = ['aptitude', 'certificate', 'plan', 'chat'] as const;
+export const AI_PURPOSES = ['plan', 'chat'] as const;
 export type AiPurpose = (typeof AI_PURPOSES)[number];
-
-export type MockVerdict = 'cleared' | 'not_cleared' | 'unavailable';
 
 export type AiFailureReason = 'unavailable' | 'invalid_output';
 export type AiResult<T> = { ok: true; data: T } | { ok: false; reason: AiFailureReason };
@@ -15,9 +14,19 @@ export interface StructuredRequest<T> {
   schema: z.ZodType<T>;
 }
 
-// Output shape shared by the aptitude and certificate purposes; the mock fixtures follow it.
-export const AiVerdictSchema = z.object({
-  verdict: z.enum(['cleared', 'not_cleared']),
-  notes: z.string(),
-});
-export type AiVerdict = z.infer<typeof AiVerdictSchema>;
+// A read-only lookup the model may ask for before it answers. It is bound to the signed-in member when it
+// is built, so the model can never name another member, and it only ever reads.
+export interface AiTool {
+  name: string;
+  description: string;
+  input: z.ZodType;
+  run: (args: unknown) => Promise<string>;
+}
+
+export interface StreamedRequest<T> extends StructuredRequest<T> {
+  tools?: readonly AiTool[];
+  // The shape shown to the model, when it should be stricter than what is accepted back (schema).
+  instructionSchema?: z.ZodType;
+}
+
+export type AiStreamItem<T> = { type: 'event'; event: JsonStreamEvent } | { type: 'result'; result: AiResult<T> };

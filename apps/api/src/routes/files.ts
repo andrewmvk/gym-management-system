@@ -14,8 +14,6 @@ function canRead(session: Session, ownerId: string, kind: UploadKind) {
       return false;
     case 'exam':
       return session.user.id === ownerId;
-    case 'certificate':
-      return session.ability.can('manage', 'MedicalCertificate');
   }
 }
 

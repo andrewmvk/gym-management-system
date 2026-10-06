@@ -13,7 +13,7 @@ interface AuthShellProps {
 export function AuthShell({ tagline, subline, footer, children }: AuthShellProps) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-10 sm:py-16">
-      <div className="w-full max-w-lg overflow-hidden rounded-lg border bg-card shadow-showcase">
+      <div className="w-full max-w-lg overflow-clip rounded-lg border bg-card shadow-showcase">
         <div className="kit-corner flex flex-col gap-5 bg-kit px-5 pt-5 pr-24 pb-6 text-kit-foreground sm:px-8 sm:pr-28">
           <Link href="/" className="w-fit rounded-md outline-none focus-visible:ring-3 focus-visible:ring-ring/50">
             <Brand />

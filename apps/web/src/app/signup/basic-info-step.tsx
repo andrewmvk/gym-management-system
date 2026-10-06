@@ -23,42 +23,40 @@ const GENDER_LABELS = {
 interface BasicInfoStepProps {
   defaultValues: BasicInfoInput;
   onContinue: (values: BasicInfoInput) => void;
-  onResume: (userId: string) => void;
+  // Set when the final registration found the email already registered.
+  emailError?: string | null;
 }
 
-export function BasicInfoStep({ defaultValues, onContinue, onResume }: BasicInfoStepProps) {
+const EMAIL_TAKEN_MESSAGE = 'An account already exists for this email. Try signing in instead.';
+
+export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicInfoStepProps) {
   const trpc = useTRPC();
   const form = useForm<BasicInfoInput>({
     resolver: zodResolver(BasicInfoInputSchema),
     defaultValues,
+    errors: emailError ? { email: { type: 'server', message: emailError } } : undefined,
   });
 
-  // Nothing is stored here: the check only rejects an unusable e-mail, or sends a returning applicant
-  // straight to their verdict, before they fill in the rest of the signup.
+  // Nothing is stored here: the check only refuses an already registered email before the person fills
+  // in the rest of the registration.
   const checkEmail = useMutation(
-    trpc.aptitude.checkEmail.mutationOptions({
+    trpc.auth.checkEmail.mutationOptions({
       onSuccess: (result) => {
-        if (result.status === 'email_blocked') {
-          toast.error("This e-mail can't be used to sign up.");
-          return;
-        }
         if (result.status === 'already_registered') {
-          toast.error('An account already exists for this e-mail. Try signing in instead.');
-          return;
-        }
-        if (result.status === 'resumable') {
-          toast.message('Welcome back! Picking up where you left off.');
-          onResume(result.userId);
+          form.setError('email', { message: EMAIL_TAKEN_MESSAGE });
           return;
         }
         onContinue(form.getValues());
       },
-      onError: () => toast.error("We couldn't check your e-mail. Try again."),
+      onError: () => toast.error("We couldn't check your email. Try again."),
     }),
   );
 
   return (
-    <StepPanel title="About you" description="Start with your basic information. We'll ask for a reference photo next.">
+    <StepPanel
+      title="About you"
+      description="Start with your basic information. We'll ask for your consent and a reference photo next."
+    >
       <form noValidate onSubmit={form.handleSubmit((values) => checkEmail.mutate({ email: values.email }))}>
         <FieldGroup>
           <Controller
@@ -77,7 +75,7 @@ export function BasicInfoStep({ defaultValues, onContinue, onResume }: BasicInfo
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="signup-email">E-mail</FieldLabel>
+                <FieldLabel htmlFor="signup-email">Email</FieldLabel>
                 <Input
                   {...field}
                   id="signup-email"

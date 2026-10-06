@@ -51,8 +51,8 @@ export function createKioskRouter(kioskApiKey: string, nodeEnv: Env['NODE_ENV'])
       case 'member_not_found':
         res.status(404).json({ error: 'Member not found' });
         return;
-      case 'member_not_cleared':
-        res.status(403).json({ error: 'Member is not cleared to train' });
+      case 'member_inactive':
+        res.status(403).json({ error: 'Membership is inactive', reason: 'membership_inactive' });
         return;
       case 'recorded':
         res.json({ checkInId: outcome.checkInId, turnstileStatus: outcome.turnstileStatus });

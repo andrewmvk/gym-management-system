@@ -3,6 +3,7 @@ Covers: FR-3, FR-4
 MVP: 2
 Artifacts: apps/api/src/db/schema/aptitude.ts (questionnaire table), migration, packages/shared/src/schemas/aptitude.ts, aptitude procedures for the questionnaire, the questionnaire and result screens in apps/web/src/app/signup/
 Evidence: Vitest with the AI mock: cleared, not_cleared, and unavailable each produce the documented state, recheck only works on pending_retry, and pending_retry never turns into a real decision on its own
+Status: Superseded by P-31 (audit-log item 20): the whole prompt is removed from the target. Acceptance of a member happens in person at the gym, so the questionnaire, the AI verdict, `pending_retry` for people, the recheck and `aptitude_status` no longer exist (FR-3 and FR-4 are removed). The code stays until P-31 lands
 
 Task: implement the aptitude questionnaire, its AI evaluation with the pending_retry state, and the matching signup screens.
 

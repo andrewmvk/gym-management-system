@@ -2,7 +2,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import type { AddressInfo } from 'node:net';
 import { db, pool } from '@api/db/client';
 import { dTurnstileConfig, dUsers, fCheckIns, TURNSTILE_CONFIG_ID } from '@api/db/schema';
-import { recordCheckIn } from '@api/modules/checkins/service';
+import { getTurnstileSummary, listRecentCheckIns, recordCheckIn } from '@api/modules/checkins/service';
 import { resetTestDatabase } from '@api/test/database';
 import { eq } from 'drizzle-orm';
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
@@ -27,10 +27,10 @@ async function configureTurnstile(config: Partial<typeof dTurnstileConfig.$infer
   });
 }
 
-async function createMember(aptitudeStatus: 'cleared' | 'pending' | 'rejected' = 'cleared') {
+async function createMember() {
   const [member] = await db
     .insert(dUsers)
-    .values({ email: `${crypto.randomUUID()}@example.com`, name: 'Member', aptitudeStatus })
+    .values({ email: `${crypto.randomUUID()}@example.com`, name: 'Member' })
     .returning();
   return member!.id;
 }
@@ -176,16 +176,114 @@ describe('recordCheckIn (RN-09)', () => {
     ]);
   });
 
-  it('records nothing for an unknown or non-cleared member and never calls the turnstile', async () => {
+  it('records nothing for an unknown member and never calls the turnstile', async () => {
     await configureTurnstile({});
-    const pending = await createMember('pending');
-    const rejected = await createMember('rejected');
 
     expect(await recordCheckIn(crypto.randomUUID())).toEqual({ kind: 'member_not_found' });
-    expect(await recordCheckIn(pending)).toEqual({ kind: 'member_not_cleared' });
-    expect(await recordCheckIn(rejected)).toEqual({ kind: 'member_not_cleared' });
 
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
     expect(received).toHaveLength(0);
+  });
+
+  it('refuses a member whose membership is inactive: no turnstile call and no check-in row', async () => {
+    await configureTurnstile({});
+    const [lapsed] = await db
+      .insert(dUsers)
+      .values({ email: 'lapsed@example.com', name: 'Lapsed', membershipStatus: 'inactive' })
+      .returning();
+
+    expect(await recordCheckIn(lapsed!.id)).toEqual({ kind: 'member_inactive' });
+
+    expect(await db.select().from(fCheckIns)).toHaveLength(0);
+    expect(received).toHaveLength(0);
+  });
+
+  it('lets the member in again once the membership is active', async () => {
+    await configureTurnstile({});
+    const [member] = await db
+      .insert(dUsers)
+      .values({ email: 'back@example.com', name: 'Back', membershipStatus: 'inactive' })
+      .returning();
+    await recordCheckIn(member!.id);
+    await db.update(dUsers).set({ membershipStatus: 'active' }).where(eq(dUsers.id, member!.id));
+
+    expect(await recordCheckIn(member!.id)).toMatchObject({ kind: 'recorded', turnstileStatus: 'success' });
+  });
+});
+
+describe('check-in log and turnstile summary', () => {
+  async function insertCheckIn(
+    userId: string,
+    checkedInAt: Date,
+    turnstileStatus: 'success' | 'failed',
+    turnstileResponse: Record<string, unknown> | null,
+  ) {
+    await db.insert(fCheckIns).values({ userId, checkedInAt, turnstileStatus, turnstileResponse });
+  }
+
+  it('maps each stored response to a short stable failure code, newest first', async () => {
+    const memberId = await createMember();
+    const at = (minutes: number) => new Date(Date.now() - minutes * 60 * 1000);
+    await insertCheckIn(memberId, at(60), 'success', { response: { httpStatus: 200, body: {} } });
+    await insertCheckIn(memberId, at(50), 'failed', { response: null, error: 'not_configured' });
+    await insertCheckIn(memberId, at(40), 'failed', { response: null, error: 'timeout' });
+    await insertCheckIn(memberId, at(30), 'failed', { response: { httpStatus: 503, body: 'x' }, error: 'http_error' });
+    await insertCheckIn(memberId, at(20), 'failed', { response: null, error: 'network_error' });
+    await insertCheckIn(memberId, at(10), 'failed', { something: 'else' });
+    await insertCheckIn(memberId, at(5), 'failed', null);
+
+    const log = await listRecentCheckIns();
+
+    expect(log.map((entry) => entry.failureReason)).toEqual([
+      'unknown',
+      'unknown',
+      'network_error',
+      'http_error',
+      'timeout',
+      'not_configured',
+      null,
+    ]);
+    expect(log[6]).toMatchObject({ memberName: 'Member', turnstileStatus: 'success' });
+    expect(Object.keys(log[0]!).sort()).toEqual([
+      'checkedInAt',
+      'failureReason',
+      'id',
+      'memberName',
+      'turnstileStatus',
+    ]);
+  });
+
+  it('caps the log at the requested limit', async () => {
+    const memberId = await createMember();
+    for (let minutes = 0; minutes < 5; minutes++) {
+      await insertCheckIn(memberId, new Date(Date.now() - minutes * 60 * 1000), 'success', null);
+    }
+
+    expect(await listRecentCheckIns(3)).toHaveLength(3);
+  });
+
+  it('counts today’s total and failed check-ins and says whether the turnstile is configured', async () => {
+    const memberId = await createMember();
+    const now = new Date(2026, 9, 7, 12, 0);
+    await insertCheckIn(memberId, new Date(2026, 9, 7, 8, 0), 'success', null);
+    await insertCheckIn(memberId, new Date(2026, 9, 7, 9, 0), 'failed', { error: 'timeout' });
+    await insertCheckIn(memberId, new Date(2026, 9, 6, 9, 0), 'failed', { error: 'timeout' });
+
+    expect(await getTurnstileSummary(now)).toEqual({ failedToday: 1, totalToday: 2, isConfigured: false });
+
+    await db.update(dTurnstileConfig).set({ url: baseUrl });
+    expect(await getTurnstileSummary(now)).toMatchObject({ isConfigured: true });
+  });
+
+  it('never carries the API key, a response body or an embedding', async () => {
+    await configureTurnstile({});
+    const memberId = await createMember();
+    await recordCheckIn(memberId);
+
+    const payload = JSON.stringify([await listRecentCheckIns(), await getTurnstileSummary()]);
+
+    expect(payload).not.toContain(API_KEY);
+    expect(payload).not.toContain('opened');
+    expect(payload).not.toMatch(/embedding|photo/i);
   });
 });

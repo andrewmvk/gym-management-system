@@ -5,7 +5,7 @@ import { HomeNotice } from '@/app/(member)/home/home-notice';
 import { NextUpCard } from '@/app/(member)/home/next-up-card';
 import { NowHero } from '@/app/(member)/home/now-hero';
 import { RemainingList } from '@/app/(member)/home/remaining-list';
-import { SinceLastVisit } from '@/app/(member)/home/since-last-visit';
+import { TrainerChangeNotice } from '@/app/(member)/home/trainer-change-notice';
 import { WeekStrip } from '@/app/(member)/home/week-strip';
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
@@ -63,7 +63,7 @@ function MemberHomeContent() {
       side={
         <>
           <WeekStrip />
-          <SinceLastVisit />
+          <TrainerChangeNotice />
         </>
       }
     />

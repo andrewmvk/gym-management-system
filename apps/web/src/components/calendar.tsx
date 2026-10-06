@@ -144,7 +144,9 @@ export function Calendar({
           </div>
         ) : (
           <p className="font-display text-lg font-bold tracking-wider uppercase" aria-live="polite">
-            {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+            <span key={toIsoDate(month)} className="inline-block animate-tick">
+              {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+            </span>
           </p>
         )}
         <Button variant="ghost" size="icon-sm" disabled={!canGoForward} onClick={() => showMonth(nextMonth)}>

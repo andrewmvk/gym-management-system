@@ -3,6 +3,7 @@ Covers: FR-5, FR-6, FR-7, FR-8
 MVP: 3
 Artifacts: apps/api/src/db/schema/aptitude.ts (certificates table), migration, apps/api/src/modules/aptitude/ (certificate procedures and state resolver), apps/web/src/app/signup/ (certificate step and waiting or rejected screens), apps/web/src/app/(staff)/certificates/
 Evidence: Vitest table over every questionnaire result x certificate result x admin decision proves each certificate result reaches the admin queue and pending_retry is never coalesced; manual: an admin confirms and overrides from the queue
+Status: Superseded by P-31 (audit-log item 20): the whole prompt is removed from the target. The certificate upload, the AI certificate review, the admin backstop queue, rejection and the permanently blocked e-mail no longer exist, because the staff check any certificate in person at the gym (FR-5 to FR-8 and RN-02 are removed, the `review_certificates` policy goes). The code stays until P-31 lands
 
 Task: implement the medical certificate path: upload, AI review, the admin backstop queue, and the final approval or rejection.
 

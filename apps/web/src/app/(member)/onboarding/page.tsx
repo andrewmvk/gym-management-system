@@ -6,7 +6,8 @@ import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 
 const TITLE = 'Health profile';
-const DESCRIPTION = 'Your health and goals. Every training plan is built from this, plus what you tell your coach.';
+const DESCRIPTION =
+  'Your health and goals, and what your coach remembers from your chats. Every training plan is built from both.';
 
 function OnboardingSkeleton() {
   return (

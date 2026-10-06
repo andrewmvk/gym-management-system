@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon, LogOutIcon } from 'lucide-react';
 import { Deferred } from '@/components/deferred';
-import { Badge } from '@/components/ui/badge';
+import { MembershipBadge } from '@/components/membership-badge';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -61,9 +61,7 @@ function UserMenuRoot({ area }: { area: AppArea }) {
           <span className="truncate font-semibold">{user.name}</span>
           <span className="truncate text-muted-foreground">{user.email}</span>
           {area === 'member' && user.membershipPlan && (
-            <Badge variant={user.membershipStatus === 'active' ? 'live' : 'unavailable'} className="mt-2">
-              {user.membershipPlan} · {user.membershipStatus}
-            </Badge>
+            <MembershipBadge plan={user.membershipPlan} status={user.membershipStatus} className="mt-2" />
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />

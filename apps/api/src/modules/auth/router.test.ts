@@ -1,9 +1,10 @@
+import { readFile } from 'node:fs/promises';
+import { fileURLToPath } from 'node:url';
 import { env } from '@api/config/env';
 import { db, pool } from '@api/db/client';
-import { dUsers, fUserPolicyGroupOnUser, fUserPolicyOnUser } from '@api/db/schema';
+import { dUsers, fConsentEvents, fUserPolicyGroupOnUser, fUserPolicyOnUser } from '@api/db/schema';
 import { SEED_ADMIN_EMAIL, seedBase } from '@api/db/seed';
 import { logger } from '@api/lib/logger';
-import { findActiveGrants } from '@api/modules/auth/repository';
 import { SESSION_COOKIE, signSessionToken } from '@api/modules/auth/session';
 import { resetTestDatabase } from '@api/test/database';
 import { appRouter } from '@api/trpc/app-router';
@@ -46,7 +47,6 @@ async function createMember(options: { hasPassword?: boolean } = {}) {
       email: MEMBER_EMAIL,
       name: 'Demo Member',
       passwordHash: options.hasPassword === false ? null : await bcrypt.hash(MEMBER_PASSWORD, 4),
-      aptitudeStatus: 'cleared',
       membershipStatus: 'active',
       membershipPlan: 'monthly',
     })
@@ -62,14 +62,21 @@ async function adminId() {
   return admin!.id;
 }
 
-const APPLICANT_EMAIL = 'applicant@example.com';
+const REGISTRATION_PASSWORD = 'a-strong-password';
+const REFERENCE_PHOTO = fileURLToPath(new URL('../../test/fixtures/faces/valid/reference.jpg', import.meta.url));
 
-async function createApplicant(aptitudeStatus: 'pending' | 'cleared' | 'rejected') {
-  const [applicant] = await db
-    .insert(dUsers)
-    .values({ email: APPLICANT_EMAIL, name: 'Demo Applicant', aptitudeStatus })
-    .returning();
-  return applicant!;
+// The fixture is a real face, so the registration works whichever FACE_EMBEDDING_MODE the environment sets.
+async function registrationInput(overrides: { email?: string; password?: string; consented?: boolean } = {}) {
+  const photo = await readFile(REFERENCE_PHOTO);
+  return {
+    name: 'Jamie Rivera',
+    phone: '+1 555-0100',
+    email: overrides.email ?? 'jamie.rivera@example.com',
+    birthdate: '1995-06-12',
+    consented: (overrides.consented ?? true) as true,
+    photo: { imageBase64: photo.toString('base64'), mimeType: 'image/jpeg' },
+    password: overrides.password ?? REGISTRATION_PASSWORD,
+  };
 }
 
 describe('auth', () => {
@@ -134,6 +141,65 @@ describe('auth', () => {
 
       await expect(caller.auth.login({ email: MEMBER_EMAIL, password: 'anything' })).rejects.toMatchObject({
         code: 'UNAUTHORIZED',
+      });
+    });
+
+    describe('inactive membership', () => {
+      async function deactivate(memberId: string) {
+        await db.update(dUsers).set({ membershipStatus: 'inactive' }).where(eq(dUsers.id, memberId));
+      }
+
+      it('refuses a correct password with the front-desk message and sets no cookie', async () => {
+        const member = await createMember();
+        await deactivate(member.id);
+        const { caller, res } = await callerFor();
+
+        await expect(caller.auth.login({ email: MEMBER_EMAIL, password: MEMBER_PASSWORD })).rejects.toMatchObject({
+          code: 'FORBIDDEN',
+          message: 'Your membership is inactive. Ask the front desk to reactivate it.',
+        });
+        expect(res.cookie).not.toHaveBeenCalled();
+      });
+
+      it('keeps the generic error for a wrong password so inactivity is not revealed', async () => {
+        const member = await createMember();
+        await deactivate(member.id);
+        const { caller } = await callerFor();
+
+        await expect(caller.auth.login({ email: MEMBER_EMAIL, password: 'nope' })).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+          message: 'Invalid e-mail or password',
+        });
+      });
+
+      it('signs in again once the membership is reactivated', async () => {
+        const member = await createMember();
+        await deactivate(member.id);
+        await db.update(dUsers).set({ membershipStatus: 'active' }).where(eq(dUsers.id, member.id));
+        const { caller } = await callerFor();
+
+        expect((await caller.auth.login({ email: MEMBER_EMAIL, password: MEMBER_PASSWORD }))?.user.email).toBe(
+          MEMBER_EMAIL,
+        );
+      });
+
+      it('turns an existing session cookie into no session at all', async () => {
+        const member = await createMember();
+        const token = signSessionToken(member.id);
+        expect((await (await callerFor(token)).caller.auth.me())?.user.id).toBe(member.id);
+
+        await deactivate(member.id);
+
+        expect(await (await callerFor(token)).caller.auth.me()).toBeNull();
+        await expect((await callerFor(token)).caller.auth.listMembers()).rejects.toMatchObject({
+          code: 'UNAUTHORIZED',
+        });
+      });
+
+      it('never affects staff, who have no membership status', async () => {
+        const token = signSessionToken(await adminId());
+
+        expect((await (await callerFor(token)).caller.auth.me())?.user.email).toBe(SEED_ADMIN_EMAIL);
       });
     });
   });
@@ -204,95 +270,81 @@ describe('auth', () => {
     });
   });
 
-  describe('setPassword', () => {
-    it('activates a cleared applicant: member policies, active membership, a session, and nextStep onboarding', async () => {
-      const applicant = await createApplicant('cleared');
+  describe('register', () => {
+    it('creates the member in one request: member group, active membership, a session, and nextStep onboarding', async () => {
       const { caller, res } = await callerFor();
 
-      const result = await caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' });
+      const result = await caller.auth.register(await registrationInput());
 
-      expect(result?.nextStep).toBe('onboarding');
-      expect(result?.user.membershipStatus).toBe('active');
+      expect(result).toMatchObject({ status: 'registered', nextStep: 'onboarding' });
+      if (result.status !== 'registered') return;
+      expect(result.user.membershipStatus).toBe('active');
+      expect(result.user).not.toHaveProperty('passwordHash');
+      expect(result.rules).toContainEqual({ action: 'read', subject: 'MemberApp' });
       expect(res.cookie).toHaveBeenCalledWith(SESSION_COOKIE, expect.any(String), expect.any(Object));
 
       const memberships = await db
-        .select({ groupId: fUserPolicyGroupOnUser.groupId, expiresOn: fUserPolicyGroupOnUser.expiresOn })
+        .select({ groupId: fUserPolicyGroupOnUser.groupId })
         .from(fUserPolicyGroupOnUser)
-        .where(eq(fUserPolicyGroupOnUser.userId, applicant.id));
-      expect(memberships).toEqual([{ groupId: MEMBER_GROUP, expiresOn: null }]);
-      const directGrants = await db.select().from(fUserPolicyOnUser).where(eq(fUserPolicyOnUser.userId, applicant.id));
-      expect(directGrants).toHaveLength(0);
-      const effective = await findActiveGrants(applicant.id, new Date());
-      expect(effective).toHaveLength(MEMBER_POLICY_IDS.length);
-
-      const [user] = await db.select().from(dUsers).where(eq(dUsers.id, applicant.id));
-      expect(user?.passwordHash).not.toBeNull();
-      expect(user?.membershipPlan).toBeTruthy();
+        .where(eq(fUserPolicyGroupOnUser.userId, result.user.id));
+      expect(memberships).toEqual([{ groupId: MEMBER_GROUP }]);
+      expect(await db.select().from(fConsentEvents).where(eq(fConsentEvents.userId, result.user.id))).toHaveLength(1);
     });
 
-    it('refuses a second call for an already-activated applicant', async () => {
-      const applicant = await createApplicant('cleared');
+    it('lets the new member log in with the chosen password right away', async () => {
       const { caller } = await callerFor();
-      await caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' });
+      await caller.auth.register(await registrationInput());
 
-      await expect(
-        caller.auth.setPassword({ userId: applicant.id, password: 'another-password' }),
-      ).rejects.toMatchObject({ code: 'CONFLICT' });
+      const login = await caller.auth.login({ email: 'jamie.rivera@example.com', password: REGISTRATION_PASSWORD });
+
+      expect(login?.user.email).toBe('jamie.rivera@example.com');
     });
 
-    it('refuses a still-pending applicant', async () => {
-      const applicant = await createApplicant('pending');
+    it('refuses an already registered e-mail without a session', async () => {
       const { caller } = await callerFor();
+      await caller.auth.register(await registrationInput());
+      const second = await callerFor();
 
-      await expect(
-        caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' }),
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      const result = await second.caller.auth.register(await registrationInput());
+
+      expect(result).toEqual({ status: 'already_registered' });
+      expect(second.res.cookie).not.toHaveBeenCalled();
     });
 
-    it('refuses a rejected applicant (RN-03)', async () => {
-      const applicant = await createApplicant('rejected');
+    it('refuses a password shorter than 8 characters and a missing consent, storing nothing', async () => {
       const { caller } = await callerFor();
 
-      await expect(
-        caller.auth.setPassword({ userId: applicant.id, password: 'a-strong-password' }),
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
-    it('refuses an unknown userId', async () => {
-      const { caller } = await callerFor();
-
-      await expect(
-        caller.auth.setPassword({ userId: '00000000-0000-0000-0000-000000000000', password: 'a-strong-password' }),
-      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
-    });
-
-    it('refuses a password shorter than 8 characters', async () => {
-      const applicant = await createApplicant('cleared');
-      const { caller } = await callerFor();
-
-      await expect(caller.auth.setPassword({ userId: applicant.id, password: 'short' })).rejects.toMatchObject({
+      await expect(caller.auth.register(await registrationInput({ password: 'short' }))).rejects.toMatchObject({
         code: 'BAD_REQUEST',
       });
+      await expect(caller.auth.register(await registrationInput({ consented: false }))).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+      expect(await db.select().from(fConsentEvents)).toHaveLength(0);
+    });
+
+    it('is public: it needs no session', async () => {
+      const { caller } = await callerFor();
+
+      expect(await caller.auth.checkEmail({ email: 'new@example.com' })).toEqual({ status: 'available' });
     });
   });
 
   describe('listMembers', () => {
     it('lists each member with the membership fields and no biometric field, for an admin', async () => {
       const member = await createMember();
-      await createApplicant('pending');
       const { caller } = await callerFor(signSessionToken(await adminId()));
 
       const members = await caller.auth.listMembers();
 
       expect(members.map((row) => row.email)).toContain(MEMBER_EMAIL);
-      expect(members.map((row) => row.email)).not.toContain(APPLICANT_EMAIL);
+      expect(members.map((row) => row.email)).not.toContain(SEED_ADMIN_EMAIL);
       expect(members.find((row) => row.id === member.id)).toEqual({
         id: member.id,
         name: 'Demo Member',
         email: MEMBER_EMAIL,
         membershipStatus: 'active',
         membershipPlan: 'monthly',
-        aptitudeStatus: 'cleared',
       });
     });
 

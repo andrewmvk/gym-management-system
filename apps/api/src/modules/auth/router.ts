@@ -1,7 +1,8 @@
-import { activateMember, listMembers, loadSession, verifyCredentials } from '@api/modules/auth/service';
+import { checkEmail, listMembers, loadSession, register, verifyCredentials } from '@api/modules/auth/service';
 import { clearSessionCookie, setSessionCookie } from '@api/modules/auth/session';
 import { assertCan, authedProcedure, publicProcedure, router } from '@api/trpc/procedures';
-import { LoginInputSchema, SetPasswordInputSchema } from '@cadence/shared/schemas/auth';
+import { LoginInputSchema } from '@cadence/shared/schemas/auth';
+import { CheckEmailInputSchema, RegisterInputSchema } from '@cadence/shared/schemas/signup';
 import { TRPCError } from '@trpc/server';
 
 export const authRouter = router({
@@ -18,16 +19,23 @@ export const authRouter = router({
     return session && { user: session.user, rules: session.rules };
   }),
 
-  // Public on purpose: no session exists before activation (FR-9) - the userId is the applicant's own
-  // signup capability, the same one used throughout apps/web/src/app/signup/.
-  setPassword: publicProcedure.input(SetPasswordInputSchema).mutation(async ({ ctx, input }) => {
-    const user = await activateMember(input);
+  // Public on purpose: no account exists before registration (FR-9), and the registration page is only
+  // restricted to the gym on paper (FR-57).
+  checkEmail: publicProcedure.input(CheckEmailInputSchema).mutation(({ input }) => checkEmail(input)),
 
-    setSessionCookie(ctx.res, user.id);
-    ctx.log.info({ userId: user.id }, 'member activated');
+  // Public on purpose, same reasoning as checkEmail. A refused e-mail or photo is a normal answer (a
+  // status), not an error, so the wizard can send the person back to the right step.
+  register: publicProcedure.input(RegisterInputSchema).mutation(async ({ ctx, input }) => {
+    const result = await register(input);
+    if (result.status !== 'registered') return result;
 
-    const session = await loadSession(user.id);
-    return session && { user: session.user, rules: session.rules, nextStep: 'onboarding' as const };
+    setSessionCookie(ctx.res, result.user.id);
+    ctx.log.info({ userId: result.user.id }, 'member registered');
+
+    const session = await loadSession(result.user.id);
+    if (!session)
+      throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Registration could not start a session' });
+    return { status: 'registered' as const, user: session.user, rules: session.rules, nextStep: 'onboarding' as const };
   }),
 
   // read_members (scope all): the membership table of the staff app, with no biometric field in the result (FR-40).

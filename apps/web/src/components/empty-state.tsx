@@ -12,7 +12,12 @@ interface EmptyStateProps {
 
 export function EmptyState({ icon: Icon, title, description, action, className }: EmptyStateProps) {
   return (
-    <div className={cn('flex flex-col items-center gap-3 px-4 py-10 text-center', className)}>
+    <div
+      className={cn(
+        'flex animate-in flex-col items-center gap-3 px-4 py-10 text-center duration-300 fade-in-0',
+        className,
+      )}
+    >
       <span className="flex size-12 items-center justify-center rounded-md border-2 border-dashed border-foreground/25 text-muted-foreground">
         <Icon className="size-6" />
       </span>

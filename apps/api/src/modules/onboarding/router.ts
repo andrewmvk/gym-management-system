@@ -7,9 +7,10 @@ import { OnboardingSubmitInputSchema } from '@cadence/shared/schemas/onboarding'
 // condition binds to ctx.user.id, never a client-supplied id, so a member can only ever act on their
 // own submissions.
 export const onboardingRouter = router({
-  submit: authedProcedure.input(OnboardingSubmitInputSchema).mutation(({ ctx, input }) => {
+  // Yields `saved` as soon as the information is stored, then the exercises of the plan being built, then `done`.
+  submit: authedProcedure.input(OnboardingSubmitInputSchema).mutation(async function* ({ ctx, input }) {
     assertCan(ctx.ability, 'manage', subject('Onboarding', { userId: ctx.user.id }));
-    return service.submit(ctx.user.id, input);
+    yield* service.submitStream(ctx.user.id, input);
   }),
 
   getStatus: authedProcedure.query(({ ctx }) => {

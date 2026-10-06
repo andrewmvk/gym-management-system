@@ -64,6 +64,85 @@
   --shadow-showcase: 0 24px 48px -24px oklch(0.2 0.05 266 / 0.4);
   --shadow-fab: 0 12px 32px -8px oklch(0.3 0.2 266 / 0.55);
   --inset-shadow-baseline: inset 0 -1px 0 var(--border);
+
+  /* The coach at work: tempo bars rise in turn like reps, and the spark above them breathes. */
+  --animate-ai-bar: ai-bar 1100ms var(--ease-out-expo) infinite;
+  --animate-ai-spark: ai-spark 1100ms ease-in-out infinite;
+  /* A block of coach content settling into the thread. */
+  --animate-block-in: block-in 420ms var(--ease-out-expo) both;
+  /* The proposal opening beside the chat: only the proposal moves, the chat stays where it is. */
+  --animate-panel-in: panel-in 320ms var(--ease-out-expo) both;
+
+  /* A page settling in after navigation. `backwards` so no transform is left behind to trap fixed children. */
+  --animate-page-in: page-in 280ms var(--ease-out-expo) backwards;
+  /* A control acknowledging a change: the check landing in a box. */
+  --animate-pop: pop 200ms var(--ease-out-expo) backwards;
+  /* A count that just changed, rolling in from below. */
+  --animate-tick: tick 260ms var(--ease-out-expo) backwards;
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.375rem);
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+  }
+  @keyframes tick {
+    from {
+      opacity: 0;
+      transform: translateY(35%);
+    }
+  }
+  @keyframes fade-only {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes ai-bar {
+    0%,
+    100% {
+      transform: scaleY(0.4);
+    }
+    45% {
+      transform: scaleY(1);
+    }
+  }
+  @keyframes ai-spark {
+    0%,
+    100% {
+      opacity: 0.45;
+      transform: scale(0.7) rotate(0deg);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1) rotate(45deg);
+    }
+  }
+  @keyframes panel-in {
+    from {
+      opacity: 0;
+      transform: translateX(-1.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+  @keyframes block-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.5rem);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
 }
 
 /* Club Kit: cobalt is the kit color, ink and chalk are the panels, pace yellow is the tape. */
@@ -268,8 +347,30 @@
   }
 }
 
+/* The coach mark animates parts of its own shape, so each part scales from its own base and center. */
+.ai-mark path {
+  transform-box: fill-box;
+}
+.ai-mark [data-part="bar"] {
+  transform-origin: bottom center;
+}
+.ai-mark [data-part="spark"] {
+  transform-origin: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
+  /* Arrivals keep their fade, so a change is still noticed, but stop travelling. */
+  .animate-page-in,
+  .animate-pop,
+  .animate-tick,
+  .animate-block-in,
+  .animate-panel-in {
+    animation-name: fade-only;
+  }
   .strike-wipe::after {
     transition: none;
+  }
+  .ai-mark [data-part] {
+    animation: none;
   }
 }

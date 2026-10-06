@@ -14,6 +14,13 @@ export function todayLocal(now: Date = new Date()): string {
   return localDateString(now);
 }
 
+// Noon avoids a daylight-saving jump moving the result across midnight.
+export function shiftLocalDate(date: string, days: number): string {
+  const shifted = new Date(`${date}T12:00:00`);
+  shifted.setDate(shifted.getDate() + days);
+  return localDateString(shifted);
+}
+
 function parseLocalDateString(dateString: string): { year: number; month: number; day: number } {
   const [year, month, day] = dateString.split('-').map(Number);
   return { year: year!, month: month! - 1, day: day! };

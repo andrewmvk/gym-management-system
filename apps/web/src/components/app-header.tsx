@@ -8,8 +8,8 @@ import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { Brand } from '@/components/brand';
 import { KitBar } from '@/components/kit-bar';
+import { MembershipBadge } from '@/components/membership-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   NavigationMenu,
@@ -189,12 +189,11 @@ export function AppHeader({ area }: { area: AppArea }) {
       </NavigationMenu>
       <div className="ml-auto flex items-center gap-1">
         {area === 'member' && membership?.membershipPlan && (
-          <Badge
-            variant={membership.membershipStatus === 'active' ? 'live' : 'unavailable'}
+          <MembershipBadge
+            plan={membership.membershipPlan}
+            status={membership.membershipStatus}
             className="mr-1 hidden sm:inline-flex"
-          >
-            {membership.membershipPlan} · {membership.membershipStatus}
-          </Badge>
+          />
         )}
         <ThemeToggle />
         <UserMenu area={area} />

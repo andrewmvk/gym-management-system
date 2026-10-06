@@ -2,7 +2,14 @@ import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { env } from '@api/config/env';
 import { type Database, db as defaultDb, type Transaction } from '@api/db/client';
-import { dUserPolicy, dUserPolicyGroup, dUserPolicyGroupPolicy, dUsers, fUserPolicyGroupOnUser } from '@api/db/schema';
+import {
+  dUserPolicy,
+  dUserPolicyGroup,
+  dUserPolicyGroupPolicy,
+  dUsers,
+  fUserPolicyGroupOnUser,
+  fUserPolicyOnUser,
+} from '@api/db/schema';
 import { seedCatalog } from '@api/db/seed-data/catalog';
 import { computeFaceEmbedding } from '@api/lib/face-embedding';
 import { saveUpload } from '@api/lib/uploads';
@@ -16,7 +23,7 @@ import {
   TRAINER_GROUP,
 } from '@cadence/shared/auth';
 import bcrypt from 'bcryptjs';
-import { and, eq, notInArray, sql } from 'drizzle-orm';
+import { and, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 export const SEED_TRAINER_EMAIL = 'trainer@example.com';
 export const SEED_ADMIN_EMAIL = 'admin@example.com';
@@ -31,6 +38,15 @@ interface StaffAccount {
   name: string;
   password: string;
   groupId: PolicyGroupId;
+}
+
+// Policies that no longer exist in the catalog, named explicitly so the seed never deletes one it does not know.
+const RETIRED_POLICY_IDS = ['review_certificates'];
+
+async function retirePolicies(tx: Transaction) {
+  await tx.delete(fUserPolicyOnUser).where(inArray(fUserPolicyOnUser.policyId, RETIRED_POLICY_IDS));
+  await tx.delete(dUserPolicyGroupPolicy).where(inArray(dUserPolicyGroupPolicy.policyId, RETIRED_POLICY_IDS));
+  await tx.delete(dUserPolicy).where(inArray(dUserPolicy.id, RETIRED_POLICY_IDS));
 }
 
 // The groups are owned by the code, so every run re-asserts their policy lists: a change in the catalog reaches
@@ -75,8 +91,8 @@ async function ensureStaffAccount(tx: Transaction, account: StaffAccount) {
   await tx.insert(fUserPolicyGroupOnUser).values({ userId: user.id, groupId: account.groupId }).onConflictDoNothing();
 }
 
-// The demo member is created already activated (cleared, active, in the member group) so the member screens can be
-// used without going through signup. Like the staff rows it is insert-if-missing, and the photo is only stored and
+// The demo member is created already registered (active, in the member group) so the member screens can be
+// used without going through registration. Like the staff rows it is insert-if-missing, and the photo is only stored and
 // embedded when the row is first created, so a re-run never piles up copies of the file.
 async function ensureStudentAccount(tx: Transaction) {
   const [created] = await tx
@@ -85,7 +101,6 @@ async function ensureStudentAccount(tx: Transaction) {
       email: SEED_STUDENT_EMAIL,
       name: 'Demo Student',
       passwordHash: await bcrypt.hash(env.SEED_STUDENT_PASSWORD, BCRYPT_ROUNDS),
-      aptitudeStatus: 'cleared',
       membershipStatus: 'active',
       membershipPlan: DEFAULT_MEMBERSHIP_PLAN,
     })
@@ -133,6 +148,7 @@ export async function seedBase(database: Database = defaultDb) {
       });
 
     await seedPolicyGroups(tx);
+    await retirePolicies(tx);
 
     await ensureStaffAccount(tx, {
       email: SEED_TRAINER_EMAIL,

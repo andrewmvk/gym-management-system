@@ -12,12 +12,5 @@ export function HomeNotice() {
 
   if (!plan?.needsReview) return null;
 
-  return (
-    <NeedsReviewNotice
-      exercises={plan.exercises}
-      planStatus={plan.status}
-      hasCompleted={plan.exercises.some((exercise) => exercise.completed)}
-      className="rounded-lg"
-    />
-  );
+  return <NeedsReviewNotice exercises={plan.exercises} className="rounded-lg" />;
 }

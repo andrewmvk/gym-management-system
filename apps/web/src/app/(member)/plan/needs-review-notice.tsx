@@ -1,8 +1,8 @@
 'use client';
 
-import { SparklesIcon, TriangleAlertIcon } from 'lucide-react';
+import { TriangleAlertIcon } from 'lucide-react';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
-import { Button } from '@/components/ui/button';
+import { AiButton } from '@/components/ai-button';
 import { cn } from '@/lib/utils';
 
 interface NoticeExercise {
@@ -14,19 +14,15 @@ interface NoticeExercise {
 
 interface NeedsReviewNoticeProps {
   exercises: readonly NoticeExercise[];
-  planStatus: 'ai_published' | 'trainer_edited';
-  hasCompleted: boolean;
+  // Only today's plan can be rebuilt from here; a day ahead is changed through the coach.
+  canRebuild?: boolean;
   className?: string;
 }
 
 // Pace Tape means "look at this": a plan with an exercise that cannot be done is flagged for the trainers
 // too, and the member can skip the wait by rebuilding it from what is available.
-export function NeedsReviewNotice({ exercises, planStatus, hasCompleted, className }: NeedsReviewNoticeProps) {
-  const rebuild = useRebuildPlan({
-    planStatus,
-    hasCompleted,
-    successMessage: "Your plan was rebuilt without what can't be done.",
-  });
+export function NeedsReviewNotice({ exercises, canRebuild = true, className }: NeedsReviewNoticeProps) {
+  const rebuild = useRebuildPlan({ successMessage: "Your plan was rebuilt without what can't be done." });
   const blocked = exercises.filter((exercise) => !exercise.isPerformable);
 
   return (
@@ -56,10 +52,17 @@ export function NeedsReviewNotice({ exercises, planStatus, hasCompleted, classNa
           </ul>
         </div>
       </div>
-      <Button variant="outline" className="shrink-0" disabled={rebuild.isPending} onClick={rebuild.requestRebuild}>
-        <SparklesIcon data-icon="inline-start" />
-        {rebuild.isPending ? 'Rebuilding...' : 'Rebuild today without them'}
-      </Button>
+      {canRebuild && (
+        <AiButton
+          variant="outline"
+          className="shrink-0"
+          isPending={rebuild.isPending}
+          pendingLabel="Rebuilding..."
+          onClick={rebuild.requestRebuild}
+        >
+          Rebuild today without them
+        </AiButton>
+      )}
       {rebuild.dialog}
     </section>
   );

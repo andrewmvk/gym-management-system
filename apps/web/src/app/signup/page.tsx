@@ -10,7 +10,7 @@ export default function SignupPage() {
   return (
     <AuthShell
       tagline="Join the club."
-      subline="A few details, a reference photo and a short health check, and you're in."
+      subline="Registration happens at the gym, after a staff member has checked your workout restrictions. A few details, a reference photo and a password, and you're in."
       footer={
         <>
           Already a member?{' '}

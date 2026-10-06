@@ -1,6 +1,7 @@
 import * as service from '@api/modules/plans/reviews-service';
 import { assertCan, authedProcedure, router } from '@api/trpc/procedures';
 import { subject } from '@cadence/shared/auth';
+import { WeightKgSchema } from '@cadence/shared/schemas/coach';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
@@ -19,7 +20,7 @@ const PlanExerciseInputSchema = z.object({
   exerciseId: z.uuid(),
   sets: z.number().int().positive(),
   reps: z.number().int().positive(),
-  load: z.string().trim().optional(),
+  load: WeightKgSchema.optional(),
   notes: z.string().trim().optional(),
 });
 const EditPlanInputSchema = z.object({
@@ -28,8 +29,8 @@ const EditPlanInputSchema = z.object({
   note: z.string().trim().optional(),
 });
 
-// Registered as the top-level "reviews" router (same reasoning as P-10's "certificates"): the
-// procedure names read naturally as reviews.queue/getPlan/addNote/editPlan, not nested under plans.
+// Registered as the top-level "reviews" router: the procedure names read naturally as
+// reviews.queue/getPlan/addNote/editPlan, not nested under plans.
 export const reviewsRouter = router({
   // read_all_plans (scope all) only: see ANY_TRAINING_PLAN above for why a bare type check would
   // wrongly admit a member's self-scoped read_own_plans grant too.
@@ -59,8 +60,10 @@ export const reviewsRouter = router({
     return result;
   }),
 
+  // Changing a plan needs the plan-editing policy as well as the review one; a note needs only the review one.
   editPlan: authedProcedure.input(EditPlanInputSchema).mutation(async ({ ctx, input }) => {
     assertCan(ctx.ability, 'manage', 'PlanReview');
+    assertCan(ctx.ability, 'update', ANY_TRAINING_PLAN);
     const result = await service.editPlan(input.planId, ctx.user.id, input.exercises, input.note);
     if (!result) throw new TRPCError({ code: 'NOT_FOUND', message: 'Plan not found' });
     return result;

@@ -1,355 +1,320 @@
-import type { ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
+import { randomUUID } from 'node:crypto';
 import { todayLocal } from '@api/lib/dates';
-import { type AiResult, runStructured } from '@api/modules/ai';
-import { findUserById } from '@api/modules/auth/repository';
+import { type AiResult, type AiStreamItem, type AiTool, streamStructured } from '@api/modules/ai';
 import { listExercises } from '@api/modules/catalog/service';
-import * as repository from '@api/modules/chat/repository';
-import { findFocusByUserId } from '@api/modules/focus/repository';
-import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
-import * as plansRepository from '@api/modules/plans/repository';
+import { buildExplainerBlock, buildPickerBlock, buildProposalBlock, buildSafetyBlock } from '@api/modules/chat/blocks';
 import {
-  type AvailableExercise,
-  buildMuscleFocusLines,
-  formatCatalogLine,
-  generateForDate,
-  getToday,
-  getTodayAggregate,
-  type PlanAggregate,
-} from '@api/modules/plans/service';
-import type { MemberMuscleFocus } from '@cadence/shared/schemas/muscles';
-import { type ChatResponse, ChatResponseSchema } from '@cadence/shared/schemas/profile-events';
+  assembleChatContext,
+  buildChatUserPrompt,
+  CHAT_SYSTEM_PROMPT,
+  type ChatContext,
+} from '@api/modules/chat/context';
+import * as repository from '@api/modules/chat/repository';
+import { buildChatTools } from '@api/modules/chat/tools';
+import * as plansRepository from '@api/modules/plans/repository';
+import { checkOverwriteGuard, type NeedsConfirmation } from '@api/modules/plans/service';
+import { listActiveInjuries } from '@api/modules/profile/service';
+import {
+  AI_RESPONSE_PARTS,
+  type CoachAiEnvelope,
+  CoachAiEnvelopeSchema,
+  CoachAiResponseSchema,
+  type CoachApplyInput,
+  type CoachSendInput,
+  type CoachStreamEvent,
+  type PendingFact,
+  type SafetyWarning,
+} from '@cadence/shared/schemas/coach';
+import { findInjuryConflicts } from '@cadence/shared/schemas/coach-draft';
+import {
+  injuryMuscles,
+  needsConfirmation,
+  PROFILE_EVENT_LABELS,
+  type ProfileEventFact,
+  ProfileEventFactSchema,
+} from '@cadence/shared/schemas/profile-events';
 import { TRPCError } from '@trpc/server';
-import { z } from 'zod';
 
-const RECENT_EVENTS_LIMIT = 50;
 const SOURCE_MESSAGE_EXCERPT_LENGTH = 200;
+const UNAVAILABLE = { code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' } as const;
 
-function computeAge(birthdate: string | null): number | null {
-  if (!birthdate) return null;
-  const birth = new Date(birthdate);
-  const now = new Date();
-  let age = now.getFullYear() - birth.getFullYear();
-  const hadBirthdayThisYear =
-    now.getMonth() > birth.getMonth() || (now.getMonth() === birth.getMonth() && now.getDate() >= birth.getDate());
-  if (!hadBirthdayThisYear) age -= 1;
-  return age;
+export { summarizeOlderEvents } from '@api/modules/chat/context';
+
+export interface CoachStreamRequest {
+  purpose: 'chat';
+  system: string;
+  user: string;
+  schema: typeof CoachAiEnvelopeSchema;
+  instructionSchema: typeof CoachAiResponseSchema;
+  tools: AiTool[];
 }
 
-// One line, counted by event type - "compact" per this prompt's own wording, not a per-event digest.
-export function summarizeOlderEvents(events: readonly ProfileEvent[]): string | null {
-  if (events.length === 0) return null;
-  const counts = new Map<string, number>();
-  for (const event of events) counts.set(event.eventType, (counts.get(event.eventType) ?? 0) + 1);
-  const byType = [...counts.entries()].map(([type, count]) => `${count} ${type}`).join(', ');
-  return `${events.length} older events not shown in detail: ${byType}.`;
-}
+export type CoachStream = (request: CoachStreamRequest) => AsyncGenerator<AiStreamItem<CoachAiEnvelope>>;
 
-// No "resolved"/expiry concept exists on f_profile_events (docs/05-data-model.md), so "active" means
-// reported and still within the recent-events window, not a separately tracked status.
-const ACTIVE_HEALTH_EVENT_TYPES = new Set(['injury', 'medication_change']);
+const UNUSABLE_PROPOSAL_NOTE =
+  "\n\nI couldn't turn that into a plan change, so nothing has been proposed. Ask me again and I'll rebuild it.";
 
-export interface ChatContext {
-  ageYears: number | null;
-  gender: string | null;
-  onboardingSubmissions: Awaited<ReturnType<typeof findSubmissionsByUserId>>;
-  recentEvents: ProfileEvent[];
-  activeHealthEvents: ProfileEvent[];
-  olderEventsSummary: string | null;
-  todayPlan: Awaited<ReturnType<typeof getToday>>;
-  availableExercises: AvailableExercise[];
-  muscleFocus: MemberMuscleFocus[];
-  aggregate: PlanAggregate;
-}
+const MAX_QUICK_REPLIES = 3;
+const MAX_QUICK_REPLY_LENGTH = 60;
 
-async function assembleChatContext(userId: string): Promise<ChatContext> {
-  const [user, onboardingSubmissions, profileEvents, todayPlan, catalog, aggregate, muscleFocus] = await Promise.all([
-    findUserById(userId),
-    findSubmissionsByUserId(userId),
-    plansRepository.findProfileEventsByUserId(userId),
-    getToday(userId),
-    listExercises(),
-    getTodayAggregate(),
-    findFocusByUserId(userId),
-  ]);
-  // The focus block is the current truth; its change events would only repeat stale levels.
-  const allEvents = profileEvents.filter((event) => event.eventType !== 'muscle_focus_changed');
-  const recentEvents = allEvents.slice(0, RECENT_EVENTS_LIMIT);
-
-  return {
-    ageYears: computeAge(user?.birthdate ?? null),
-    gender: user?.gender ?? null,
-    onboardingSubmissions,
-    recentEvents,
-    activeHealthEvents: recentEvents.filter((event) => ACTIVE_HEALTH_EVENT_TYPES.has(event.eventType)),
-    olderEventsSummary: summarizeOlderEvents(allEvents.slice(RECENT_EVENTS_LIMIT)),
-    todayPlan,
-    availableExercises: catalog.filter((exercise) => exercise.isAvailable),
-    muscleFocus,
-    aggregate,
-  };
-}
-
-function buildAggregateLines(aggregate: PlanAggregate): string[] {
-  const lines: string[] = [];
-  lines.push(
-    "Today's aggregate across all members (anonymized, no member identity) - use this only if asked what other members are doing:",
-  );
-  lines.push(
-    aggregate.topExercises.length > 0
-      ? `- Top exercises: ${aggregate.topExercises.map((e) => `${e.name} (${e.count})`).join(', ')}`
-      : '- Top exercises: none yet',
-  );
-  lines.push(
-    aggregate.topMuscles.length > 0
-      ? `- Top muscles: ${aggregate.topMuscles.map((muscle) => `${muscle.name} (${muscle.count})`).join(', ')}`
-      : '- Top muscles: none yet',
-  );
-  return lines;
-}
-
-// FR-25: assembled fresh on every call, never from a stored conversation - AGENTS.md principle 2, the
-// AI reasons from these accumulated facts, never a raw transcript.
-export function buildChatUserPrompt(context: ChatContext, message: string): string {
-  const lines: string[] = [];
-  lines.push(context.ageYears !== null ? `Member age: ${context.ageYears}` : 'Member age: unknown');
-  lines.push(`Member gender: ${context.gender ?? 'unknown'}`);
-
-  lines.push('Onboarding submissions (most recent first):');
-  for (const submission of context.onboardingSubmissions) {
-    const conditions = submission.physicalConditions.conditions.join(', ') || 'none';
-    const otherNotes = submission.physicalConditions.otherNotes ? ` (${submission.physicalConditions.otherNotes})` : '';
-    lines.push(`- Goals: ${submission.goals}`);
-    lines.push(`  Medications: ${submission.medications.join(', ') || 'none'}`);
-    lines.push(`  Conditions: ${conditions}${otherNotes}`);
-  }
-
-  if (context.todayPlan) {
-    lines.push(`Today's plan (${context.todayPlan.status}):`);
-    for (const exercise of context.todayPlan.exercises) {
-      lines.push(
-        `- ${exercise.exerciseName} (${exercise.sets}x${exercise.reps}${exercise.completed ? ', completed' : ''})`,
-      );
-    }
-  } else {
-    lines.push("Today's plan: none generated yet.");
-  }
-
-  // FR-28: placed right next to today's plan so a risk (e.g. an old knee injury) is easy to weigh
-  // against today's actual exercises, rather than buried in the general history dump below.
-  lines.push("Active injuries and medication changes (weigh these against today's plan above):");
-  if (context.activeHealthEvents.length === 0) lines.push('- none reported');
-  for (const event of context.activeHealthEvents) lines.push(`- ${event.eventType}: ${JSON.stringify(event.payload)}`);
-
-  lines.push(...buildMuscleFocusLines(context.muscleFocus));
-
-  lines.push('Available exercise catalog - propose alternatives only from this list:');
-  for (const exercise of context.availableExercises) lines.push(formatCatalogLine(exercise));
-
-  lines.push('Profile history, most recent first:');
-  if (context.recentEvents.length === 0) lines.push('- none yet');
-  for (const event of context.recentEvents) {
-    lines.push(`- ${event.eventType}: ${JSON.stringify(event.payload)}`);
-  }
-  if (context.olderEventsSummary) lines.push(context.olderEventsSummary);
-
-  lines.push(...buildAggregateLines(context.aggregate));
-
-  lines.push('Member message:');
-  lines.push(message);
-
-  return lines.join('\n');
-}
-
-// FR-25 to FR-29: this project's own wording, not a requirement quote.
-const CHAT_SYSTEM_PROMPT =
-  "You are a personal trainer AI assistant chatting with a gym member. Use the member's profile, " +
-  "onboarding data, today's plan, and profile history to reply helpfully and safely. Extract any new, " +
-  'durable facts the message reveals (injury, skipped exercise, medication change, life event, updated ' +
-  'physical state, or a request to adjust their plan) as structured facts - never invent facts the ' +
-  "message does not support. Weigh the member's active injuries and medication changes against today's " +
-  'exercises: if one conflicts, warn about it and propose a safer alternative from the available ' +
-  'catalog. Catalog exercises list the muscles they train as primary or secondary, and the member muscle ' +
-  'focus (-2 much less to +2 much more) says which muscles they want emphasized; respect it when proposing ' +
-  'alternatives, but never above safety. Only mention the cross-member aggregate if the member asks about ' +
-  'what others are doing.';
-
-export type EvaluateChat = (contextPrompt: string) => Promise<AiResult<ChatResponse>>;
-
-async function defaultEvaluateChat(contextPrompt: string): Promise<AiResult<ChatResponse>> {
-  return runStructured({
-    purpose: 'chat',
-    system: CHAT_SYSTEM_PROMPT,
-    user: contextPrompt,
-    schema: ChatResponseSchema,
+// Each fact and quick reply is judged on its own: one that does not fit is left out, the rest are kept.
+function validFacts(value: unknown): ProfileEventFact[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((item) => {
+    const parsed = ProfileEventFactSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
   });
+}
+
+function validQuickReplies(value: unknown): string[] {
+  const parsed = AI_RESPONSE_PARTS.quickReplies.safeParse(value);
+  if (!parsed.success) return [];
+  return parsed.data
+    .map((reply) => reply.trim().slice(0, MAX_QUICK_REPLY_LENGTH))
+    .filter(Boolean)
+    .slice(0, MAX_QUICK_REPLIES);
 }
 
 export interface SendMessageOverrides {
-  evaluateChat?: EvaluateChat;
+  stream?: CoachStream;
 }
 
-export interface SendMessageResult {
-  reply: string;
-  factsSaved: number;
-  adjustment?: ChatResponse['adjustment'];
+function toPendingFact(event: { id: string }, fact: ProfileEventFact): PendingFact {
+  return {
+    id: event.id,
+    eventType: fact.eventType,
+    label: PROFILE_EVENT_LABELS[fact.eventType],
+    description: fact.payload.description,
+    muscles: fact.eventType === 'injury' ? injuryMuscles(fact.payload) : [],
+  };
 }
 
-export async function sendMessage(
+async function blockForPart(userId: string, key: keyof typeof AI_RESPONSE_PARTS, value: unknown, context: ChatContext) {
+  switch (key) {
+    case 'planProposal': {
+      const parsed = AI_RESPONSE_PARTS.planProposal.safeParse(value);
+      return parsed.success ? buildProposalBlock(userId, parsed.data, context) : null;
+    }
+    case 'exercisePicker': {
+      const parsed = AI_RESPONSE_PARTS.exercisePicker.safeParse(value);
+      return parsed.success ? buildPickerBlock(parsed.data, context) : null;
+    }
+    case 'exerciseExplainer': {
+      const parsed = AI_RESPONSE_PARTS.exerciseExplainer.safeParse(value);
+      return parsed.success ? buildExplainerBlock(parsed.data, context) : null;
+    }
+    case 'safetyWarning': {
+      const parsed = AI_RESPONSE_PARTS.safetyWarning.safeParse(value);
+      return parsed.success ? buildSafetyBlock(parsed.data, context) : null;
+    }
+    default:
+      return null;
+  }
+}
+
+const STREAMED_BLOCK_KEYS = ['planProposal', 'exercisePicker', 'exerciseExplainer', 'safetyWarning'] as const;
+
+function defaultStream(request: CoachStreamRequest) {
+  return streamStructured(request);
+}
+
+// FR-25: the reply streams as text, then each component the AI chose arrives as soon as it is complete and
+// validated. The AI never writes anything: its facts are stored as pending (the member confirms them) and
+// everything else is a proposal the member applies through applyDraft.
+export async function* sendMessage(
   userId: string,
-  message: string,
+  input: CoachSendInput,
   overrides: SendMessageOverrides = {},
-): Promise<SendMessageResult> {
-  const context = await assembleChatContext(userId);
-  const evaluateChat = overrides.evaluateChat ?? defaultEvaluateChat;
-  const result = await evaluateChat(buildChatUserPrompt(context, message));
-  if (!result.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
+): AsyncGenerator<CoachStreamEvent> {
+  const context = await assembleChatContext(userId, input);
+  const stream = overrides.stream ?? defaultStream;
 
-  const sourceMessage = message.slice(0, SOURCE_MESSAGE_EXCERPT_LENGTH);
-  await repository.insertProfileEvents(
-    result.data.facts.map((fact) => ({ userId, eventType: fact.eventType, payload: fact.payload, sourceMessage })),
-  );
+  const emitted = new Set<string>();
+  let hasText = false;
+  let result: AiResult<CoachAiEnvelope> | undefined;
+  // A proposal the coach wrote but the server could not use must not vanish while the reply talks as if it
+  // existed, so the member is told.
+  let hasProposalAttempt = false;
+  let hasProposalBlock = false;
 
-  return { reply: result.data.reply, factsSaved: result.data.facts.length, adjustment: result.data.adjustment };
-}
-
-const PlanCorrectionExerciseSchema = z.object({
-  exerciseId: z.uuid(),
-  sets: z.number().int().positive(),
-  reps: z.number().int().positive(),
-  load: z.string().optional(),
-  notes: z.string().optional(),
-  completed: z.boolean(),
-});
-const PlanCorrectionSchema = z.object({ exercises: z.array(PlanCorrectionExerciseSchema) });
-type PlanCorrection = z.infer<typeof PlanCorrectionSchema>;
-
-// FR-21/FR-23: this project's own wording, not a requirement quote.
-const PLAN_CORRECTION_SYSTEM_PROMPT =
-  "You are correcting a gym member's training plan for a past date based on what they say actually " +
-  "happened, not generating a new one. You are given that date's current exercises and the available " +
-  'exercise catalog. Return the full corrected exercise list - keep, remove, or replace exercises per the ' +
-  "member's message, choosing exerciseId only from the catalog, and set completed accurately for every " +
-  'exercise you return, including ones you keep unchanged.';
-
-function buildCorrectionUserPrompt(
-  currentExercises: readonly plansRepository.PlanExerciseDetail[],
-  availableExercises: readonly AvailableExercise[],
-  aggregate: PlanAggregate,
-  instruction: string,
-): string {
-  const lines: string[] = [];
-  lines.push('Current exercises for this date:');
-  if (currentExercises.length === 0) lines.push('- none');
-  for (const exercise of currentExercises) {
-    lines.push(
-      `- ${exercise.exerciseId} | ${exercise.exerciseName} | sets ${exercise.sets} reps ${exercise.reps} | completed: ${exercise.completed}`,
-    );
-  }
-
-  lines.push('Available exercise catalog - choose exerciseId only from this list:');
-  for (const exercise of availableExercises) lines.push(formatCatalogLine(exercise));
-
-  lines.push(...buildAggregateLines(aggregate));
-
-  lines.push('Member correction request:');
-  lines.push(instruction);
-
-  return lines.join('\n');
-}
-
-export type EvaluateCorrection = (contextPrompt: string) => Promise<AiResult<PlanCorrection>>;
-
-async function defaultEvaluateCorrection(contextPrompt: string): Promise<AiResult<PlanCorrection>> {
-  return runStructured({
+  for await (const item of stream({
     purpose: 'chat',
-    system: PLAN_CORRECTION_SYSTEM_PROMPT,
-    user: contextPrompt,
-    schema: PlanCorrectionSchema,
-  });
-}
-
-export type AdjustPlanResult =
-  | { status: 'ok'; plan: TrainingPlan & { exercises: TrainingPlanExercise[] } }
-  | { status: 'needs_confirmation'; editedBy: string; editedAt: Date };
-
-export interface AdjustPlanOverrides {
-  evaluateCorrection?: EvaluateCorrection;
-}
-
-// FR-21/FR-23/RN-06/RN-07: today or a future date goes through the exact same regeneration guard as the
-// member's own plan screen (P-13/P-15) - the instruction text itself doesn't feed into that path, since
-// any fact chat.send already recorded in the same turn already shapes that regeneration's context. Only
-// a past date needs a dedicated AI call, since regenerating history is meaningless - it asks the AI to
-// return the corrected full exercise list (completed flags included) and writes it in place, keeping the
-// same plan row (RN-07: no history table, the corrected version is the only version).
-export async function adjustPlan(
-  userId: string,
-  date: string,
-  instruction: string,
-  confirmOverwrite = false,
-  overrides: AdjustPlanOverrides = {},
-): Promise<AdjustPlanResult> {
-  if (date >= todayLocal()) {
-    return generateForDate(userId, date, confirmOverwrite);
+    system: CHAT_SYSTEM_PROMPT,
+    user: buildChatUserPrompt(context, input),
+    schema: CoachAiEnvelopeSchema,
+    instructionSchema: CoachAiResponseSchema,
+    tools: buildChatTools(userId, context),
+  })) {
+    if (item.type === 'result') {
+      result = item.result;
+      break;
+    }
+    const { event } = item;
+    if (event.type === 'delta' && event.key === 'reply') {
+      hasText = true;
+      yield { type: 'text', delta: event.text };
+    } else if (event.type === 'value' && (STREAMED_BLOCK_KEYS as readonly string[]).includes(event.key)) {
+      const key = event.key as (typeof STREAMED_BLOCK_KEYS)[number];
+      const block = await blockForPart(userId, key, event.value, context);
+      emitted.add(key);
+      if (key === 'planProposal') {
+        hasProposalAttempt = true;
+        hasProposalBlock ||= block !== null;
+      }
+      if (block) yield { type: 'block', block };
+    }
   }
+  if (!result?.ok) throw new TRPCError(UNAVAILABLE);
+  const answer = result.data;
 
-  const existing = await plansRepository.findPlanByUserAndDate(userId, date);
-  if (!existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'No plan exists for that date' });
+  if (!hasText && answer.reply) yield { type: 'text', delta: answer.reply };
+  for (const key of STREAMED_BLOCK_KEYS) {
+    if (emitted.has(key) || !answer[key]) continue;
+    const block = await blockForPart(userId, key, answer[key], context);
+    if (key === 'planProposal') {
+      hasProposalAttempt = true;
+      hasProposalBlock ||= block !== null;
+    }
+    if (block) yield { type: 'block', block };
+  }
+  if (hasProposalAttempt && !hasProposalBlock) yield { type: 'text', delta: UNUSABLE_PROPOSAL_NOTE };
 
-  if (existing.status === 'trainer_edited' && !confirmOverwrite) {
-    const editor = existing.lastEditedByUserId ? await findUserById(existing.lastEditedByUserId) : null;
-    return {
-      status: 'needs_confirmation',
-      editedBy: editor?.name ?? 'a trainer',
-      editedAt: existing.lastEditedAt ?? existing.aiGeneratedAt ?? new Date(),
+  // A plan the coach proposes is remembered when the member applies it, with a note that carries what was
+  // asked, so the request is not also reported as a fact here.
+  const facts = validFacts(answer.facts).filter(
+    (fact) => !(hasProposalBlock && fact.eventType === 'plan_adjustment_request'),
+  );
+  const sourceMessage = input.message.slice(0, SOURCE_MESSAGE_EXCERPT_LENGTH);
+  const toInput = (fact: ProfileEventFact) => ({
+    userId,
+    eventType: fact.eventType,
+    payload: fact.payload,
+    sourceMessage,
+  });
+
+  // Only an injury or a medication change waits for the member's yes; everything else is remembered at once.
+  const needingConfirmation = facts.filter((fact) => needsConfirmation(fact.eventType));
+  const rememberedAtOnce = facts.filter((fact) => !needsConfirmation(fact.eventType));
+  await repository.insertConfirmedProfileEvents(rememberedAtOnce.map(toInput));
+  if (needingConfirmation.length > 0) {
+    const rows = await repository.insertPendingProfileEvents(needingConfirmation.map(toInput));
+    yield {
+      type: 'block',
+      block: {
+        type: 'facts',
+        id: randomUUID(),
+        facts: rows.map((row, index) => toPendingFact(row, needingConfirmation[index]!)),
+      },
     };
   }
 
-  const [currentExercises, catalog, aggregate] = await Promise.all([
-    plansRepository.findExercisesForPlanWithDetails(existing.id),
-    listExercises(),
-    getTodayAggregate(),
-  ]);
-  const availableExercises = catalog.filter((exercise) => exercise.isAvailable);
+  const quickReplies = validQuickReplies(answer.quickReplies);
+  if (quickReplies.length > 0) {
+    yield { type: 'block', block: { type: 'quick_replies', id: randomUUID(), replies: quickReplies } };
+  }
+}
 
-  const evaluateCorrection = overrides.evaluateCorrection ?? defaultEvaluateCorrection;
-  const result = await evaluateCorrection(
-    buildCorrectionUserPrompt(currentExercises, availableExercises, aggregate, instruction),
+export type ApplyDraftResult =
+  | { status: 'ok'; plan: Awaited<ReturnType<typeof plansRepository.replacePlan>> }
+  | NeedsConfirmation
+  | { status: 'needs_acknowledgement'; warnings: SafetyWarning[] };
+
+// The member's Apply: the only way a coach proposal reaches the database. The exercises are checked against
+// the catalog and its availability again, injury warnings must have been acknowledged, and a trainer edit or
+// ticked exercise still needs the member's confirmation (FR-22) before the plan is replaced.
+export async function applyDraft(userId: string, input: CoachApplyInput): Promise<ApplyDraftResult> {
+  const today = todayLocal();
+  const isPast = input.date < today;
+  const existing = await plansRepository.findPlanByUserAndDate(userId, input.date);
+  if (isPast && !existing) throw new TRPCError({ code: 'NOT_FOUND', message: 'No plan exists for that date' });
+
+  const catalogById = new Map((await listExercises()).map((entry) => [entry.id, entry]));
+  const ids = input.exercises.map((exercise) => exercise.exerciseId);
+  const isValid = ids.every((id) => {
+    const entry = catalogById.get(id);
+    return entry && (isPast || entry.isAvailable);
+  });
+  if (!isValid || new Set(ids).size !== ids.length) {
+    throw new TRPCError({ code: 'BAD_REQUEST', message: 'The plan has an exercise that cannot be done right now' });
+  }
+
+  const injuries = await listActiveInjuries(userId);
+  const conflicts = findInjuryConflicts(
+    input.exercises.map((exercise) => ({
+      exerciseId: exercise.exerciseId,
+      muscles: catalogById.get(exercise.exerciseId)!.muscles,
+    })),
+    injuries,
   );
-  if (!result.ok) throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'AI is temporarily unavailable' });
+  const acknowledgedIds = new Set(input.acknowledgedWarnings.map((warning) => warning.exerciseId));
+  const unacknowledged = conflicts.filter((warning) => !acknowledgedIds.has(warning.exerciseId));
+  if (unacknowledged.length > 0) return { status: 'needs_acknowledgement', warnings: unacknowledged };
 
-  const availableIds = new Set(availableExercises.map((exercise) => exercise.id));
-  const corrected = result.data.exercises.filter((exercise) => availableIds.has(exercise.exerciseId));
-  const completedExerciseIds = new Set(
-    corrected.filter((exercise) => exercise.completed).map((exercise) => exercise.exerciseId),
-  );
+  if (existing && !input.confirmOverwrite) {
+    const guard = await checkOverwriteGuard(existing, { countCompleted: !isPast });
+    if (guard) return guard;
+  }
 
-  const exercisesInput: plansRepository.PlanExerciseInput[] = corrected.map(
-    ({ exerciseId, sets, reps, load, notes }) => ({
-      exerciseId,
-      sets,
-      reps,
-      load,
-      notes,
-    }),
-  );
-  const plan = await plansRepository.replacePlan({ userId, planDate: date, exercises: exercisesInput });
+  const before = existing
+    ? (await plansRepository.findExercisesForPlanWithDetails(existing.id)).map((row) => ({
+        exerciseId: row.exerciseId,
+        name: row.exerciseName,
+        sets: row.sets,
+        reps: row.reps,
+        load: row.load,
+      }))
+    : [];
 
-  // replacePlan always inserts fresh rows with completed=false - reapply completed=true for whichever
-  // corrected exercises the AI marked done, matching the new row ids replacePlan just created.
-  await Promise.all(
-    plan.exercises
-      .filter((exercise) => completedExerciseIds.has(exercise.exerciseId))
-      .map((exercise) => plansRepository.setExerciseCompleted(exercise.id, true)),
-  );
+  const plan = await plansRepository.replacePlan({
+    userId,
+    planDate: input.date,
+    exercises: input.exercises.map((exercise) => ({
+      exerciseId: exercise.exerciseId,
+      sets: exercise.sets,
+      reps: exercise.reps,
+      load: exercise.load || undefined,
+      notes: exercise.notes?.trim() || undefined,
+      completed: isPast ? (exercise.completed ?? undefined) : undefined,
+    })),
+  });
 
-  return {
-    status: 'ok',
-    plan: {
-      ...plan,
-      exercises: plan.exercises.map((exercise) =>
-        completedExerciseIds.has(exercise.exerciseId) ? { ...exercise, completed: true } : exercise,
-      ),
+  const nameOf = (id: string) => catalogById.get(id)?.name ?? 'Exercise';
+  const conflictReason = new Map(conflicts.map((warning) => [warning.exerciseId, warning.reason]));
+  await plansRepository.insertPlanChange({
+    trainingPlanId: plan.id,
+    userId,
+    kind: 'coach',
+    request: input.request || null,
+    before,
+    after: plan.exercises.map((row) => ({
+      exerciseId: row.exerciseId,
+      name: nameOf(row.exerciseId),
+      sets: row.sets,
+      reps: row.reps,
+      load: row.load,
+    })),
+    acknowledgedWarnings: input.acknowledgedWarnings
+      .filter((warning) => ids.includes(warning.exerciseId))
+      .map((warning) => ({
+        exerciseId: warning.exerciseId,
+        name: nameOf(warning.exerciseId),
+        reason: conflictReason.get(warning.exerciseId) ?? warning.reason,
+      })),
+  });
+
+  // The plan is remembered only once it is applied, as one short line: what was asked and what mattered. The
+  // coach writes it and rewrites it as the conversation refines the proposal; without one the request stands in.
+  await plansRepository.insertProfileEvent({
+    userId,
+    eventType: 'plan_adjustment_request',
+    payload: {
+      description:
+        input.memoryNote ||
+        `Applied a plan for ${input.date}${input.request ? `: ${input.request.slice(0, 200)}` : ''}`,
+      planDate: input.date,
     },
-  };
+    sourceMessage: input.request ? input.request.slice(0, SOURCE_MESSAGE_EXCERPT_LENGTH) : null,
+  });
+
+  return { status: 'ok', plan };
 }

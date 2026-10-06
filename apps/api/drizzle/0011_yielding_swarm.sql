@@ -1,0 +1,1 @@
+ALTER TABLE "f_profile_events" ADD COLUMN "resolved_at" timestamp with time zone;

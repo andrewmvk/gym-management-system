@@ -73,6 +73,36 @@
   /* The proposal opening beside the chat: only the proposal moves, the chat stays where it is. */
   --animate-panel-in: panel-in 320ms var(--ease-out-expo) both;
 
+  /* A page settling in after navigation. `backwards` so no transform is left behind to trap fixed children. */
+  --animate-page-in: page-in 280ms var(--ease-out-expo) backwards;
+  /* A control acknowledging a change: the check landing in a box. */
+  --animate-pop: pop 200ms var(--ease-out-expo) backwards;
+  /* A count that just changed, rolling in from below. */
+  --animate-tick: tick 260ms var(--ease-out-expo) backwards;
+
+  @keyframes page-in {
+    from {
+      opacity: 0;
+      transform: translateY(0.375rem);
+    }
+  }
+  @keyframes pop {
+    from {
+      opacity: 0;
+      transform: scale(0.55);
+    }
+  }
+  @keyframes tick {
+    from {
+      opacity: 0;
+      transform: translateY(35%);
+    }
+  }
+  @keyframes fade-only {
+    from {
+      opacity: 0;
+    }
+  }
   @keyframes ai-bar {
     0%,
     100% {
@@ -329,6 +359,14 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
+  /* Arrivals keep their fade, so a change is still noticed, but stop travelling. */
+  .animate-page-in,
+  .animate-pop,
+  .animate-tick,
+  .animate-block-in,
+  .animate-panel-in {
+    animation-name: fade-only;
+  }
   .strike-wipe::after {
     transition: none;
   }

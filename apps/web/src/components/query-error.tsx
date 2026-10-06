@@ -15,7 +15,7 @@ export function QueryError({ title, onRetry, isRetrying, className }: QueryError
     <div
       role="alert"
       className={cn(
-        'flex flex-col items-center gap-3 rounded-lg border-2 border-dashed border-destructive/50 px-4 py-10 text-center',
+        'flex animate-in flex-col items-center gap-3 rounded-lg border-2 border-dashed border-destructive/50 px-4 py-10 text-center duration-300 fade-in-0',
         className,
       )}
     >

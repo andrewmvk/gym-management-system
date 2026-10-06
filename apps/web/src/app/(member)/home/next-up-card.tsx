@@ -159,7 +159,8 @@ function NextUpCardRoot() {
         </div>
       }
     >
-      <div className="flex flex-col gap-4 px-5 py-5 sm:px-6">
+      {/* Ticking an exercise off brings the next one in, so the card reads as moving on, not as a rewrite. */}
+      <div key={next.id} className="flex animate-block-in flex-col gap-4 px-5 py-5 sm:px-6">
         <div className="flex items-baseline justify-between gap-4">
           <h2 className="font-display text-xl font-bold tracking-wide uppercase">Next up</h2>
           <p className="numerals text-xl font-bold text-muted-foreground">
@@ -185,7 +186,7 @@ function NextUpCardRoot() {
             <span className="mt-2 block text-2xl font-bold text-muted-foreground">{formatWeight(next.load)}</span>
           ) : null}
         </p>
-        <details>
+        <details className="[&[open]>:not(summary)]:animate-in [&[open]>:not(summary)]:duration-200 [&[open]>:not(summary)]:fade-in-0">
           <summary className="flex min-h-11 w-fit items-center text-sm font-semibold underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/45">
             How to do it
           </summary>

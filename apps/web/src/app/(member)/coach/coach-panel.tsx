@@ -100,7 +100,7 @@ export function CoachPanel() {
             <Button
               type="button"
               size="lg"
-              className="fixed right-4 bottom-4 z-40 rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6"
+              className="fixed right-4 bottom-4 z-40 animate-block-in rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6"
             >
               <AiMark className="size-5" data-icon="inline-start" />
               Coach

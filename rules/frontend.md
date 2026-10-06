@@ -24,6 +24,16 @@ While data loads, render the shadcn/ui `Skeleton` in place of the content it sta
 - `Deferred` is for content that is mounting with nothing on screen yet. When a parameter change (a date, a filter, a page) triggers a new load while a result is already shown, don't tear that result down: pass the parameter through `useLaggedValue(param, isLoadingNewParam)` (`hooks/use-lagged-value.ts`) and render from the lagged value. The current view stays until the new data lands, or turns into the skeleton (rendered directly, without `Deferred`) once the load passes 200ms. Controls that set the parameter (chips, pickers) still read the real value so they respond instantly.
 - This covers loading data only. A button whose action is running shows its own pending state, not a skeleton: it is disabled, its label changes to what is happening and its mark moves. Use `AiButton` (`components/ai-button.tsx`) for it, with the Coach Mark (`components/ai-mark.tsx`): the default `ai` mark for what the coach does, `mark="tempo"` (no spark) for other work such as saving or applying. Never a spinner, and never a text-only change.
 
+## Motion
+
+Motion acknowledges an action or explains a change; it is never decoration. The full vocabulary is "Motion" in `DESIGN.md`; the code-level rules are:
+
+- Use the tokens in `globals.css` (`animate-page-in`, `animate-block-in`, `animate-pop`, `animate-tick`, `--ease-out-expo`) or the `tw-animate-css` utilities (`animate-in fade-in-0 duration-200`) before writing a new keyframe. Animate `transform`, `translate` and `opacity` only, never `width`, `height` or margins.
+- A thing that appears fades in from a visible default (a mount animation, no `opacity-0` start state that a failed script could leave behind). Use `fill-mode: backwards`, never `forwards` or `both` on an ancestor of fixed elements: a leftover transform becomes their containing block.
+- To replay an animation when a value changes, put `key={value}` on the element that animates (the done tally, a count, a month). Don't key a container whose children hold focus or state (a calendar grid).
+- A choice among several options (segmented filter, single toggle group, tabs) uses `useSlidingIndicator` (`hooks/use-sliding-indicator.ts`) and a `hidden group-data-sliding/<name>:block` marker, so the options still paint their own state until the marker is placed.
+- Every new animation needs a `prefers-reduced-motion` path that keeps the fade: add its class to the reduced-motion list in `globals.css`, or use `motion-reduce:transition-none` / `motion-reduce:animate-none`.
+
 ## Forms
 
 `react-hook-form` + `zodResolver`, using shadcn/ui's `Field` components (`Field`, `FieldLabel`, `FieldError`, `FieldGroup`) with react-hook-form's `Controller`; shadcn/ui no longer ships a `Form` component. Wherever a form's shape mirrors a tRPC procedure's input, import that zod schema from `packages/shared` rather than redefining it - client and server validation must never drift apart.

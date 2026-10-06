@@ -321,7 +321,7 @@ export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDial
             active {routine.length === 1 ? 'policy' : 'policies'}
           </button>
           {isExpanded && (
-            <ul className="flex flex-col gap-3">
+            <ul className="flex animate-in flex-col gap-3 duration-200 fade-in-0 slide-in-from-top-1">
               {routine.map(({ effective, direct }) =>
                 direct ? (
                   <DirectGrantLine key={effective.policyId} context={context} grant={direct.grant} kind="normal" />

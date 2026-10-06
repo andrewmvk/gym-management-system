@@ -226,7 +226,9 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
           </p>
         ) : (
           <p className="numerals text-5xl leading-none font-extrabold" aria-live="polite">
-            {doneCount}
+            <span key={doneCount} className="inline-block animate-tick">
+              {doneCount}
+            </span>
             <span className="text-kit-muted">/{plan.exercises.length}</span>
             <span className="sr-only"> exercises done</span>
           </p>
@@ -330,7 +332,12 @@ function DayPlanRoot({ date, todayIso }: DayPlanProps) {
     return hasSettled ? skeleton : <Deferred>{skeleton}</Deferred>;
   }
 
-  return <DayPlanBody key={shownDate} date={shownDate} todayIso={todayIso} query={planQuery} />;
+  // Picking a day swaps the whole plan; the body fades in so the swap reads as a change, not a flicker.
+  return (
+    <div key={shownDate} className="animate-in duration-200 fade-in-0">
+      <DayPlanBody date={shownDate} todayIso={todayIso} query={planQuery} />
+    </div>
+  );
 }
 
 export const DayPlan = Object.assign(DayPlanRoot, { Skeleton: DayPlanSkeleton });

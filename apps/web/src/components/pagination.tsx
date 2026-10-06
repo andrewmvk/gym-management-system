@@ -38,7 +38,7 @@ export function Pagination({
       className={cn('flex flex-col-reverse items-center justify-between gap-3 sm:flex-row', className)}
     >
       <p className="text-sm text-muted-foreground">
-        <span className="numerals text-base font-semibold text-foreground">
+        <span key={first} className="numerals inline-block animate-tick text-base font-semibold text-foreground">
           {first}-{last}
         </span>{' '}
         of <span className="numerals text-base font-semibold text-foreground">{total}</span> {noun}

@@ -206,7 +206,7 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
   if (state.kind === 'scanning') {
     return (
       <section role="status" className={cn(PANEL, frame, statusFrameTone(state))}>
-        <div className="flex flex-col gap-8">
+        <div key="scanning" className="flex animate-block-in flex-col gap-8">
           <ScanFaceIcon className={cn(ICON, 'text-primary')} aria-hidden />
           <h1 className={TITLE}>{scanningTitle(state)}</h1>
           <p className={cn(DETAIL, 'text-kit-muted')}>{scanningDetail(state)}</p>
@@ -219,7 +219,7 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
   if (state.kind === 'unavailable') {
     return (
       <section role="alert" className={cn(PANEL, frame, statusFrameTone(state))}>
-        <div className="flex flex-col gap-8">
+        <div key="unavailable" className="flex animate-block-in flex-col gap-8">
           <TriangleAlertIcon className={ICON} aria-hidden />
           <h1 className={TITLE}>{state.title}</h1>
           <p className={cn(DETAIL, 'text-kit-muted')}>{state.detail}</p>
@@ -236,7 +236,7 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
   const Icon = copy.icon;
   return (
     <section role="status" className={cn(PANEL, frame, copy.tone)}>
-      <div className="flex flex-col gap-8">
+      <div key={state.kind} className="flex animate-block-in flex-col gap-8">
         <Icon className={ICON} aria-hidden />
         <h1 className={TITLE}>{copy.title}</h1>
         <p className={DETAIL}>{copy.detail}</p>

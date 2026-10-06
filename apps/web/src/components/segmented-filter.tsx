@@ -1,3 +1,6 @@
+'use client';
+
+import { useSlidingIndicator } from '@/hooks/use-sliding-indicator';
 import { cn } from '@/lib/utils';
 
 interface SegmentedFilterProps<T extends string> {
@@ -15,8 +18,20 @@ export function SegmentedFilter<T extends string>({
   onChange,
   className,
 }: SegmentedFilterProps<T>) {
+  const ref = useSlidingIndicator<HTMLDivElement>('[role="radio"][aria-checked="true"]');
+
   return (
-    <div role="radiogroup" aria-label={label} className={cn('inline-flex rounded-md border bg-muted', className)}>
+    <div
+      ref={ref}
+      role="radiogroup"
+      aria-label={label}
+      className={cn('group/segmented relative inline-flex rounded-md border bg-muted', className)}
+    >
+      {/* The chosen option's card glides under the labels; the options only change their text color. */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 left-0 hidden w-(--slide-w) translate-x-(--slide-x) rounded-sm bg-card shadow-raised transition-[translate,width] duration-300 ease-(--ease-out-expo) group-data-sliding/segmented:block motion-reduce:transition-none"
+      />
       {options.map((option) => {
         const isActive = option.value === value;
         return (
@@ -27,13 +42,17 @@ export function SegmentedFilter<T extends string>({
             aria-checked={isActive}
             onClick={() => onChange(option.value)}
             className={cn(
-              'inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm px-3 font-display text-sm font-semibold tracking-wider whitespace-nowrap uppercase transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
-              isActive ? 'bg-card text-foreground shadow-raised' : 'text-muted-foreground hover:text-foreground',
+              'relative inline-flex h-10 flex-1 items-center justify-center gap-1.5 rounded-sm px-3 font-display text-sm font-semibold tracking-wider whitespace-nowrap uppercase transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
+              isActive
+                ? 'bg-card text-foreground shadow-raised group-data-sliding/segmented:bg-transparent group-data-sliding/segmented:shadow-none'
+                : 'text-muted-foreground hover:text-foreground',
             )}
           >
             {option.label}
             {option.count !== undefined && (
-              <span className="numerals text-base text-muted-foreground">{option.count}</span>
+              <span key={option.count} className="numerals inline-block animate-tick text-base text-muted-foreground">
+                {option.count}
+              </span>
             )}
           </button>
         );

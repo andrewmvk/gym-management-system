@@ -127,7 +127,9 @@ export function SignupWizard() {
           Back
         </Button>
       )}
-      {content}
+      <div key={step} className="animate-block-in">
+        {content}
+      </div>
     </div>
   );
 }

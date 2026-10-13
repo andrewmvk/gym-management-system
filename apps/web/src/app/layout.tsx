@@ -19,6 +19,7 @@ const barlowCondensed = Barlow_Condensed({
 export const metadata: Metadata = {
   title: { default: 'Cadence', template: '%s · Cadence' },
   description: 'Gym management with face-recognition check-in and AI training plans',
+  appleWebApp: { capable: true, title: 'Cadence', statusBarStyle: 'black-translucent' },
 };
 
 export const viewport: Viewport = {
@@ -26,6 +27,7 @@ export const viewport: Viewport = {
     { media: '(prefers-color-scheme: light)', color: '#1c1f28' },
     { media: '(prefers-color-scheme: dark)', color: '#0f1117' },
   ],
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({ children }: LayoutProps<'/'>) {

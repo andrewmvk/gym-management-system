@@ -106,9 +106,10 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - NFR-1: **Responsive** - usable on mobile and desktop viewports (the member-facing app in particular must work well on phones).
 - NFR-2: **Reasonable performance** - no specific benchmark targets; standard SPA/SSR responsiveness is sufficient.
 - NFR-3: **Basic security hygiene** - passwords hashed, authenticated routes actually protected (JWT verified server-side), the auth cookie is `httpOnly` and `sameSite=lax` always, and `Secure` whenever `NODE_ENV=production` (off for local Docker Compose demo runs, since `Secure` cookies are dropped over plain HTTP), file uploads validated by type/size, secrets kept out of source control (`.env`, not committed).
-- NFR-4: **No accessibility (WCAG), offline, i18n, or scale requirements** - explicitly out of scope.
-- NFR-5: **No SLA/uptime requirement** - the system only needs to run reliably for local development/demo via Docker Compose.
+- NFR-4: **No accessibility (WCAG), i18n, or scale requirements** - explicitly out of scope.
+- NFR-5: **No SLA/uptime requirement** - the system only needs to run reliably for local development/demo via Docker Compose, and, once deployed (NFR-7), on a free hosting tier with no uptime guarantee.
 - NFR-6: **No password-reset/account-recovery flow** - explicitly out of scope; a forgotten password is a non-issue for this academic demo.
+- NFR-7: **Installable as a Progressive Web App** (decided 2026-10-13, audit-log item 32) - a valid web app manifest and icons (reusing the existing brand mark) so the member/staff app can be added to a phone's home screen and launched standalone, once served over HTTPS. No service-worker-based offline caching, background sync, or push notifications are required - this is about installability, not offline use. A later, optional step may wrap the same PWA for the Play Store/App Store (e.g. Bubblewrap/Capacitor) without a separate native codebase.
 
 ## 3. Permitted Scopes (In / Out of Scope)
 
@@ -130,6 +131,7 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - Admin-editable weekly opening hours.
 - Seeded, fixed-credential demo trainer/admin accounts.
 - Explicit, recorded LGPD consent for biometric processing before a face embedding is ever computed.
+- A PWA-installable member/staff app (manifest, brand icons, standalone launch, NFR-7) and a free-tier public deployment (separate from the local Docker Compose grading environment) so it can be reached and installed from a phone.
 
 ### Out of Scope
 - Real payment processing, invoicing, or subscription billing logic.
@@ -146,4 +148,6 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - Notifications to staff of any kind.
 - Password reset/account recovery.
 - Accessibility compliance, internationalization, offline support, per-user timezone handling.
-- Production-grade infra concerns (autoscaling, CDN, uptime monitoring, real object storage, hardened kiosk network boundary) - local Docker Compose is the target environment.
+- Production-grade infra concerns (autoscaling, CDN, uptime monitoring, real object storage, hardened kiosk network boundary). Local Docker Compose stays the primary dev/grading environment; a free-tier public deployment (NFR-7) is for phone access and distribution only, and does not need to meet any production-hardening bar.
+- Service-worker-based offline caching, background sync, and push notifications (NFR-7 covers installability only, not offline use).
+- A paid custom domain - a free subdomain from the hosting provider (with its own valid HTTPS certificate) is sufficient for installability and store packaging.

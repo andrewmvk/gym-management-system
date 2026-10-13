@@ -84,3 +84,17 @@ history.
 
 **MVP 5 validation**: `docker compose up` brings up the system from scratch and it passes the Unit 1
 §11 checklist for every relevant task.
+
+## MVP 6 - Mobile installability and public deployment (beyond the course MVP model, audit-log item 32)
+
+Goal: reach a phone. Everything above targets `docker compose up` on the developer's machine (NFR-5); this
+stage is additive and does not change MVP 1-5's validation.
+
+- PWA installability (NFR-7): a web app manifest and icons reusing the existing brand mark, `P-33`.
+- A free-tier public deployment (frontend, API and database on separate free hosting, independent of the
+  local Docker Compose setup), so the manifest's HTTPS requirement is met and a phone can actually install it.
+- Optional, later: wrap the same PWA for the Play Store (Bubblewrap/Trusted Web Activity) and the App Store
+  (Capacitor), without a separate native codebase.
+
+**MVP 6 validation**: the manifest and icons are served correctly and the app installs to a phone's home
+screen from the deployed URL.

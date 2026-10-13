@@ -51,8 +51,9 @@ A prompt is a specification, not a contract. If the implementation has to deviat
 | [P-30](./P-30-must-review-and-overview.md) | Must-review plans, plan review preview, member Now and staff Overview | FR-53, FR-54, FR-55, FR-56, RN-14 | 4 | P-29, P-15, P-14 | Heitor |
 | [P-31](./P-31-in-person-registration.md) | In-person registration (planned, nothing implemented; fixes P-07, P-08, P-09, P-10, P-12) | FR-57 (and the rewording of FR-1, FR-9 to FR-12, FR-44, FR-46, RN-12; removes FR-3 to FR-8, RN-02, RN-03) | 4 | P-30 | Andrew |
 | [P-33](./P-33-pwa-installability.md) | PWA installability | NFR-7 | 6 | none | Heitor |
+| [P-34](./P-34-public-deployment.md) | Public deployment | NFR-7 | 6 | P-33 | Heitor |
 
-`P-33` covers NFR-7, added 2026-10-13 (audit-log item 32) alongside a narrowed NFR-4 and a reworded Out of Scope list - see `docs/07-mvp-roadmap.md` MVP 6. There is no `P-32` prompt file: it was designed with the developer in a grilling session (audit-log item 23) rather than written as a prompt first.
+`P-33` covers NFR-7, added 2026-10-13 (audit-log item 32) alongside a narrowed NFR-4 and a reworded Out of Scope list - see `docs/07-mvp-roadmap.md` MVP 6. `P-34` adds the external-database entrypoint mode and the deployment steps (`docs/10-deployment.md`), plus a pre-existing migration-ordering bug fix it found along the way (`docker/backend-entrypoint.sh`, `apps/api/src/db/client.ts`). There is no `P-32` prompt file: it was designed with the developer in a grilling session (audit-log item 23) rather than written as a prompt first.
 
 `P-31` is the planned rework that brings the registration code in line with the in-person model (`Fixes: P-07, P-08, P-09, P-10, P-12`, audit-log item 20). It supersedes parts of `P-07` to `P-10` and `P-12`, which carry a `Status:` note saying so. The 2026-10-04 critique (audit-log item 21) did not get a prompt of its own: it amended the prompts it affected (`P-04`, `P-05`, `P-11`, `P-13` to `P-21`, `P-23` to `P-26`, `P-29`, `P-30`), and its new requirements FR-58 to FR-62 are owned by `P-16`, `P-13`, `P-15`, `P-20` and `P-25` respectively.
 
@@ -60,14 +61,14 @@ A prompt is a specification, not a contract. If the implementation has to deviat
 
 ## Distribution (requirements and stages)
 
-Total: 32 prompts covering the functional requirements FR-1..FR-62 (44 original + 2 added by `P-27`/`P-28` + 2 added by the policy groups amendment of `P-23` + 4 added by `P-29` + 4 added by `P-30` + 6 added by the 2026-10-04 changes: FR-57 owned by `P-31`, and FR-58 to FR-62 owned by the amended prompts `P-16`, `P-13`, `P-15`, `P-20` and `P-25`, see `docs/09-audit-log.md`) plus the non-functional NFR-7 added by `P-33`. Requirement ids are never renumbered: FR-3 to FR-8 stay as tombstones (removed by audit-log item 20, executed by `P-31`), so 56 functional requirements are active. `P-29`, `P-30` and the other amended prompts also reword existing requirements, which stay counted under the prompts that originally covered them. `P-31` supersedes parts of `P-07`, `P-08`, `P-09`, `P-10` and `P-12` (`P-08` and `P-10` entirely), which carry a `Status:` note saying so; it is planned and nothing of it is implemented.
+Total: 33 prompts covering the functional requirements FR-1..FR-62 (44 original + 2 added by `P-27`/`P-28` + 2 added by the policy groups amendment of `P-23` + 4 added by `P-29` + 4 added by `P-30` + 6 added by the 2026-10-04 changes: FR-57 owned by `P-31`, and FR-58 to FR-62 owned by the amended prompts `P-16`, `P-13`, `P-15`, `P-20` and `P-25`, see `docs/09-audit-log.md`) plus the non-functional NFR-7 added by `P-33` (`P-34` shares it, as the infra half of the same requirement). Requirement ids are never renumbered: FR-3 to FR-8 stay as tombstones (removed by audit-log item 20, executed by `P-31`), so 56 functional requirements are active. `P-29`, `P-30` and the other amended prompts also reword existing requirements, which stay counted under the prompts that originally covered them. `P-31` supersedes parts of `P-07`, `P-08`, `P-09`, `P-10` and `P-12` (`P-08` and `P-10` entirely), which carry a `Status:` note saying so; it is planned and nothing of it is implemented.
 
 The owner and stage counts below are computed from the index above: prompts are counted per Default owner and per MVP stage, and each active functional requirement is counted once, under the prompt that lists it as its own (not as a rewording or a "with"), so the requirement split follows the owner of that prompt.
 
 | Owner | Prompts | Functional requirements (active) | Non-functional requirements (primary) |
 |---|---|---|---|
 | Andrew | 11 | 14 of 56 | NFR-1, NFR-3, NFR-5 |
-| Heitor | 21 | 42 of 56 | NFR-7 |
+| Heitor | 22 | 42 of 56 | NFR-7 |
 
 NFR-1 (responsive UI) is listed once, on the foundation prompt P-03, but it applies to every screen of every prompt. NFR-2 has no dedicated work. NFR-4 and NFR-6 are explicit non-goals. NFR-7 (PWA installability) is `P-33`'s.
 
@@ -78,7 +79,7 @@ NFR-1 (responsive UI) is listed once, on the foundation prompt P-03, but it appl
 | MVP 3 | 4 | 5 | 9 |
 | MVP 4 | 2 | 4 | 6 |
 | MVP 5 | 0 | 1 | 1 |
-| MVP 6 | 0 | 1 | 1 |
+| MVP 6 | 0 | 2 | 2 |
 
 Counting requirements alone understates the base work: P-01 to P-05 have no functional requirement of their own but every other prompt depends on them.
 
@@ -98,3 +99,4 @@ A wave only needs prompts from earlier waves, so everything inside a wave can ru
 - **Wave 9**: P-30
 - **Wave 10**: P-31 (it reworks flows that waves 4 to 7 built, so it only runs after the prompts that touched the same files)
 - **Wave 11**: P-33 (independent of every other prompt; placed last only because it was decided last)
+- **Wave 12**: P-34 (needs P-33's manifest/icons to already exist before the deployment they need to be installable from makes sense)

@@ -90,9 +90,12 @@ history.
 Goal: reach a phone. Everything above targets `docker compose up` on the developer's machine (NFR-5); this
 stage is additive and does not change MVP 1-5's validation.
 
-- PWA installability (NFR-7): a web app manifest and icons reusing the existing brand mark, `P-33`.
-- A free-tier public deployment (frontend, API and database on separate free hosting, independent of the
-  local Docker Compose setup), so the manifest's HTTPS requirement is met and a phone can actually install it.
+- PWA installability (NFR-7): a web app manifest and icons reusing the existing brand mark, `P-33` (done).
+- A free-tier public deployment (frontend on Vercel, API on Render via a new entrypoint mode, database on
+  Neon, independent of the local Docker Compose setup), so the manifest's HTTPS requirement is met and a
+  phone can actually install it, `P-34` (done, except actually creating the accounts and deploying - see
+  `docs/10-deployment.md`). Along the way, `P-34` found and fixed a pre-existing migration-ordering bug
+  that blocks any fresh or far-behind database, not only this deployment's.
 - Optional, later: wrap the same PWA for the Play Store (Bubblewrap/Trusted Web Activity) and the App Store
   (Capacitor), without a separate native codebase.
 

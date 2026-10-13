@@ -1,9 +1,30 @@
 #!/usr/bin/env bash
 # Runs PostgreSQL and the API in one container (course requirement: exactly two containers).
-# Modes: "api" (default) starts both; "db-only" starts just PostgreSQL for host-side pnpm dev.
+# Modes: "api" (default) starts both; "db-only" starts just PostgreSQL for host-side pnpm dev;
+# "api-external-db" (NFR-7/MVP 6, P-34) runs only the API against the DATABASE_URL a free-tier host
+# already provides (e.g. Neon) - no local PostgreSQL, no POSTGRES_* vars required. The local/grading
+# "api" and "db-only" paths below are unchanged.
 set -euo pipefail
 
 MODE="${1:-api}"
+log() { echo "[entrypoint] $*"; }
+has_script() { node -e "process.exit(require('./package.json').scripts?.['$1'] ? 0 : 1)"; }
+
+if [ "$MODE" = "api-external-db" ]; then
+  log "external database mode: skipping local PostgreSQL"
+  cd /app/apps/api
+  if has_script db:migrate; then
+    log "running db:migrate"
+    pnpm run db:migrate
+  fi
+  if has_script db:seed; then
+    log "running db:seed"
+    pnpm run db:seed
+  fi
+  log "starting the API"
+  exec ./node_modules/.bin/tsx src/index.ts
+fi
+
 PG_BIN="$(ls -d /usr/lib/postgresql/*/bin | head -n 1)"
 PGDATA="${PGDATA:-/var/lib/postgresql/data}"
 SOCKET_DIR=/run/postgresql
@@ -15,7 +36,6 @@ TEST_DB="${POSTGRES_DB}_test"
 API_PID=""
 PG_PID=""
 
-log() { echo "[entrypoint] $*"; }
 as_postgres() { gosu postgres "$@"; }
 psql_admin() { as_postgres "$PG_BIN/psql" -h "$SOCKET_DIR" -U "$POSTGRES_USER" -d postgres -v ON_ERROR_STOP=1 -tAc "$1"; }
 
@@ -79,7 +99,6 @@ if [ "$MODE" = "db-only" ]; then
 fi
 
 cd /app/apps/api
-has_script() { node -e "process.exit(require('./package.json').scripts?.['$1'] ? 0 : 1)"; }
 
 if has_script db:migrate; then
   log "running db:migrate"

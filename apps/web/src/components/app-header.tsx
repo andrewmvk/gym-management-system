@@ -7,6 +7,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useMemo, useState } from 'react';
 import { Brand } from '@/components/brand';
+import { InstallAppButton } from '@/components/install-app-button';
 import { KitBar } from '@/components/kit-bar';
 import { MembershipBadge } from '@/components/membership-badge';
 import { ThemeToggle } from '@/components/theme-toggle';
@@ -195,6 +196,7 @@ export function AppHeader({ area }: { area: AppArea }) {
             className="mr-1 hidden sm:inline-flex"
           />
         )}
+        <InstallAppButton />
         <ThemeToggle />
         <UserMenu area={area} />
       </div>

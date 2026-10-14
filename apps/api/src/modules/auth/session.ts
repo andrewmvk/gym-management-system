@@ -23,11 +23,16 @@ export function verifySessionToken(token: string): string | null {
 }
 
 // Secure only in production: the local compose demo is plain HTTP, where a Secure cookie is silently dropped.
+// sameSite follows it for the same reason: the public deployment (docs/10-deployment.md) puts the frontend and
+// the API on two different registrable domains, so the browser only sends the cookie back cross-site when it is
+// None, which in turn requires Secure. Local compose keeps frontend and API on the same site, where Lax is both
+// enough and necessary, since None without Secure is rejected outright.
 function cookieOptions(): CookieOptions {
+  const isProduction = env.NODE_ENV === 'production';
   return {
     httpOnly: true,
-    sameSite: 'lax',
-    secure: env.NODE_ENV === 'production',
+    sameSite: isProduction ? 'none' : 'lax',
+    secure: isProduction,
     path: '/',
   };
 }

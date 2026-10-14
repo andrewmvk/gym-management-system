@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { Brand } from '@/components/brand';
+import { InstallAppButton } from '@/components/install-app-button';
 import { KitBar } from '@/components/kit-bar';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { Button } from '@/components/ui/button';
@@ -12,6 +13,7 @@ export function PublicHeader() {
         <Brand />
       </Link>
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
+        <InstallAppButton />
         <ThemeToggle />
         <Button asChild variant="ghost" className="hidden text-kit-foreground hover:bg-white/10 sm:inline-flex">
           <Link href="/gym">Gym info</Link>

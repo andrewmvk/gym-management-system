@@ -69,11 +69,24 @@ re-check its pricing page before assuming the steps below still apply.
 
    | Variable | Value |
    |---|---|
-   | `NEXT_PUBLIC_API_URL` | the Render URL from step 2.6 |
+   | `NEXT_PUBLIC_API_URL` | empty (`""`) - the browser calls the API through this same origin, not the Render URL directly; see "Why the API is proxied, not called directly" below |
+   | `API_PROXY_TARGET` | the Render URL from step 2.6. Server-side only (no `NEXT_PUBLIC_` prefix): `apps/web/next.config.ts` reads it to rewrite `/trpc/*`, `/files/*` and `/kiosk/*` to the real API |
    | `KIOSK_API_KEY` | the same value set on Render. `apps/web/next.config.ts` remaps it to `NEXT_PUBLIC_KIOSK_API_KEY` at build time (so it reaches the kiosk page's client bundle) - set the plain `KIOSK_API_KEY` name here, not the `NEXT_PUBLIC_` one |
 
 4. Deploy. Update the API's `WEB_ORIGIN` env var on Render to this Vercel URL once you have it (step 2.4
    needs the real URL, not a guess), and redeploy the API so CORS allows it.
+
+### Why the API is proxied, not called directly
+
+Every browser on iOS (Chrome, Safari, anything) runs on Apple's WebKit engine and blocks a cookie set by a
+different registrable domain outright, even with `SameSite=None; Secure` - Vercel and Render are two
+different domains, so a direct cross-site call never keeps the member signed in on an iPhone (it works on
+desktop and Android, where each browser has its own networking stack). `apps/web/next.config.ts` rewrites
+the API paths through the Vercel origin instead, so the browser only ever talks to one domain and the
+session cookie is first-party everywhere. `NEXT_PUBLIC_API_URL=""` makes the frontend call `/trpc`, `/files`
+and `/kiosk` as relative paths instead of an absolute Render URL, so they hit the rewrite. Local Docker
+Compose does not set `API_PROXY_TARGET`, so the rewrite is a no-op there and the frontend calls the local API
+directly, same as before.
 
 ## Verifying installability
 

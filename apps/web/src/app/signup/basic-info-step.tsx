@@ -1,6 +1,6 @@
 'use client';
 
-import { type BasicInfoInput, BasicInfoInputSchema } from '@cadence/shared/schemas/signup';
+import { type BasicInfoInput, BasicInfoInputSchema, type GENDER_OPTIONS } from '@cadence/shared/schemas/signup';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation } from '@tanstack/react-query';
 import { Controller, useForm } from 'react-hook-form';
@@ -12,13 +12,15 @@ import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toIsoDate } from '@/lib/calendar-date';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 
-const GENDER_LABELS = {
+const GENDER_LABELS: Record<(typeof GENDER_OPTIONS)[number], LabelKey> = {
   female: 'Female',
   male: 'Male',
   prefer_not_to_say: 'Prefer not to say',
-} as const;
+};
 
 interface BasicInfoStepProps {
   defaultValues: BasicInfoInput;
@@ -27,9 +29,11 @@ interface BasicInfoStepProps {
   emailError?: string | null;
 }
 
+// Kept in English in the form state: FieldError translates it where it shows.
 const EMAIL_TAKEN_MESSAGE = 'An account already exists for this email. Try signing in instead.';
 
 export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicInfoStepProps) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const form = useForm<BasicInfoInput>({
     resolver: zodResolver(BasicInfoInputSchema),
@@ -48,14 +52,14 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
         }
         onContinue(form.getValues());
       },
-      onError: () => toast.error("We couldn't check your email. Try again."),
+      onError: () => toast.error(t("We couldn't check your email. Try again.")),
     }),
   );
 
   return (
     <StepPanel
-      title="About you"
-      description="Start with your basic information. We'll ask for your consent and a reference photo next."
+      title={t('About you')}
+      description={t("Start with your basic information. We'll ask for your consent and a reference photo next.")}
     >
       <form noValidate onSubmit={form.handleSubmit((values) => checkEmail.mutate({ email: values.email }))}>
         <FieldGroup>
@@ -64,7 +68,7 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="signup-name">Full name</FieldLabel>
+                <FieldLabel htmlFor="signup-name">{t('Full name')}</FieldLabel>
                 <Input {...field} id="signup-name" autoComplete="name" aria-invalid={fieldState.invalid} />
                 {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
               </Field>
@@ -75,7 +79,7 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="signup-email">Email</FieldLabel>
+                <FieldLabel htmlFor="signup-email">{t('Email')}</FieldLabel>
                 <Input
                   {...field}
                   id="signup-email"
@@ -93,7 +97,7 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="signup-phone">Phone</FieldLabel>
+                  <FieldLabel htmlFor="signup-phone">{t('Phone')}</FieldLabel>
                   <Input {...field} id="signup-phone" type="tel" autoComplete="tel" aria-invalid={fieldState.invalid} />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -104,13 +108,13 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="signup-birthdate">Birthdate</FieldLabel>
+                  <FieldLabel htmlFor="signup-birthdate">{t('Birthdate')}</FieldLabel>
                   <DatePicker
                     id="signup-birthdate"
                     value={field.value}
                     onChange={field.onChange}
                     onBlur={field.onBlur}
-                    placeholder="Select a date"
+                    placeholder={t('Select a date')}
                     max={toIsoDate(new Date())}
                     captionLayout="dropdown"
                     aria-invalid={fieldState.invalid}
@@ -126,16 +130,16 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
             render={({ field }) => (
               <Field>
                 <FieldLabel htmlFor="signup-gender">
-                  Gender <span className="font-normal text-muted-foreground">(optional)</span>
+                  {t('Gender')} <span className="font-normal text-muted-foreground">{t('(optional)')}</span>
                 </FieldLabel>
                 <Select value={field.value ?? ''} onValueChange={(value) => field.onChange(value || undefined)}>
                   <SelectTrigger id="signup-gender" className="w-full">
-                    <SelectValue placeholder="Prefer not to say" />
+                    <SelectValue placeholder={t('Prefer not to say')} />
                   </SelectTrigger>
                   <SelectContent>
                     {Object.entries(GENDER_LABELS).map(([value, label]) => (
                       <SelectItem key={value} value={value}>
-                        {label}
+                        {t(label)}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -144,7 +148,7 @@ export function BasicInfoStep({ defaultValues, onContinue, emailError }: BasicIn
             )}
           />
           <Button type="submit" size="lg" className="mt-4 w-full" disabled={checkEmail.isPending}>
-            {checkEmail.isPending ? 'Continuing...' : 'Continue'}
+            {checkEmail.isPending ? t('Continuing...') : t('Continue')}
           </Button>
         </FieldGroup>
       </form>

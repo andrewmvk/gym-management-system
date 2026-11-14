@@ -8,17 +8,19 @@ import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 import { useUrlState } from '@/hooks/use-url-state';
 import { toIsoDate } from '@/lib/calendar-date';
-
-const TITLE = 'My plan';
-const DESCRIPTION = "Today's training, the days you've done and the ones coming up.";
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 const isIsoDate = (raw: string): raw is string => /^\d{4}-\d{2}-\d{2}$/.test(raw);
 
 function PlanHeader({ strip }: { strip: ReactNode }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between lg:gap-8">
       <div className="min-w-0">
-        <PageHeading title={TITLE} description={DESCRIPTION} />
+        <PageHeading
+          title={t('My plan')}
+          description={t("Today's training, the days you've done and the ones coming up.")}
+        />
       </div>
       {strip}
     </div>

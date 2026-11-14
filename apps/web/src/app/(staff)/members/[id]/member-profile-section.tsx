@@ -1,8 +1,10 @@
+'use client';
+
 import { PaperclipIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { MemberSection } from '@/app/(staff)/members/[id]/member-section';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime, formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface MemberProfileSectionProps {
   onboarding: {
@@ -17,7 +19,6 @@ interface MemberProfileSectionProps {
   } | null;
 }
 
-const TITLE = 'Current health profile';
 const SKELETON_ROWS = 6;
 
 function ProfileRow({ label, children }: { label: string; children: ReactNode }) {
@@ -30,12 +31,14 @@ function ProfileRow({ label, children }: { label: string; children: ReactNode })
 }
 
 function None() {
-  return <span className="text-muted-foreground">None listed</span>;
+  const { t } = useI18n();
+  return <span className="text-muted-foreground">{t('None listed')}</span>;
 }
 
 function MemberProfileSectionSkeleton() {
+  const { t } = useI18n();
   return (
-    <MemberSection title={TITLE} description={<Skeleton className="mt-1 h-5 w-48" />}>
+    <MemberSection title={t('Current health profile')} description={<Skeleton className="mt-1 h-5 w-48" />}>
       {Array.from({ length: SKELETON_ROWS }, (_, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
         <div key={index} className="flex flex-col gap-1 border-b px-5 py-4 last:border-b-0 sm:px-6">
@@ -48,38 +51,40 @@ function MemberProfileSectionSkeleton() {
 }
 
 function MemberProfileSectionRoot({ onboarding }: MemberProfileSectionProps) {
+  const { t, tn, formatDateTime, formatPlanDate } = useI18n();
+  const title = t('Current health profile');
+
   if (!onboarding) {
     return (
-      <MemberSection title={TITLE} description="What the member told us in the health profile.">
-        <p className="px-5 py-4 text-muted-foreground sm:px-6">This member has not submitted a health profile yet.</p>
+      <MemberSection title={title} description={t('What the member told us in the health profile.')}>
+        <p className="px-5 py-4 text-muted-foreground sm:px-6">
+          {t('This member has not submitted a health profile yet.')}
+        </p>
       </MemberSection>
     );
   }
 
   return (
     <MemberSection
-      title={TITLE}
-      description={
-        <>
-          Submitted <span className="numerals text-base font-semibold">{formatDateTime(onboarding.submittedAt)}</span>.
-          The newest entry is the one the AI reads first.
-        </>
-      }
+      title={title}
+      description={tn('Submitted {date}. The newest entry is the one the AI reads first.', {
+        date: <span className="numerals text-base font-semibold">{formatDateTime(onboarding.submittedAt)}</span>,
+      })}
     >
       <dl>
-        <ProfileRow label="Height and weight">
+        <ProfileRow label={t('Height and weight')}>
           <span className="numerals text-lg font-semibold">{onboarding.heightCm}</span> cm,{' '}
           <span className="numerals text-lg font-semibold">{onboarding.weightKg}</span> kg
         </ProfileRow>
-        <ProfileRow label="Goals">{onboarding.goals}</ProfileRow>
-        <ProfileRow label="Medications">
+        <ProfileRow label={t('Goals')}>{onboarding.goals}</ProfileRow>
+        <ProfileRow label={t('Medications')}>
           {onboarding.medications.length > 0 ? onboarding.medications.join(', ') : <None />}
         </ProfileRow>
-        <ProfileRow label="Physical conditions">
+        <ProfileRow label={t('Physical conditions')}>
           {onboarding.conditions.length > 0 ? onboarding.conditions.join(', ') : <None />}
         </ProfileRow>
-        <ProfileRow label="Other notes">{onboarding.otherNotes ?? <None />}</ProfileRow>
-        <ProfileRow label="Medical exams">
+        <ProfileRow label={t('Other notes')}>{onboarding.otherNotes ?? <None />}</ProfileRow>
+        <ProfileRow label={t('Medical exams')}>
           {onboarding.exams.length > 0 ? (
             <ul className="flex flex-col gap-3">
               {onboarding.exams.map((exam) => (
@@ -97,7 +102,7 @@ function MemberProfileSectionRoot({ onboarding }: MemberProfileSectionProps) {
                   {exam.hasAttachment && (
                     <p className="flex items-center gap-1.5 text-sm text-muted-foreground">
                       <PaperclipIcon className="size-4" aria-hidden />
-                      File attached by the member
+                      {t('File attached by the member')}
                     </p>
                   )}
                 </li>

@@ -47,7 +47,7 @@ Full functional detail lives in `docs/02-requirements.md` (FR-1 through FR-72) a
 - Membership is a mocked active/inactive status: an inactive member cannot log in and cannot check in at the kiosk (no turnstile call, no check-in recorded) until an admin reactivates them; no payment is processed.
 - No checkout event anywhere - occupancy is a rolling-window estimate, explicitly framed as such, not an exact headcount.
 - Trainer/admin accounts exist only via a first-boot seed script with fixed demo credentials - there is no staff self-signup UI anywhere. Permissions themselves are policy-driven (member/trainer/admin are seeded policy groups, a named bundle of policies a user belongs to, not a fixed role field), so an Admin can later change what an existing account can do without that being a self-signup path.
-- Explicitly out of scope: real payments/billing, building the turnstile API itself, a persisted/scrollable chat log, multi-location support, 1:1 trainer assignment, real biometric data from real people, a real checkout/exit flow, enforcing the registration restriction (intranet, IP allowlist or staff-issued token), any digital aptitude screening or certificate handling, notifications to staff, exercise deletion or editing an exercise's muscle map after creation, password reset/account recovery, WCAG/i18n/offline/scale requirements, production infra hardening.
+- Explicitly out of scope: real payments/billing, building the turnstile API itself, a persisted/scrollable chat log, multi-location support, 1:1 trainer assignment, real biometric data from real people, a real checkout/exit flow, enforcing the registration restriction (intranet, IP allowlist or staff-issued token), any digital aptitude screening or certificate handling, notifications to staff, exercise deletion or editing an exercise's muscle map after creation, password reset/account recovery, WCAG/offline/scale requirements, any language beyond Portuguese and English, production infra hardening.
 
 ## Brand Commitments
 
@@ -67,4 +67,4 @@ None real, by design. All member records, check-ins, training plans, and the tur
 
 ## Accessibility & Inclusion
 
-No accessibility (WCAG), offline, internationalization, or scale requirement is established for this project (NFR-4) - explicitly out of scope for this academic, non-deployed demo.
+No accessibility (WCAG), offline, or scale requirement is established for this project (NFR-4) - explicitly out of scope for this academic demo. Language is the one inclusion commitment: the whole interface and the AI coach speak Brazilian Portuguese (the default) or English, picked by the person in the browser from the login and signup pages, the public header or the account menu, and never stored on the account (FR-73).

@@ -1,5 +1,5 @@
 import { ExerciseMuscleSchema, MuscleGroupIdSchema, MuscleIdSchema } from '@shared/schemas/muscles';
-import { ProfileEventFactSchema } from '@shared/schemas/profile-events';
+import { PROFILE_EVENT_TYPES, ProfileEventFactSchema } from '@shared/schemas/profile-events';
 import { z } from 'zod';
 
 export const DRAFT_MAX_EXERCISES = 20;
@@ -228,7 +228,7 @@ export type PickerOption = z.infer<typeof PickerOptionSchema>;
 
 export const PendingFactSchema = z.object({
   id: z.uuid(),
-  eventType: z.string(),
+  eventType: z.enum(PROFILE_EVENT_TYPES),
   label: z.string(),
   description: z.string(),
   muscles: z.array(MuscleIdSchema),

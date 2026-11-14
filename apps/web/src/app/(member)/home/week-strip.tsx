@@ -7,12 +7,14 @@ import { PanelSection } from '@/components/panel-section';
 import { QueryError } from '@/components/query-error';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toIsoDate } from '@/lib/calendar-date';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 function WeekStripSkeleton() {
+  const { t } = useI18n();
   return (
-    <PanelSection title="This week">
+    <PanelSection title={t('This week')}>
       <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
         <Skeleton className="h-9 w-28" />
         <div className="grid grid-cols-7 gap-1">
@@ -28,6 +30,7 @@ function WeekStripSkeleton() {
 
 // Seven slanted segments, Monday to Sunday: cobalt where there was a check-in, outlined for today.
 function WeekStripRoot() {
+  const { t, tn, formatDate } = useI18n();
   const trpc = useTRPC();
   const days = currentWeek();
   const todayIso = toIsoDate(new Date());
@@ -44,7 +47,7 @@ function WeekStripRoot() {
   if (weekQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load your week"
+        title={t("We couldn't load your week")}
         onRetry={() => weekQuery.refetch()}
         isRetrying={weekQuery.isRefetching}
       />
@@ -55,21 +58,31 @@ function WeekStripRoot() {
   const trainedCount = days.filter((day) => trained.has(day.iso)).length;
 
   return (
-    <PanelSection title="This week">
+    <PanelSection title={t('This week')}>
       <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
         <p className="text-sm text-muted-foreground">
-          <span className="numerals text-3xl leading-none font-bold text-foreground">{trainedCount}</span>
-          <span className="numerals text-xl font-bold">/7</span> days at the gym
+          {tn('{count} days at the gym', {
+            count: (
+              <>
+                <span className="numerals text-3xl leading-none font-bold text-foreground">{trainedCount}</span>
+                <span className="numerals text-xl font-bold">/7</span>
+              </>
+            ),
+          })}
         </p>
         <ol className="grid grid-cols-7 gap-1.5">
           {days.map((day) => {
             const isTrained = trained.has(day.iso);
             const isToday = day.iso === todayIso;
+            const weekday = formatDate(day.date, { weekday: 'long' });
+            const label = isTrained
+              ? t('{day}: checked in', { day: weekday })
+              : t('{day}: no check-in', { day: weekday });
             return (
               <li key={day.iso} className="flex flex-col items-center gap-1">
                 <span
                   role="img"
-                  aria-label={`${day.date.toLocaleDateString(undefined, { weekday: 'long' })}: ${isTrained ? 'checked in' : 'no check-in'}${isToday ? ' (today)' : ''}`}
+                  aria-label={isToday ? t('{label} (today)', { label }) : label}
                   className={cn(
                     'h-10 w-full -skew-x-12 rounded-xs',
                     isTrained ? 'bg-primary' : 'bg-muted',
@@ -83,7 +96,7 @@ function WeekStripRoot() {
                   )}
                   aria-hidden
                 >
-                  {day.date.toLocaleDateString(undefined, { weekday: 'narrow' })}
+                  {formatDate(day.date, { weekday: 'narrow' })}
                 </span>
               </li>
             );

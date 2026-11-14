@@ -4,14 +4,22 @@ import { OpeningHoursForm } from '@/app/(staff)/settings/hours/opening-hours-for
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
-const TITLE = 'Opening hours';
-const DESCRIPTION = 'When the gym is open each day of the week. A closed day has no hours at all.';
+function OpeningHoursHeading() {
+  const { t } = useI18n();
+  return (
+    <PageHeading
+      title={t('Opening hours')}
+      description={t('When the gym is open each day of the week. A closed day has no hours at all.')}
+    />
+  );
+}
 
 function OpeningHoursPageSkeleton() {
   return (
     <PageContainer>
-      <PageHeading title={TITLE} description={DESCRIPTION} />
+      <OpeningHoursHeading />
       <OpeningHoursForm.Skeleton />
     </PageContainer>
   );
@@ -21,7 +29,7 @@ export default function OpeningHoursPage() {
   return (
     <GuardedContent skeleton={<OpeningHoursPageSkeleton />}>
       <PageContainer>
-        <PageHeading title={TITLE} description={DESCRIPTION} />
+        <OpeningHoursHeading />
         <OpeningHoursForm />
       </PageContainer>
     </GuardedContent>

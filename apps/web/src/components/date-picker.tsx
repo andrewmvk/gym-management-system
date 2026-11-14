@@ -6,6 +6,7 @@ import { Calendar } from '@/components/calendar';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { fromIsoDate, toIsoDate } from '@/lib/calendar-date';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface DatePickerProps {
@@ -28,7 +29,7 @@ export function DatePicker({
   value,
   onChange,
   onBlur,
-  placeholder = 'Pick a date',
+  placeholder,
   min,
   max,
   captionLayout,
@@ -36,6 +37,7 @@ export function DatePicker({
   className,
   ...aria
 }: DatePickerProps) {
+  const { t, formatDate } = useI18n();
   const [open, setOpen] = useState(false);
   const selected = fromIsoDate(value);
   const minDate = min ? (fromIsoDate(min) ?? undefined) : undefined;
@@ -71,8 +73,8 @@ export function DatePicker({
           <CalendarIcon className="size-4 shrink-0 text-muted-foreground" />
           <span className={cn('flex-1 truncate', !selected && 'text-muted-foreground')}>
             {selected
-              ? selected.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
-              : placeholder}
+              ? formatDate(selected, { day: 'numeric', month: 'short', year: 'numeric' })
+              : (placeholder ?? t('Pick a date'))}
           </span>
         </button>
       </PopoverTrigger>
@@ -88,14 +90,14 @@ export function DatePicker({
           <div className="mt-3 flex items-center justify-between gap-2 border-t pt-3">
             {isTodayAllowed ? (
               <Button variant="ghost" size="sm" onClick={() => choose(todayIso)}>
-                Today
+                {t('Today')}
               </Button>
             ) : (
               <span />
             )}
             {isClearable && value && (
               <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => choose('')}>
-                Clear
+                {t('Clear')}
               </Button>
             )}
           </div>

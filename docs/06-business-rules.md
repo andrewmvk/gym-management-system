@@ -2,7 +2,7 @@
 
 Unit 2 asks that we distinguish **functional requirement** ("what the system does"), **non-functional
 requirement** ("with what quality"), and **business rule** ("what domain condition must be honored").
-`docs/02-requirements.md` already numbers FR-1..FR-72 (functional) and NFR-1..NFR-6 (non-functional),
+`docs/02-requirements.md` already numbers FR-1..FR-73 (functional) and NFR-1..NFR-6 (non-functional),
 but several business rules are **embedded as prose inside the FRs**, without their own code. This
 document extracts the most important ones as RN-01..RN-22, in the format Unit 2 recommends (code,
 description, source requirement, verification criterion) - so each one becomes an isolated, testable

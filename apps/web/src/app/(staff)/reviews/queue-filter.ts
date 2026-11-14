@@ -1,12 +1,14 @@
+import type { LabelKey } from '@/lib/i18n/translate';
+
 export const STATUS_FILTERS = ['all', 'must_review', 'ai_published', 'trainer_edited'] as const;
 export type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 export const WHEN_FILTERS = ['upcoming', 'past', 'all'] as const;
 export type WhenFilter = (typeof WHEN_FILTERS)[number];
 
-export const WHEN_LABELS: Record<WhenFilter, string> = {
+export const WHEN_LABELS: Record<WhenFilter, LabelKey> = {
   upcoming: 'Today and later',
-  past: 'Past',
+  past: 'review::Past',
   all: 'All dates',
 };
 

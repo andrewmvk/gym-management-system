@@ -1,6 +1,7 @@
 'use client';
 
 import { createAppAbility } from '@cadence/shared/auth';
+import { WEEKDAYS, type Weekday } from '@cadence/shared/schemas/gym';
 import { useQuery } from '@tanstack/react-query';
 import { DoorClosedIcon, DoorOpenIcon, FlameIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -13,6 +14,7 @@ import { QueryError } from '@/components/query-error';
 import { Badge } from '@/components/ui/badge';
 import { type ChartConfig, ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { STAFF_HOME_PATH } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
@@ -20,7 +22,6 @@ import { cn } from '@/lib/utils';
 const REFRESH_INTERVAL_MS = 60_000;
 const HOUR_LABEL_EVERY = 6;
 const BAR_FILL = 'color-mix(in oklch, var(--foreground) 60%, transparent)';
-const HOURLY_CHART_CONFIG = { count: { label: 'Members checked in', color: 'var(--primary)' } } satisfies ChartConfig;
 
 interface NextChange {
   event: 'opens' | 'closes';
@@ -28,37 +29,40 @@ interface NextChange {
   time: string;
 }
 
-function plural(count: number, one: string, many: string) {
-  return count === 1 ? one : many;
-}
-
 function pad(hour: number) {
   return String(hour).padStart(2, '0');
 }
 
-function capitalize(word: string) {
-  return word.charAt(0).toUpperCase() + word.slice(1);
+function isWeekday(day: string): day is Weekday {
+  return (WEEKDAYS as readonly string[]).includes(day);
 }
 
-function describeNextChange(change: NextChange | null) {
-  if (!change) return 'Closed all week';
-  if (change.event === 'closes') return `Open until ${change.time}`;
-  if (change.day === 'today') return `Opens at ${change.time}`;
-  if (change.day === 'tomorrow') return `Opens tomorrow at ${change.time}`;
-  return `Opens ${capitalize(change.day)} at ${change.time}`;
+function describeNextChange({ t, weekdayLabel }: I18n, change: NextChange | null) {
+  if (!change) return t('Closed all week');
+  if (change.event === 'closes') return t('Open until {time}', { time: change.time });
+  if (change.day === 'today') return t('Opens at {time}', { time: change.time });
+  if (change.day === 'tomorrow') return t('Opens tomorrow at {time}', { time: change.time });
+  const day = isWeekday(change.day) ? weekdayLabel(change.day) : change.day;
+  return t('Opens {day} at {time}', { day, time: change.time });
 }
 
 function HourlyCheckIns({ hours, currentHour }: { hours: { hour: number; count: number }[]; currentHour: number }) {
+  const { t, tn } = useI18n();
   const max = Math.max(...hours.map((entry) => entry.count));
   const peak = hours.find((entry) => entry.count === max)!;
+  const chartConfig = { count: { label: t('Members checked in'), color: 'var(--primary)' } } satisfies ChartConfig;
 
   return (
     <div className="flex flex-col gap-3 px-5 py-4 sm:px-6">
       <p className="text-sm">
-        Busiest hour <span className="numerals font-semibold">{pad(peak.hour)}:00</span>, with {peak.count}{' '}
-        {plural(peak.count, 'member', 'members')} checked in. Each member counts once per hour.
+        {tn(
+          peak.count === 1
+            ? 'Busiest hour {hour}, with {count} member checked in. Each member counts once per hour.'
+            : 'Busiest hour {hour}, with {count} members checked in. Each member counts once per hour.',
+          { hour: <span className="numerals font-semibold">{pad(peak.hour)}:00</span>, count: peak.count },
+        )}
       </p>
-      <ChartContainer config={HOURLY_CHART_CONFIG} className="aspect-auto h-48 w-full">
+      <ChartContainer config={chartConfig} className="aspect-auto h-48 w-full">
         <BarChart accessibilityLayer data={hours} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
           <CartesianGrid vertical={false} />
           <XAxis
@@ -76,7 +80,7 @@ function HourlyCheckIns({ hours, currentHour }: { hours: { hour: number; count: 
                 hideIndicator
                 labelFormatter={(_, payload) => {
                   const hour = payload[0]?.payload.hour as number;
-                  return `${pad(hour)}:00 to ${pad(hour)}:59`;
+                  return t('{from} to {to}', { from: `${pad(hour)}:00`, to: `${pad(hour)}:59` });
                 }}
               />
             }
@@ -105,39 +109,51 @@ function StatusPanel({
   occupancy: number;
   windowMinutes: number;
 }) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const StatusIcon = isOpen ? DoorOpenIcon : DoorClosedIcon;
   return (
     <div className="grid overflow-hidden rounded-lg bg-kit text-kit-foreground md:grid-cols-2">
       <div className="flex flex-col gap-3 border-b border-kit-line px-5 py-6 sm:px-6 md:border-r md:border-b-0">
-        <p className="font-display text-xs font-semibold tracking-widest text-kit-muted uppercase">The gym is</p>
+        <p className="font-display text-xs font-semibold tracking-widest text-kit-muted uppercase">{t('The gym is')}</p>
         <p className="flex items-center gap-3">
           <StatusIcon className="size-10" aria-hidden />
           <span className="font-display text-6xl leading-none font-extrabold uppercase">
-            {isOpen ? 'Open' : 'Closed'}
+            {isOpen ? t('gym::Open') : t('gym::Closed')}
           </span>
         </p>
         <div className="flex flex-col gap-0.5 text-sm">
-          <p className="numerals font-display text-xl leading-tight font-semibold">{describeNextChange(nextChange)}</p>
+          <p className="numerals font-display text-xl leading-tight font-semibold">
+            {describeNextChange(i18n, nextChange)}
+          </p>
           <p className="text-kit-muted">
-            {todayHours ? `Today's hours ${todayHours.open} to ${todayHours.close}` : 'Closed all day today'}
+            {todayHours
+              ? t("Today's hours {open} to {close}", { open: todayHours.open, close: todayHours.close })
+              : t('Closed all day today')}
           </p>
         </div>
       </div>
       <div className="flex flex-col gap-3 px-5 py-6 sm:px-6">
         <div className="flex items-center gap-2">
-          <p className="font-display text-xs font-semibold tracking-widest text-kit-muted uppercase">On the floor</p>
+          <p className="font-display text-xs font-semibold tracking-widest text-kit-muted uppercase">
+            {t('On the floor')}
+          </p>
           <Badge variant="pending" className="border-kit-muted text-kit-foreground">
-            Estimate
+            {t('Estimate')}
           </Badge>
         </div>
         <p className={cn('flex items-baseline gap-2', !isOpen && 'text-kit-muted')}>
-          <span className="font-display text-xl font-semibold uppercase">About</span>
+          <span className="font-display text-xl font-semibold uppercase">{t('About')}</span>
           <span className="numerals font-display text-6xl leading-none font-extrabold">{occupancy}</span>
-          <span className="font-display text-xl font-semibold uppercase">{plural(occupancy, 'person', 'people')}</span>
+          <span className="font-display text-xl font-semibold uppercase">
+            {occupancy === 1 ? t('person') : t('people')}
+          </span>
         </p>
         <p className="text-sm text-pretty text-kit-muted">
-          Check-ins in the last {windowMinutes} minutes. The gym has no checkout, so this is an estimate, not a
-          headcount.
+          {t(
+            'Check-ins in the last {minutes} minutes. The gym has no checkout, so this is an estimate, not a headcount.',
+            { minutes: windowMinutes },
+          )}
         </p>
       </div>
     </div>
@@ -189,28 +205,32 @@ function GymInfoSkeleton() {
 }
 
 function StaffLinks({ canSeeCheckIns }: { canSeeCheckIns: boolean }) {
+  const { t, tn } = useI18n();
+  const demandLink = (
+    <Link href={STAFF_HOME_PATH} className="font-semibold text-foreground underline underline-offset-4">
+      {t("Today's demand")}
+    </Link>
+  );
+  const logLink = (
+    <Link href="/checkins" className="font-semibold text-foreground underline underline-offset-4">
+      {t('check-in log')}
+    </Link>
+  );
+
   return (
     <p className="text-sm text-pretty text-muted-foreground">
-      Staff:{' '}
-      <Link href={STAFF_HOME_PATH} className="font-semibold text-foreground underline underline-offset-4">
-        Today&apos;s demand
-      </Link>{' '}
-      shows what today&apos;s plans ask of the equipment
-      {canSeeCheckIns && (
-        <>
-          , and the{' '}
-          <Link href="/checkins" className="font-semibold text-foreground underline underline-offset-4">
-            check-in log
-          </Link>{' '}
-          shows who came in and whether the turnstile opened
-        </>
-      )}
-      .
+      {canSeeCheckIns
+        ? tn(
+            "Staff: {demand} shows what today's plans ask of the equipment, and the {log} shows who came in and whether the turnstile opened.",
+            { demand: demandLink, log: logLink },
+          )
+        : tn("Staff: {demand} shows what today's plans ask of the equipment.", { demand: demandLink })}
     </p>
   );
 }
 
 export function GymInfo() {
+  const { t, formatTime } = useI18n();
   const trpc = useTRPC();
   const me = useQuery(trpc.auth.me.queryOptions());
   const rules = me.data?.rules;
@@ -230,7 +250,9 @@ export function GymInfo() {
 
   if (!data) {
     if (info.isError) {
-      return <QueryError title="Gym info unavailable" onRetry={() => info.refetch()} isRetrying={info.isFetching} />;
+      return (
+        <QueryError title={t('Gym info unavailable')} onRetry={() => info.refetch()} isRetrying={info.isFetching} />
+      );
     }
     return (
       <Deferred>
@@ -239,18 +261,15 @@ export function GymInfo() {
     );
   }
 
-  const updatedAt = new Date(detail.data ? detail.dataUpdatedAt : info.dataUpdatedAt).toLocaleTimeString(undefined, {
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+  const updatedAt = formatTime(new Date(detail.data ? detail.dataUpdatedAt : info.dataUpdatedAt));
   const isStale = info.isError;
 
   return (
     <div className="flex flex-col gap-8">
       <div className="flex flex-col gap-3">
         <p className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-          Updated <span className="numerals font-semibold text-foreground">{updatedAt}</span>
-          {isStale && <Badge variant="retry">Couldn't refresh</Badge>}
+          {t('Updated')} <span className="numerals font-semibold text-foreground">{updatedAt}</span>
+          {isStale && <Badge variant="retry">{t("Couldn't refresh")}</Badge>}
         </p>
         <StatusPanel
           isOpen={data.isOpen}
@@ -267,15 +286,19 @@ export function GymInfo() {
         </Deferred>
       )}
       {canSeeHourly && detail.isError && (
-        <QueryError title="Hourly detail unavailable" onRetry={() => detail.refetch()} isRetrying={detail.isFetching} />
+        <QueryError
+          title={t('Hourly detail unavailable')}
+          onRetry={() => detail.refetch()}
+          isRetrying={detail.isFetching}
+        />
       )}
       {detail.data && (
         <PanelSection
-          title="Check-ins per hour"
-          description="Members who checked in today, by hour of the day. Hover or tap a bar for its count."
+          title={t('Check-ins per hour')}
+          description={t('Members who checked in today, by hour of the day. Hover or tap a bar for its count.')}
         >
           {detail.data.checkInsPerHour.every((entry) => entry.count === 0) ? (
-            <EmptyState icon={FlameIcon} title="No check-ins yet today" />
+            <EmptyState icon={FlameIcon} title={t('No check-ins yet today')} />
           ) : (
             <HourlyCheckIns hours={detail.data.checkInsPerHour} currentHour={detail.data.currentHour} />
           )}

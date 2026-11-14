@@ -33,7 +33,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toIsoDate } from '@/lib/calendar-date';
 import { serverMessage } from '@/lib/error-message';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -80,6 +80,7 @@ function signature(exercises: readonly Pick<EditableExercise, 'exerciseId' | 'se
 }
 
 export function PlanReviewBody({ planId }: { planId: string }) {
+  const { t, tn, tx, formatPlanDate } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ability = useAppAbility();
@@ -89,7 +90,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
   const [exercises, setExercises] = useState<EditableExercise[] | null>(null);
   const [note, setNote] = useState('');
 
-  const back = { href: `/reviews${search}`, label: 'Back to queue' };
+  const back = { href: `/reviews${search}`, label: t('Back to queue') };
 
   // Seeds local editable state from the server once, and again after a successful save (via
   // onSuccess's setExercises(null) below) - never on a plain background refetch, so it doesn't clobber
@@ -112,9 +113,9 @@ export function PlanReviewBody({ planId }: { planId: string }) {
       onSuccess: async () => {
         setNote('');
         await invalidate();
-        toast.success('Note added to the review history.');
+        toast.success(t('Note added to the review history.'));
       },
-      onError: (error) => toast.error(serverMessage(error, "We couldn't save that note. Try again.")),
+      onError: (error) => toast.error(tx(serverMessage(error, t("We couldn't save that note. Try again.")))),
     }),
   );
 
@@ -124,9 +125,9 @@ export function PlanReviewBody({ planId }: { planId: string }) {
         setNote('');
         await invalidate();
         setExercises(null);
-        toast.success('Plan updated. The member sees it right away.');
+        toast.success(t('Plan updated. The member sees it right away.'));
       },
-      onError: (error) => toast.error(serverMessage(error, "We couldn't save those changes. Try again.")),
+      onError: (error) => toast.error(tx(serverMessage(error, t("We couldn't save those changes. Try again.")))),
     }),
   );
 
@@ -158,18 +159,20 @@ export function PlanReviewBody({ planId }: { planId: string }) {
   if (planQuery.isError) {
     return (
       <PageContainer>
-        <PageHeading title="Plan review" back={back} />
+        <PageHeading title={t('Plan review')} back={back} />
         {planQuery.error.data?.code === 'NOT_FOUND' ? (
           <div className="rounded-lg border bg-card">
             <EmptyState
               icon={ClipboardXIcon}
-              title="Plan not found"
-              description="This plan does not exist any more, or the link is wrong. Go back to the queue to pick another."
+              title={t('Plan not found')}
+              description={t(
+                'This plan does not exist any more, or the link is wrong. Go back to the queue to pick another.',
+              )}
             />
           </div>
         ) : (
           <QueryError
-            title="We couldn't load this plan"
+            title={t("We couldn't load this plan")}
             onRetry={() => planQuery.refetch()}
             isRetrying={planQuery.isRefetching}
           />
@@ -201,9 +204,9 @@ export function PlanReviewBody({ planId }: { planId: string }) {
   const isSaving = editPlan.isPending;
 
   let readOnlyMessage: string | null = null;
-  if (!canNote) readOnlyMessage = 'You can read this plan. Trainers edit it and leave notes.';
-  else if (!canEditPlan) readOnlyMessage = 'You can leave notes on this plan, but not change its exercises.';
-  else if (isPast) readOnlyMessage = 'Past plans cannot be edited. You can still leave a note.';
+  if (!canNote) readOnlyMessage = t('You can read this plan. Trainers edit it and leave notes.');
+  else if (!canEditPlan) readOnlyMessage = t('You can leave notes on this plan, but not change its exercises.');
+  else if (isPast) readOnlyMessage = t('Past plans cannot be edited. You can still leave a note.');
 
   // The preview follows the rows being edited; exercises that cannot be done today are left out, as in the member's view.
   const planLoad = computeMuscleLoad(
@@ -230,10 +233,13 @@ export function PlanReviewBody({ planId }: { planId: string }) {
           description={
             <span className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <span>
-                Plan for{' '}
-                <span className="font-semibold text-foreground">
-                  {formatPlanDate(plan.planDate, { weekday: 'long', day: 'numeric', month: 'long' })}
-                </span>
+                {tn('Plan for {date}', {
+                  date: (
+                    <span className="font-semibold text-foreground">
+                      {formatPlanDate(plan.planDate, { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </span>
+                  ),
+                })}
               </span>
               <span className="text-muted-foreground">{plan.memberEmail}</span>
             </span>
@@ -255,24 +261,24 @@ export function PlanReviewBody({ planId }: { planId: string }) {
         <>
           <Card>
             <CardHeader>
-              <CardTitle>Exercises</CardTitle>
+              <CardTitle>{t('Exercises')}</CardTitle>
               <CardDescription>
-                {readOnlyMessage ?? 'Changes publish to the member as soon as you save.'}
+                {readOnlyMessage ?? t('Changes publish to the member as soon as you save.')}
               </CardDescription>
             </CardHeader>
             <CardContent className="flex flex-col py-2">
               <div
                 className={`${ROW_GRID} border-b py-2 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase sm:border-b-0`}
               >
-                <span className={`${CELL.name} hidden sm:block`}>Exercise</span>
-                <span className={CELL.count}>Sets</span>
-                <span className={CELL.count}>Reps</span>
-                <span className={CELL.load}>Load</span>
+                <span className={`${CELL.name} hidden sm:block`}>{t('Exercise')}</span>
+                <span className={CELL.count}>{t('Sets')}</span>
+                <span className={CELL.count}>{t('Reps')}</span>
+                <span className={CELL.load}>{t('Load')}</span>
                 <span className={CELL.action} />
               </div>
               {exercises?.map((exercise, index) => {
                 const details = catalog.find((c) => c.id === exercise.exerciseId);
-                const name = details?.name ?? 'Unknown exercise';
+                const name = details ? tx(details.name) : t('Unknown exercise');
                 return (
                   <div key={exercise.key} className={`${ROW_GRID} border-b py-3 last:border-b-0`}>
                     <span className={`${CELL.name} flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 font-semibold`}>
@@ -288,16 +294,16 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                       {exercise.isCompleted && (
                         <span className="inline-flex items-center gap-1 font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                           <CheckIcon className="size-3.5" aria-hidden />
-                          Done
+                          {t('Done')}
                         </span>
                       )}
                       {details && !details.isAvailable && (
                         <Badge variant="unavailable">
-                          Out of service
+                          {t('Out of service')}
                           {details.equipment.some((item) => !item.isAvailable) &&
                             `: ${details.equipment
                               .filter((item) => !item.isAvailable)
-                              .map((item) => item.name)
+                              .map((item) => tx(item.name))
                               .join(', ')}`}
                         </Badge>
                       )}
@@ -310,7 +316,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                           className={`${CELL.count} numerals text-lg`}
                           value={exercise.sets}
                           onChange={(e) => updateExercise(index, { sets: Number(e.target.value) })}
-                          aria-label={`Sets for ${name}`}
+                          aria-label={t('Sets for {name}', { name })}
                         />
                         <Input
                           type="number"
@@ -318,13 +324,13 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                           className={`${CELL.count} numerals text-lg`}
                           value={exercise.reps}
                           onChange={(e) => updateExercise(index, { reps: Number(e.target.value) })}
-                          aria-label={`Reps for ${name}`}
+                          aria-label={t('Reps for {name}', { name })}
                         />
                         <KgInput
                           className={CELL.load}
                           value={exercise.load}
                           onValueChange={(load) => updateExercise(index, { load })}
-                          aria-label={`Weight in kilograms for ${name}`}
+                          aria-label={t('Weight in kilograms for {name}', { name })}
                         />
                         <Button
                           type="button"
@@ -334,7 +340,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                           onClick={() => removeExercise(index)}
                         >
                           <Trash2Icon />
-                          <span className="sr-only">Remove {name}</span>
+                          <span className="sr-only">{t('Remove {name}', { name })}</span>
                         </Button>
                       </>
                     ) : (
@@ -342,7 +348,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                         <span className={`${CELL.count} numerals text-lg`}>{exercise.sets}</span>
                         <span className={`${CELL.count} numerals text-lg`}>{exercise.reps}</span>
                         <span className={`${CELL.load} text-sm text-muted-foreground`}>
-                          {exercise.load ? `${exercise.load} kg` : 'None'}
+                          {exercise.load ? `${exercise.load} kg` : t('load::None')}
                         </span>
                         <span className={CELL.action} />
                       </>
@@ -360,18 +366,20 @@ export function PlanReviewBody({ planId }: { planId: string }) {
             {canNote && (
               <CardFooter className="flex-col items-stretch gap-3">
                 <Field>
-                  <FieldLabel htmlFor="review-note">Note for the review history</FieldLabel>
+                  <FieldLabel htmlFor="review-note">{t('Note for the review history')}</FieldLabel>
                   <Textarea
                     id="review-note"
                     className="min-h-16"
-                    placeholder="Why you changed it, or what the next trainer should know"
+                    placeholder={t('Why you changed it, or what the next trainer should know')}
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                   />
                   <FieldDescription>
                     {canEdit
-                      ? 'Save changes publishes your edits and attaches this note to them. Add note only leaves the exercises as they are. The member reads the note on their plan.'
-                      : 'The note joins the review history. The member reads the note on their plan.'}
+                      ? t(
+                          'Save changes publishes your edits and attaches this note to them. Add note only leaves the exercises as they are. The member reads the note on their plan.',
+                        )
+                      : t('The note joins the review history. The member reads the note on their plan.')}
                   </FieldDescription>
                 </Field>
                 <div className="flex flex-wrap justify-end gap-2">
@@ -381,7 +389,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                     disabled={addNote.isPending || !note.trim()}
                     onClick={() => addNote.mutate({ planId, note: note.trim() })}
                   >
-                    {addNote.isPending ? 'Adding...' : 'Add note only'}
+                    {addNote.isPending ? t('Adding...') : t('Add note only')}
                   </Button>
                   {canEdit && (
                     <Button
@@ -401,7 +409,7 @@ export function PlanReviewBody({ planId }: { planId: string }) {
                         })
                       }
                     >
-                      {isSaving ? 'Saving...' : 'Save changes'}
+                      {isSaving ? t('Saving...') : t('Save changes')}
                     </Button>
                   )}
                 </div>

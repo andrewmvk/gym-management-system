@@ -1,7 +1,7 @@
 'use client';
 
 import { type MuscleLoad, rankMuscles } from '@cadence/shared/schemas/muscle-heat';
-import { MUSCLE_IDS, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+import { MUSCLE_IDS, type MuscleId } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { UsersIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -16,10 +16,9 @@ import { QueryError } from '@/components/query-error';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
-const TITLE = "Today's demand";
-const DESCRIPTION = "What today's plans ask of the gym, so missing or crowded equipment is no surprise.";
 const EQUIPMENT_CATALOG_PATH = '/catalog?tab=equipment';
 const REFRESH_INTERVAL_MS = 60_000;
 const SKELETON_ROWS = 10;
@@ -31,24 +30,28 @@ type DemandFilter = (typeof DEMAND_FILTERS)[number];
 const BOARD_CLASS = 'grid gap-x-8 gap-y-8 md:grid-cols-2 lg:grid-cols-3';
 
 function DemandSkeleton() {
+  const { t } = useI18n();
   return (
     <section className="flex flex-col gap-6 border-t pt-8">
       <DemandHeading control={<Skeleton className="h-10 w-full sm:w-96" />} />
       <div className={BOARD_CLASS}>
         <MuscleMap.Skeleton isPaired className="md:col-span-2 lg:col-span-1" />
-        <DemandChart.Skeleton title="Muscles" caption="Plans per muscle" rows={SKELETON_ROWS} />
-        <DemandChart.Skeleton title="Equipment" caption="Plans per piece" rows={SKELETON_ROWS} />
+        <DemandChart.Skeleton title={t('Muscles')} caption={t('Plans per muscle')} rows={SKELETON_ROWS} />
+        <DemandChart.Skeleton title={t('plural::Equipment')} caption={t('Plans per piece')} rows={SKELETON_ROWS} />
       </div>
     </section>
   );
 }
 
 function DemandHeading({ control }: { control?: ReactNode }) {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
       <div className="flex min-w-0 flex-col gap-1">
-        <h2 className="font-display text-2xl font-bold tracking-wide uppercase">{TITLE}</h2>
-        <p className="max-w-2xl text-sm text-pretty text-muted-foreground">{DESCRIPTION}</p>
+        <h2 className="font-display text-2xl font-bold tracking-wide uppercase">{t("Today's demand")}</h2>
+        <p className="max-w-2xl text-sm text-pretty text-muted-foreground">
+          {t("What today's plans ask of the gym, so missing or crowded equipment is no surprise.")}
+        </p>
       </div>
       {control}
     </div>
@@ -63,8 +66,6 @@ interface EquipmentDemand {
   checkedInCount: number;
 }
 
-const UNIT_OF = (value: number) => (value === 1 ? 'plan' : 'plans');
-
 // The map and the two charts, and the hover they share. The hover lives here and nowhere above, and everything
 // the hover does not change is memoized, so pointing at a muscle redraws that muscle on the map, recolors one bar
 // and nothing else: the equipment chart, the other muscles and the page around them stay as they are.
@@ -77,8 +78,10 @@ function DemandBoard({
   equipment: readonly EquipmentDemand[];
   isCheckedInOnly: boolean;
 }) {
+  const { t, tn, tx, locale, muscleLabel } = useI18n();
   const [hovered, setHovered] = useState<MuscleId | null>(null);
   const [selected, setSelected] = useState<MuscleId | null>(null);
+  const formatValue = useCallback((value: number) => formatSets(locale, value), [locale]);
 
   const muscleData = useMemo(
     () =>
@@ -86,7 +89,7 @@ function DemandBoard({
         ...rankMuscles(load),
         ...MUSCLE_IDS.filter((muscle) => !load[muscle]).map((muscle) => ({ muscle, load: 0 })),
       ].map(({ muscle, load: value }) => ({ key: muscle, name: muscleLabel(muscle), value })),
-    [load],
+    [load, muscleLabel],
   );
 
   const marks = useMemo(() => {
@@ -94,11 +97,12 @@ function DemandBoard({
     for (const muscle of MUSCLE_IDS) {
       const mark = result[muscle];
       if (!mark) continue;
-      mark.value = `${formatSets(load[muscle] ?? 0)} ${UNIT_OF(load[muscle] ?? 0)}`;
+      const planCount = load[muscle] ?? 0;
+      mark.value = planCount === 1 ? t('1 plan') : t('{count} plans', { count: formatSets(locale, planCount) });
       if (!load[muscle]) mark.isGap = true;
     }
     return result;
-  }, [load]);
+  }, [load, locale, t]);
 
   const equipmentData = useMemo(() => {
     const countOf = (piece: EquipmentDemand) => (isCheckedInOnly ? piece.checkedInCount : piece.planCount);
@@ -109,11 +113,11 @@ function DemandBoard({
       )
       .map((piece) => ({
         key: piece.id,
-        name: piece.name,
+        name: tx(piece.name),
         value: countOf(piece),
         isOutOfService: !piece.isAvailable,
       }));
-  }, [equipment, isCheckedInOnly]);
+  }, [equipment, isCheckedInOnly, tx]);
   const downCount = equipmentData.filter((piece) => piece.isOutOfService).length;
 
   const hoverMuscle = useCallback((key: string | null) => setHovered(key as MuscleId | null), []);
@@ -131,45 +135,56 @@ function DemandBoard({
             isPaired
             hasTooltip
             marks={marks}
-            label={isCheckedInOnly ? 'Muscles trained by plans of members already checked in' : 'Muscles trained today'}
+            label={
+              isCheckedInOnly ? t('Muscles trained by plans of members already checked in') : t('Muscles trained today')
+            }
             selected={selected}
             highlighted={hovered}
             onSelect={toggleSelected}
             onHover={setHovered}
           />
           <MuscleLegend
-            lowLabel="Fewer plans"
-            highLabel="More plans"
+            lowLabel={t('Fewer plans')}
+            highLabel={t('More plans')}
             hasGap
-            gapLabel="No plan trains it"
+            gapLabel={t('No plan trains it')}
             className="justify-center lg:justify-start"
           />
         </div>
 
         <DemandChart
-          title="Muscles"
-          caption="Plans per muscle"
+          title={t('Muscles')}
+          caption={t('Plans per muscle')}
           data={muscleData}
-          formatValue={formatSets}
+          formatValue={formatValue}
           activeKey={hovered ?? selected}
           selectedKey={selected}
           onHover={hoverMuscle}
           onSelect={toggleSelected}
         />
 
-        <DemandChart title="Equipment" caption="Plans per piece" data={equipmentData} formatValue={String} />
+        <DemandChart
+          title={t('plural::Equipment')}
+          caption={t('Plans per piece')}
+          data={equipmentData}
+          formatValue={String}
+        />
       </div>
 
       <p className="max-w-prose text-xs text-pretty text-muted-foreground">
-        Each number is how many plans train that muscle or need that piece of equipment. Exercises that cannot be done
-        now are not counted.
+        {t(
+          'Each number is how many plans train that muscle or need that piece of equipment. Exercises that cannot be done now are not counted.',
+        )}
         {downCount > 0 && (
           <>
             {' '}
-            <Link href={EQUIPMENT_CATALOG_PATH} className="font-semibold text-foreground underline">
-              {downCount} out of service
-            </Link>{' '}
-            (struck through).
+            {tn('{link} (struck through).', {
+              link: (
+                <Link href={EQUIPMENT_CATALOG_PATH} className="font-semibold text-foreground underline">
+                  {t('{count} out of service', { count: downCount })}
+                </Link>
+              ),
+            })}
           </>
         )}
       </p>
@@ -178,6 +193,7 @@ function DemandBoard({
 }
 
 function DemandRoot() {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const query = useQuery({ ...trpc.reviews.overview.queryOptions(), refetchInterval: REFRESH_INTERVAL_MS });
   const [filter, setFilter] = useUrlState<DemandFilter>('demand', 'all', oneOf(DEMAND_FILTERS));
@@ -193,7 +209,7 @@ function DemandRoot() {
   if (!query.data) {
     return (
       <QueryError
-        title="We couldn't load today's demand"
+        title={t("We couldn't load today's demand")}
         onRetry={() => query.refetch()}
         isRetrying={query.isRefetching}
       />
@@ -208,8 +224,8 @@ function DemandRoot() {
         <DemandHeading />
         <EmptyState
           icon={UsersIcon}
-          title="No plans dated today yet"
-          description="Plans show up here as members build them for today."
+          title={t('No plans dated today yet')}
+          description={t('Plans show up here as members build them for today.')}
         />
       </section>
     );
@@ -222,12 +238,12 @@ function DemandRoot() {
       <DemandHeading
         control={
           <SegmentedFilter
-            label="Plans to count"
+            label={t('Plans to count')}
             value={filter}
             onChange={setFilter}
             options={[
-              { value: 'all', label: 'All plans today', count: planCount },
-              { value: 'checked-in', label: 'Already checked in', count: checkedInPlanCount },
+              { value: 'all', label: t('All plans today'), count: planCount },
+              { value: 'checked-in', label: t('Already checked in'), count: checkedInPlanCount },
             ]}
             className="w-full sm:w-auto"
           />
@@ -237,8 +253,8 @@ function DemandRoot() {
       {isCheckedInOnly && checkedInPlanCount === 0 ? (
         <EmptyState
           icon={UsersIcon}
-          title="Nobody with a plan has checked in yet"
-          description="The plans of members who are in the gym show up here once they check in."
+          title={t('Nobody with a plan has checked in yet')}
+          description={t('The plans of members who are in the gym show up here once they check in.')}
         />
       ) : (
         <DemandBoard

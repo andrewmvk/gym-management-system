@@ -12,10 +12,12 @@ import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { homePathFor, safeReturnPath } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 
 export function LoginForm() {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -34,11 +36,11 @@ export function LoginForm() {
       },
       onError: (error) => {
         if (error.data?.code === 'FORBIDDEN') return;
-        toast.error(error.data?.code === 'UNAUTHORIZED' ? error.message : "We couldn't sign you in. Try again.");
+        toast.error(error.data?.code === 'UNAUTHORIZED' ? tx(error.message) : t("We couldn't sign you in. Try again."));
       },
     }),
   );
-  const forbiddenMessage = login.error?.data?.code === 'FORBIDDEN' ? login.error.message : null;
+  const forbiddenMessage = login.error?.data?.code === 'FORBIDDEN' ? tx(login.error.message) : null;
 
   const session = me.data;
   useEffect(() => {
@@ -47,7 +49,7 @@ export function LoginForm() {
   }, [session, returnPath, router]);
 
   return (
-    <StepPanel title="Sign in" description="Use the email and password of your Cadence account.">
+    <StepPanel title={t('Sign in')} description={t('Use the email and password of your Cadence account.')}>
       <form noValidate onSubmit={form.handleSubmit((values) => login.mutate(values))}>
         <FieldGroup>
           <Controller
@@ -55,7 +57,7 @@ export function LoginForm() {
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="login-email">Email</FieldLabel>
+                <FieldLabel htmlFor="login-email">{t('Email')}</FieldLabel>
                 <Input
                   {...field}
                   id="login-email"
@@ -72,7 +74,7 @@ export function LoginForm() {
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="login-password">Password</FieldLabel>
+                <FieldLabel htmlFor="login-password">{t('Password')}</FieldLabel>
                 <Input
                   {...field}
                   id="login-password"
@@ -90,7 +92,7 @@ export function LoginForm() {
             </p>
           )}
           <Button type="submit" size="lg" className="mt-4 w-full" disabled={login.isPending || Boolean(session)}>
-            {login.isPending ? 'Signing in...' : 'Sign in'}
+            {login.isPending ? t('Signing in...') : t('Sign in')}
           </Button>
         </FieldGroup>
       </form>

@@ -5,14 +5,16 @@ import { Deferred } from '@/components/deferred';
 import { PanelSection } from '@/components/panel-section';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
 const SKELETON_ROWS = 4;
 
 function RemainingListSkeleton() {
+  const { t } = useI18n();
   return (
-    <PanelSection title="Today's list">
+    <PanelSection title={t("Today's list")}>
       {Array.from({ length: SKELETON_ROWS }, (_, index) => (
         // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
         <div key={index} className="flex min-h-12 items-center gap-3 border-b px-5 last:border-b-0 sm:px-6">
@@ -27,6 +29,7 @@ function RemainingListSkeleton() {
 // The queue behind the next exercise: done ones are struck, the one to do now is marked, and an exercise
 // that cannot be done is struck with its own badge.
 function RemainingListRoot() {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const todayQuery = useQuery(trpc.plans.getToday.queryOptions());
 
@@ -44,7 +47,7 @@ function RemainingListRoot() {
   const nextId = plan.exercises.find((exercise) => !exercise.completed && exercise.isPerformable)?.id;
 
   return (
-    <PanelSection title="Today's list">
+    <PanelSection title={t("Today's list")}>
       <ol>
         {plan.exercises.map((exercise, index) => (
           <li
@@ -65,11 +68,11 @@ function RemainingListRoot() {
                 !exercise.isPerformable && 'line-through decoration-2',
               )}
             >
-              {exercise.exerciseName}
+              {tx(exercise.exerciseName)}
             </span>
-            {exercise.id === nextId && <Badge>Next</Badge>}
-            {!exercise.isPerformable && <Badge variant="unavailable">Out of service</Badge>}
-            <span className="sr-only">{exercise.completed ? 'Done' : 'Not done'}</span>
+            {exercise.id === nextId && <Badge>{t('Next')}</Badge>}
+            {!exercise.isPerformable && <Badge variant="unavailable">{t('Out of service')}</Badge>}
+            <span className="sr-only">{exercise.completed ? t('Done') : t('Not done')}</span>
           </li>
         ))}
       </ol>

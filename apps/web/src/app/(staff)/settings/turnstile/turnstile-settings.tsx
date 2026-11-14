@@ -27,7 +27,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDateTime } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 
 const FAILURE_MESSAGES = {
@@ -35,7 +36,7 @@ const FAILURE_MESSAGES = {
   http_error: 'The turnstile API answered with an error.',
   timeout: 'The turnstile API did not answer within 5 seconds.',
   network_error: 'The turnstile API could not be reached.',
-} as const;
+} as const satisfies Record<string, LabelKey>;
 
 const BODY_EXAMPLE = '{"user": "{{memberId}}"}';
 
@@ -68,6 +69,7 @@ function TurnstileSettingsSkeleton() {
 }
 
 function TurnstileSettingsRoot() {
+  const { t, tx, formatDateTime } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ability = useAppAbility();
@@ -98,17 +100,19 @@ function TurnstileSettingsRoot() {
     trpc.turnstile.updateConfig.mutationOptions({
       onSuccess: (saved) => {
         queryClient.setQueryData(trpc.turnstile.getConfig.queryKey(), saved);
-        toast.success('Turnstile settings saved.');
+        toast.success(t('Turnstile settings saved.'));
         test.reset();
       },
       onError: (error) =>
-        toast.error(error.data?.code === 'BAD_REQUEST' ? error.message : "We couldn't save the settings. Try again."),
+        toast.error(
+          error.data?.code === 'BAD_REQUEST' ? tx(error.message) : t("We couldn't save the settings. Try again."),
+        ),
     }),
   );
 
   const test = useMutation(
     trpc.turnstile.testConnection.mutationOptions({
-      onError: () => toast.error("We couldn't run the test. Try again."),
+      onError: () => toast.error(t("We couldn't run the test. Try again.")),
     }),
   );
 
@@ -117,8 +121,8 @@ function TurnstileSettingsRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={LockIcon}
-          title="No access"
-          description="Your account doesn't include turnstile configuration. Ask an admin if you need it."
+          title={t('No access')}
+          description={t("Your account doesn't include turnstile configuration. Ask an admin if you need it.")}
         />
       </div>
     );
@@ -127,7 +131,7 @@ function TurnstileSettingsRoot() {
   if (configQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load the settings"
+        title={t("We couldn't load the settings")}
         onRetry={() => configQuery.refetch()}
         isRetrying={configQuery.isRefetching}
       />
@@ -155,30 +159,30 @@ function TurnstileSettingsRoot() {
         {config.isConfigured ? (
           <Badge variant="live">
             <CheckIcon data-icon="inline-start" />
-            Configured
+            {t('Configured')}
           </Badge>
         ) : (
           <Badge variant="retry">
             <TriangleAlertIcon data-icon="inline-start" />
-            Not configured
+            {t('Not configured')}
           </Badge>
         )}
         <span className="text-sm text-muted-foreground">
           {config.isConfigured
-            ? `Last saved ${formatDateTime(config.updatedAt)}`
-            : 'Check-ins are tagged failed until this is saved.'}
+            ? t('Last saved {time}', { time: formatDateTime(config.updatedAt) })
+            : t('Check-ins are tagged failed until this is saved.')}
         </span>
       </div>
 
       <Field data-invalid={Boolean(form.formState.errors.url || form.formState.errors.method)}>
-        <FieldLabel htmlFor="turnstile-url">Request</FieldLabel>
+        <FieldLabel htmlFor="turnstile-url">{t('Request')}</FieldLabel>
         <div className="flex flex-col gap-2 sm:flex-row">
           <Controller
             name="method"
             control={form.control}
             render={({ field }) => (
               <Select value={field.value} onValueChange={field.onChange}>
-                <SelectTrigger className="sm:w-28" aria-label="HTTP method">
+                <SelectTrigger className="sm:w-28" aria-label={t('HTTP method')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -203,14 +207,14 @@ function TurnstileSettingsRoot() {
           />
         </div>
         {config.isConfigured && (
-          <FieldDescription>Query values show only their last four characters once saved.</FieldDescription>
+          <FieldDescription>{t('Query values show only their last four characters once saved.')}</FieldDescription>
         )}
         {form.formState.errors.url && <FieldError errors={[form.formState.errors.url]} />}
       </Field>
 
       <Field>
         <div className="flex items-center justify-between gap-3">
-          <FieldLabel>Headers</FieldLabel>
+          <FieldLabel>{t('Headers')}</FieldLabel>
           <Button
             type="button"
             variant="ghost"
@@ -219,11 +223,13 @@ function TurnstileSettingsRoot() {
             onClick={() => headers.append(emptyHeader())}
           >
             <PlusIcon data-icon="inline-start" />
-            Add header
+            {t('Add header')}
           </Button>
         </div>
         {headers.fields.length === 0 ? (
-          <p className="text-sm text-muted-foreground">None. Add a key, token or Content-Type if the API needs one.</p>
+          <p className="text-sm text-muted-foreground">
+            {t('None. Add a key, token or Content-Type if the API needs one.')}
+          </p>
         ) : (
           <ul className="flex flex-col gap-3">
             {headers.fields.map((item, index) => {
@@ -233,7 +239,7 @@ function TurnstileSettingsRoot() {
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Input
                       {...form.register(`headers.${index}.name`)}
-                      aria-label={`Header ${index + 1} name`}
+                      aria-label={t('Header {number} name', { number: index + 1 })}
                       placeholder="Authorization"
                       autoComplete="off"
                       spellCheck={false}
@@ -246,7 +252,7 @@ function TurnstileSettingsRoot() {
                       render={({ field: secretField }) => (
                         <Input
                           {...form.register(`headers.${index}.value`)}
-                          aria-label={`Header ${index + 1} value`}
+                          aria-label={t('Header {number} value', { number: index + 1 })}
                           type={secretField.value ? 'password' : 'text'}
                           placeholder="Bearer abc123"
                           autoComplete="off"
@@ -273,9 +279,11 @@ function TurnstileSettingsRoot() {
                               }}
                             />
                             <label htmlFor={`turnstile-header-secret-${item.id}`} className="text-sm">
-                              Secret
+                              {t('Secret')}
                             </label>
-                            <HelpTip text="A secret value is hidden once saved and shows only its last four characters." />
+                            <HelpTip
+                              text={t('A secret value is hidden once saved and shows only its last four characters.')}
+                            />
                           </div>
                         )}
                       />
@@ -283,7 +291,7 @@ function TurnstileSettingsRoot() {
                         type="button"
                         variant="ghost"
                         size="icon"
-                        aria-label={`Remove header ${index + 1}`}
+                        aria-label={t('Remove header {number}', { number: index + 1 })}
                         onClick={() => headers.remove(index)}
                       >
                         <Trash2Icon />
@@ -302,7 +310,7 @@ function TurnstileSettingsRoot() {
 
       <Field data-invalid={Boolean(form.formState.errors.bodyTemplate)}>
         <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
-          <FieldLabel htmlFor="turnstile-body">Body (optional)</FieldLabel>
+          <FieldLabel htmlFor="turnstile-body">{t('Body (optional)')}</FieldLabel>
           <div className="flex items-center gap-1">
             {TURNSTILE_PLACEHOLDERS.map((name) => (
               <Button
@@ -311,7 +319,7 @@ function TurnstileSettingsRoot() {
                 variant="outline"
                 size="xs"
                 disabled={method === 'GET'}
-                aria-label={`Insert {{${name}}} at the end of the body`}
+                aria-label={t('Insert {placeholder} at the end of the body', { placeholder: `{{${name}}}` })}
                 className="font-mono tracking-normal normal-case"
                 onClick={() =>
                   form.setValue('bodyTemplate', `${form.getValues('bodyTemplate')}{{${name}}}`, {
@@ -332,7 +340,7 @@ function TurnstileSettingsRoot() {
           spellCheck={false}
           autoComplete="off"
           disabled={method === 'GET'}
-          placeholder={method === 'GET' ? 'A GET request has no body' : BODY_EXAMPLE}
+          placeholder={method === 'GET' ? t('A GET request has no body') : BODY_EXAMPLE}
           aria-invalid={Boolean(form.formState.errors.bodyTemplate)}
           className="font-mono"
         />
@@ -342,16 +350,16 @@ function TurnstileSettingsRoot() {
       <div className="flex flex-col gap-4 border-t pt-6">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <Button type="submit" disabled={save.isPending}>
-            {save.isPending ? 'Saving...' : 'Save settings'}
+            {save.isPending ? t('Saving...') : t('Save settings')}
           </Button>
           <Button type="button" variant="outline" disabled={!canTest || test.isPending} onClick={() => test.mutate()}>
             <PlayIcon data-icon="inline-start" />
-            {test.isPending ? 'Testing...' : 'Test connection'}
+            {test.isPending ? t('Testing...') : t('Test connection')}
           </Button>
           <span className="text-sm text-muted-foreground">
             {config.isConfigured && !canTest
-              ? 'Save your changes to test them.'
-              : 'The test sends the saved request for real, so the turnstile opens. No check-in is recorded.'}
+              ? t('Save your changes to test them.')
+              : t('The test sends the saved request for real, so the turnstile opens. No check-in is recorded.')}
           </span>
         </div>
 
@@ -361,27 +369,29 @@ function TurnstileSettingsRoot() {
               {testResult.status === 'success' ? (
                 <Badge variant="live">
                   <CheckIcon data-icon="inline-start" />
-                  Success
+                  {t('Success')}
                 </Badge>
               ) : (
                 <Badge variant="retry">
                   <TriangleAlertIcon data-icon="inline-start" />
-                  Failed
+                  {t('Failed')}
                 </Badge>
               )}
               {testResult.response && (
-                <span className="numerals text-sm font-semibold">HTTP {testResult.response.httpStatus}</span>
+                <span className="numerals text-sm font-semibold">
+                  {t('HTTP {status}', { status: testResult.response.httpStatus })}
+                </span>
               )}
               <span className="text-sm">
                 {testResult.status === 'success'
-                  ? 'The turnstile API accepted the request.'
-                  : FAILURE_MESSAGES[testResult.error]}
+                  ? t('The turnstile API accepted the request.')
+                  : t(FAILURE_MESSAGES[testResult.error])}
               </span>
             </div>
             {testResult.response && (
               <pre className="max-h-40 overflow-auto rounded-md bg-muted p-3 font-mono text-xs whitespace-pre-wrap">
                 {typeof testResult.response.body === 'string'
-                  ? testResult.response.body || '(empty response)'
+                  ? testResult.response.body || t('(empty response)')
                   : JSON.stringify(testResult.response.body, null, 2)}
               </pre>
             )}

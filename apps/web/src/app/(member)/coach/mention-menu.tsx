@@ -4,6 +4,7 @@ import { CheckIcon, MousePointerClickIcon } from 'lucide-react';
 import { Fragment, useEffect, useRef } from 'react';
 import { mentionKey } from '@/app/(member)/coach/coach-context';
 import type { MentionOption } from '@/app/(member)/coach/mention-options';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 export type MentionMenuEntry = { kind: 'point' } | { kind: 'option'; option: MentionOption };
@@ -32,6 +33,7 @@ export function MentionMenu({
   onActiveChange,
   className,
 }: MentionMenuProps) {
+  const { t } = useI18n();
   const activeRef = useRef<HTMLButtonElement>(null);
   // biome-ignore lint/correctness/useExhaustiveDependencies: moving the highlighted row is the trigger, nothing is read inside.
   useEffect(() => {
@@ -47,10 +49,10 @@ export function MentionMenu({
     >
       {entries.length === 0 ? (
         <p className="px-3 py-3 text-sm text-muted-foreground">
-          Nothing called &ldquo;{query}&rdquo;. Try an exercise, a muscle or a group like legs.
+          {t('Nothing called "{query}". Try an exercise, a muscle or a group like legs.', { query })}
         </p>
       ) : (
-        <ul id={id} aria-label="Point the coach at">
+        <ul id={id} aria-label={t('Point the coach at')}>
           {entries.map((entry, index) => {
             const isActive = index === activeIndex;
             const previous = entries[index - 1];
@@ -82,15 +84,15 @@ export function MentionMenu({
                       <>
                         <MousePointerClickIcon className="size-4 shrink-0 text-primary" aria-hidden />
                         <span className="flex min-w-0 flex-col">
-                          <span className="font-semibold">Pick from the page</span>
-                          <span className="text-xs text-muted-foreground">Tap what you want to ask about</span>
+                          <span className="font-semibold">{t('Pick from the page')}</span>
+                          <span className="text-xs text-muted-foreground">{t('Tap what you want to ask about')}</span>
                         </span>
                       </>
                     ) : (
                       <>
                         <span className="min-w-0 flex-1 truncate font-semibold">{entry.option.label}</span>
                         <span className="shrink-0 text-xs text-muted-foreground">{entry.option.hint}</span>
-                        {isMentioned && <CheckIcon className="size-4 shrink-0 text-primary" aria-label="Added" />}
+                        {isMentioned && <CheckIcon className="size-4 shrink-0 text-primary" aria-label={t('Added')} />}
                       </>
                     )}
                   </button>

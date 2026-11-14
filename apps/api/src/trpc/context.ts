@@ -2,6 +2,7 @@ import { loadSession } from '@api/modules/auth/service';
 import { SESSION_COOKIE, verifySessionToken } from '@api/modules/auth/session';
 import type {} from '@api/types/express';
 import { createAppAbility } from '@cadence/shared/auth';
+import { LOCALE_COOKIE, parseLocale } from '@cadence/shared/schemas/locale';
 import type { CreateExpressContextOptions } from '@trpc/server/adapters/express';
 
 export async function createContext({ req, res }: CreateExpressContextOptions) {
@@ -16,6 +17,7 @@ export async function createContext({ req, res }: CreateExpressContextOptions) {
     session,
     user: session?.user ?? null,
     ability: session?.ability ?? createAppAbility(),
+    locale: parseLocale(req.cookies?.[LOCALE_COOKIE]),
   };
 }
 

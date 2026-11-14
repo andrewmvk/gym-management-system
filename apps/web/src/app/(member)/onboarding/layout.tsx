@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { getI18n } from '@/lib/i18n/server';
 
-export const metadata: Metadata = { title: 'Health profile' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t('Health profile') };
+}
 
 export default function OnboardingLayout({ children }: { children: ReactNode }) {
   return children;

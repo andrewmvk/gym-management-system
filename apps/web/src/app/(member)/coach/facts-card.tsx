@@ -1,7 +1,6 @@
 'use client';
 
 import type { CoachBlock, PendingFact } from '@cadence/shared/schemas/coach';
-import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckIcon, PencilIcon, XIcon } from 'lucide-react';
 import Link from 'next/link';
@@ -11,6 +10,7 @@ import { AiButton } from '@/components/ai-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { HEALTH_PROFILE_PATH } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 
@@ -26,6 +26,7 @@ interface FactRowProps {
 }
 
 function FactRow({ fact, status, isBusy, onSave, onDismiss }: FactRowProps) {
+  const { t, muscleLabel, factTypeLabel } = useI18n();
   const [isEditing, setIsEditing] = useState(false);
   const [draft, setDraft] = useState(fact.description);
 
@@ -42,11 +43,14 @@ function FactRow({ fact, status, isBusy, onSave, onDismiss }: FactRowProps) {
       <div className="flex items-start justify-between gap-2">
         <div className="flex min-w-0 flex-col gap-0.5">
           <p className="font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-            {fact.label}
+            {factTypeLabel(fact.eventType)}
             {fact.muscles.length > 0 && (
               <span className="font-sans tracking-normal normal-case">
                 {' '}
-                · Affects {fact.muscles.map((muscle) => muscleLabel(muscle).toLowerCase()).join(', ')}
+                ·{' '}
+                {t('Affects {muscles}', {
+                  muscles: fact.muscles.map((muscle) => muscleLabel(muscle).toLowerCase()).join(', '),
+                })}
               </span>
             )}
           </p>
@@ -63,11 +67,11 @@ function FactRow({ fact, status, isBusy, onSave, onDismiss }: FactRowProps) {
         {status === 'saved' && (
           <Badge variant="live">
             <CheckIcon data-icon="inline-start" />
-            Saved
+            {t('Saved')}
           </Badge>
         )}
-        {status === 'dismissed' && <Badge variant="ghost">Dismissed</Badge>}
-        {status === 'pending' && <Badge variant="pending">Not saved yet</Badge>}
+        {status === 'dismissed' && <Badge variant="ghost">{t('Dismissed')}</Badge>}
+        {status === 'pending' && <Badge variant="pending">{t('Not saved yet')}</Badge>}
       </div>
 
       {isEditing && (
@@ -76,13 +80,19 @@ function FactRow({ fact, status, isBusy, onSave, onDismiss }: FactRowProps) {
             value={draft}
             maxLength={500}
             onChange={(event) => setDraft(event.target.value)}
-            aria-label="What the coach should remember"
+            aria-label={t('What the coach should remember')}
             className="min-w-0 flex-1"
           />
-          <Button type="submit" size="icon" aria-label="Save this fact" disabled={!draft.trim() || isBusy}>
+          <Button type="submit" size="icon" aria-label={t('Save this fact')} disabled={!draft.trim() || isBusy}>
             <CheckIcon />
           </Button>
-          <Button type="button" size="icon" variant="ghost" aria-label="Cancel" onClick={() => setIsEditing(false)}>
+          <Button
+            type="button"
+            size="icon"
+            variant="ghost"
+            aria-label={t('Cancel')}
+            onClick={() => setIsEditing(false)}
+          >
             <XIcon />
           </Button>
         </form>
@@ -90,15 +100,15 @@ function FactRow({ fact, status, isBusy, onSave, onDismiss }: FactRowProps) {
 
       {status === 'pending' && !isEditing && (
         <div className="flex flex-wrap items-center gap-1.5">
-          <AiButton mark="tempo" size="sm" isPending={isBusy} pendingLabel="Saving..." onClick={() => onSave()}>
-            Save it
+          <AiButton mark="tempo" size="sm" isPending={isBusy} pendingLabel={t('Saving...')} onClick={() => onSave()}>
+            {t('Save it')}
           </AiButton>
           <Button type="button" size="sm" variant="outline" disabled={isBusy} onClick={() => setIsEditing(true)}>
             <PencilIcon data-icon="inline-start" />
-            Edit
+            {t('Edit')}
           </Button>
           <Button type="button" size="sm" variant="ghost" disabled={isBusy} onClick={onDismiss}>
-            Not right
+            {t('Not right')}
           </Button>
         </div>
       )}
@@ -109,6 +119,7 @@ function FactRow({ fact, status, isBusy, onSave, onDismiss }: FactRowProps) {
 // Facts the coach picked up from the message wait here for the member: nothing is remembered, and nothing
 // reaches a plan, until it is saved. Anything left unsaved stays on the Health profile page.
 export function FactsCard({ block }: { block: FactsBlock }) {
+  const { t, tn } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [statuses, setStatuses] = useState<Record<string, FactStatus>>({});
@@ -124,9 +135,9 @@ export function FactsCard({ block }: { block: FactsBlock }) {
       onSuccess: (_rows, variables) => {
         setStatuses((current) => ({ ...current, [variables.facts[0]!.id]: 'saved' }));
         refresh();
-        toast.message('Saved. Your coach uses it from now on.');
+        toast.message(t('Saved. Your coach uses it from now on.'));
       },
-      onError: () => toast.error("We couldn't save that. Nothing was changed. Try again."),
+      onError: () => toast.error(t("We couldn't save that. Nothing was changed. Try again.")),
       onSettled: () => setBusyId(null),
     }),
   );
@@ -136,18 +147,18 @@ export function FactsCard({ block }: { block: FactsBlock }) {
         setStatuses((current) => ({ ...current, [variables.id]: 'dismissed' }));
         refresh();
       },
-      onError: () => toast.error("We couldn't dismiss that. Try again."),
+      onError: () => toast.error(t("We couldn't dismiss that. Try again.")),
       onSettled: () => setBusyId(null),
     }),
   );
 
   return (
     <section
-      aria-label="Facts to remember"
+      aria-label={t('Facts to remember')}
       className="animate-block-in flex flex-col rounded-lg border border-dashed bg-accent/40 text-card-foreground"
     >
       <h3 className="px-3 pt-2 font-display text-sm font-semibold tracking-widest text-accent-foreground uppercase">
-        Remember this?
+        {t('Remember this?')}
       </h3>
       <ul>
         {block.facts.map((fact) => (
@@ -168,11 +179,13 @@ export function FactsCard({ block }: { block: FactsBlock }) {
         ))}
       </ul>
       <p className="border-t px-3 py-2 text-xs text-pretty text-muted-foreground">
-        Anything you leave waits on your{' '}
-        <Link href={HEALTH_PROFILE_PATH} className="font-semibold underline underline-offset-4">
-          Health profile
-        </Link>
-        , and your coach does not use it until you save it.
+        {tn('Anything you leave waits on your {link}, and your coach does not use it until you save it.', {
+          link: (
+            <Link href={HEALTH_PROFILE_PATH} className="font-semibold underline underline-offset-4">
+              {t('Health profile')}
+            </Link>
+          ),
+        })}
       </p>
     </section>
   );

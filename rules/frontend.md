@@ -84,6 +84,17 @@ Every route has its own title, set through a per-route `layout.tsx` that exports
 - "Out of service" is the one user-facing phrase for unavailable equipment (the internal name stays `is_available` / the `unavailable` badge variant).
 - To explain a label without a second visible line, use `HelpTip` (`components/help-tip.tsx`, a `?` button with a tooltip). Its text is also the accessible name, and nothing a reader must act on goes in it, because a tap on a phone may not open the bubble.
 
+## Language (Portuguese and English)
+
+Every user-visible string goes through the i18n layer in `src/lib/i18n/` (FR-73); no library, a typed dictionary. The English text is the message key: write `t('Save changes')`, and the Portuguese for that exact key lives in `src/lib/i18n/pt/` (split by area, merged in `pt/index.ts`). `MessageKey` is the keys of that dictionary, so a key with no Portuguese entry, or a `{placeholder}` that differs between the two, fails `pnpm types`. A new string is added to the code and to the dictionary in the same change.
+
+- Client components call `useI18n()` (`t`, `tn`, `tx`, `locale` and the formatters); server components call `getI18n()` from `lib/i18n/server`. A plain function that returns text takes `t` or the `I18n` object as a parameter.
+- `tn` is for a sentence that holds a node (a link, a styled number); `tx` is for text that comes from data (catalog names, server messages), shown as is when the dictionary has no entry. Never translate what a person typed.
+- A word that needs a different Portuguese in different places gets a context prefix the English never shows (`t('gym::Open')`). A label kept in a module-level constant is typed `LabelKey` and passed through `t()` where it is drawn. Plural forms are two separate keys.
+- Muscles, muscle groups, fact types and weekdays go through `muscleLabel`, `groupLabel`, `factTypeLabel` and `weekdayLabel` (`lib/i18n/labels.ts`), not the English constants of `@cadence/shared`.
+- Dates, times and numbers go through the formatters in `lib/format.ts` (`pt-BR` or `en-US`); never call `toLocaleString` or `Intl` with an implicit locale.
+- The choice is the `cadence-locale` cookie (default Portuguese), read by the root layout for the first paint and by the API for the AI language. It is not stored on the account.
+
 ## Authorization (CASL)
 
 `src/abilities.tsx` wraps `@casl/react` 7, which has no `createContextualCan` or ability context of its own to create: it re-exports `AbilityProvider` and exposes a `Can` and a `useAppAbility()` typed to the shared `AppAbility`. `components/auth-guard.tsx` rebuilds the ability once per session from the rules `auth.me` returns (`createAppAbility(rules)`) and provides it via `<AbilityProvider>` around the route group. Components either render `<Can I="manage" a="TrainingPlan" />` or call `const ability = useAppAbility(); ability.can('manage', 'TrainingPlan')` - don't hide/show something based on a role check instead of an ability check.

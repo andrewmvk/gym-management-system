@@ -4,6 +4,7 @@ import { type CSSProperties, memo, useMemo } from 'react';
 import { Bar, BarChart, Cell, LabelList, Text, XAxis, YAxis } from 'recharts';
 import { ChartContainer } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 // Both charts use the same row pitch, label gutter and bar, so a bar of one lines up with the same rank of the other.
@@ -60,6 +61,7 @@ function DemandChartRoot({
   onHover,
   onSelect,
 }: DemandChartProps) {
+  const { t } = useI18n();
   const chart = useMemo(() => {
     const peak = Math.max(1, ...data.map((datum) => datum.value));
 
@@ -78,7 +80,7 @@ function DemandChartRoot({
       if (!datum) return null;
       return (
         <g>
-          <title>{datum.isOutOfService ? `${datum.name}, out of service` : datum.name}</title>
+          <title>{datum.isOutOfService ? t('{name}, out of service', { name: datum.name }) : datum.name}</title>
           <Text
             x={Number(x) - 8}
             y={Number(y)}
@@ -145,7 +147,7 @@ function DemandChartRoot({
         </Bar>
       </BarChart>
     );
-  }, [data, formatValue]);
+  }, [data, formatValue, t]);
 
   const rows = useMemo(
     () => (
@@ -153,8 +155,8 @@ function DemandChartRoot({
         {data.map((datum) => {
           const text = (
             <span className="sr-only">
-              {datum.name}
-              {datum.isOutOfService && ', out of service'}: {formatValue(datum.value)}
+              {datum.isOutOfService ? t('{name}, out of service', { name: datum.name }) : datum.name}:{' '}
+              {formatValue(datum.value)}
             </span>
           );
           return (
@@ -180,7 +182,7 @@ function DemandChartRoot({
         })}
       </ul>
     ),
-    [data, formatValue, selectedKey, onHover, onSelect, title, caption],
+    [data, formatValue, selectedKey, onHover, onSelect, title, caption, t],
   );
 
   const activeIndex = activeKey ? data.findIndex((datum) => datum.key === activeKey) : -1;

@@ -9,6 +9,7 @@ import { filterMentionOptions, type MentionOption, suggestionsFor } from '@/app/
 import { AiMark } from '@/components/ai-mark';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface CoachComposerProps {
   mentions: readonly MentionChip[];
@@ -55,6 +56,8 @@ export function CoachComposer({
   onSend,
   onMenuOpenChange,
 }: CoachComposerProps) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const listId = useId();
   const [menu, setMenu] = useState<MenuState | null>(null);
   const [activeIndex, setActiveIndex] = useState(0);
@@ -72,7 +75,7 @@ export function CoachComposer({
   useEffect(() => onMenuOpenChange(isMenuOpen), [isMenuOpen, onMenuOpenChange]);
 
   const lastMention = mentions.at(-1);
-  const suggestions = lastMention && !draft.trim() && !menu ? suggestionsFor(lastMention) : [];
+  const suggestions = lastMention && !draft.trim() && !menu ? suggestionsFor(i18n, lastMention) : [];
 
   function submit() {
     const text = draft.trim();
@@ -167,7 +170,7 @@ export function CoachComposer({
       )}
       <MentionChips chips={mentions} onRemove={onRemoveMention} />
       {suggestions.length > 0 && (
-        <ul className="flex flex-wrap gap-1.5" aria-label="Ways to ask">
+        <ul className="flex flex-wrap gap-1.5" aria-label={t('Ways to ask')}>
           {suggestions.map((suggestion) => (
             <li key={suggestion}>
               <button
@@ -195,7 +198,7 @@ export function CoachComposer({
           onClick={toggleMenu}
         >
           <AtSignIcon className="size-5" />
-          <span className="sr-only">Point the coach at an exercise, muscle or group</span>
+          <span className="sr-only">{t('Point the coach at an exercise, muscle or group')}</span>
         </Button>
         <Textarea
           ref={inputRef}
@@ -206,8 +209,8 @@ export function CoachComposer({
           }}
           onSelect={(event) => update(event.currentTarget.value, event.currentTarget.selectionStart)}
           onKeyDown={handleKeyDown}
-          placeholder={mentions.length > 0 ? 'What about it?' : 'Ask your coach, or type @'}
-          aria-label="Message your coach"
+          placeholder={mentions.length > 0 ? t('What about it?') : t('Ask your coach, or type @')}
+          aria-label={t('Message your coach')}
           aria-autocomplete="list"
           aria-controls={isMenuOpen ? listId : undefined}
           maxLength={2000}
@@ -216,7 +219,7 @@ export function CoachComposer({
         />
         <Button type="submit" size="icon" className="size-11" disabled={isStreaming || !draft.trim()}>
           {isStreaming ? <AiMark isActive className="size-5" /> : <SendHorizontalIcon className="size-5" />}
-          <span className="sr-only">{isStreaming ? 'Coach is replying' : 'Send'}</span>
+          <span className="sr-only">{isStreaming ? t('Coach is replying') : t('Send')}</span>
         </Button>
       </div>
     </form>

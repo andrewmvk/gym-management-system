@@ -1,12 +1,12 @@
 'use client';
 
-import { muscleLabel } from '@cadence/shared/schemas/muscles';
-import { injuryMuscles, PROFILE_EVENT_LABELS, type ProfileEventType } from '@cadence/shared/schemas/profile-events';
+import type { ProfileEventType } from '@cadence/shared/schemas/profile-events';
+import { injuryMuscles } from '@cadence/shared/schemas/profile-events';
 import { type FormEvent, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { formatDateTime } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 export interface PendingFact {
   id: string;
@@ -27,6 +27,7 @@ interface PendingFactRowProps {
 // A fact the coach took from a chat and is waiting on you for. Dashed, because it is not settled yet: it
 // shapes no plan until you confirm it.
 export function PendingFactRow({ fact, isPending, onConfirm, onDismiss }: PendingFactRowProps) {
+  const { t, tn, formatDateTime, muscleLabel, factTypeLabel } = useI18n();
   const [draft, setDraft] = useState<string | null>(null);
   const muscles = injuryMuscles(fact.payload).map(muscleLabel);
 
@@ -41,9 +42,9 @@ export function PendingFactRow({ fact, isPending, onConfirm, onDismiss }: Pendin
     <li className="flex flex-col gap-3 border-b border-dashed px-5 py-4 last:border-b-0 sm:px-6">
       <div className="flex min-w-0 flex-col gap-1">
         <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="pending">Not confirmed yet</Badge>
+          <Badge variant="pending">{t('Not confirmed yet')}</Badge>
           <span className="font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-            {PROFILE_EVENT_LABELS[fact.eventType]}
+            {factTypeLabel(fact.eventType)}
           </span>
         </div>
         {draft === null ? (
@@ -54,31 +55,33 @@ export function PendingFactRow({ fact, isPending, onConfirm, onDismiss }: Pendin
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
               maxLength={500}
-              aria-label="Correct what your coach remembers"
+              aria-label={t('Correct what your coach remembers')}
               autoFocus
             />
             <div className="flex gap-2">
               <Button type="submit" disabled={isPending || !draft.trim()}>
-                Save and confirm
+                {t('Save and confirm')}
               </Button>
               <Button type="button" variant="ghost" disabled={isPending} onClick={() => setDraft(null)}>
-                Cancel
+                {t('Cancel')}
               </Button>
             </div>
           </form>
         )}
-        {muscles.length > 0 && <p className="text-sm text-muted-foreground">Affects: {muscles.join(', ')}</p>}
+        {muscles.length > 0 && (
+          <p className="text-sm text-muted-foreground">{t('Affects: {muscles}', { muscles: muscles.join(', ') })}</p>
+        )}
         <p className="numerals text-base font-semibold text-muted-foreground">{formatDateTime(fact.createdAt)}</p>
         {fact.sourceMessage && (
           <p className="line-clamp-2 text-sm break-words text-muted-foreground">
-            You said: <q className="italic">{fact.sourceMessage}</q>
+            {tn('You said: {quote}', { quote: <q className="italic">{fact.sourceMessage}</q> })}
           </p>
         )}
       </div>
       {draft === null && (
         <div className="flex flex-wrap gap-2">
           <Button type="button" className="min-h-11" disabled={isPending} onClick={() => onConfirm()}>
-            Confirm
+            {t('Confirm')}
           </Button>
           <Button
             type="button"
@@ -87,10 +90,10 @@ export function PendingFactRow({ fact, isPending, onConfirm, onDismiss }: Pendin
             disabled={isPending}
             onClick={() => setDraft(fact.description)}
           >
-            Edit
+            {t('Edit')}
           </Button>
           <Button type="button" variant="ghost" className="min-h-11" disabled={isPending} onClick={onDismiss}>
-            Dismiss
+            {t('Dismiss')}
           </Button>
         </div>
       )}

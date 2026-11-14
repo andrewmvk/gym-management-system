@@ -9,7 +9,7 @@ import { type MentionChip, mentionKey, useCoach } from '@/app/(member)/coach/coa
 import { MuscleDetail, type PanelExercise } from '@/app/(member)/plan/muscle-detail';
 import { relationOf } from '@/app/(member)/plan/plan-day';
 import { MuscleLoadView, type MusclePointTarget } from '@/components/muscle-map/muscle-load-view';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -24,15 +24,16 @@ interface DistributionPointing {
 function PanelShell({
   children,
   distribution,
-  description = 'Where the plan lands. Tap a muscle to see which exercises train it.',
+  description,
 }: {
   children: ReactNode;
   distribution?: DistributionPointing;
   description?: string;
 }) {
+  const { t } = useI18n();
   const isPointing = Boolean(distribution?.isActive);
   return (
-    <section aria-label="Muscle map" className="border-b">
+    <section aria-label={t('Muscle map')} className="border-b">
       <div
         className={cn(
           'relative px-5 py-4 transition-colors sm:px-6',
@@ -41,16 +42,18 @@ function PanelShell({
         )}
       >
         <div className="flex items-center justify-between gap-3">
-          <h3 className="font-display text-xl font-bold tracking-wide uppercase">Muscle map</h3>
+          <h3 className="font-display text-xl font-bold tracking-wide uppercase">{t('Muscle map')}</h3>
           {distribution?.isMarked && (
             <span className="flex h-6 items-center gap-1 rounded-sm bg-primary px-2 font-display text-xs font-semibold tracking-widest text-primary-foreground uppercase">
               <AtSignIcon className="size-3" aria-hidden />
-              Pointed at
+              {t('Pointed at')}
             </span>
           )}
         </div>
         <p className="text-sm text-muted-foreground">
-          {isPointing ? 'Tap here to ask about the whole distribution, or a muscle or group below.' : description}
+          {isPointing
+            ? t('Tap here to ask about the whole distribution, or a muscle or group below.')
+            : (description ?? t('Where the plan lands. Tap a muscle to see which exercises train it.'))}
         </p>
         {isPointing && (
           <button
@@ -59,7 +62,7 @@ function PanelShell({
             aria-pressed={distribution?.isMarked}
             className="absolute inset-0 z-10 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
           >
-            <span className="sr-only">Point the coach at the whole muscle distribution</span>
+            <span className="sr-only">{t('Point the coach at the whole muscle distribution')}</span>
           </button>
         )}
       </div>
@@ -99,13 +102,30 @@ function PlanMusclePanelRoot({
   selected,
   onSelectedChange,
 }: PlanMusclePanelProps) {
+  const { t, formatPlanDate } = useI18n();
   const trpc = useTRPC();
   const coach = useCoach();
   const markedKeys = new Set(coach.mentions.map(mentionKey));
   const relation = relationOf(date, todayIso);
   const isPast = relation === 'past';
-  const subject =
-    relation === 'today' ? "today's plan" : `the plan for ${formatPlanDate(date, { day: 'numeric', month: 'short' })}`;
+  const isToday = relation === 'today';
+  const shortDate = formatPlanDate(date, { day: 'numeric', month: 'short' });
+  // Whole sentences per case rather than a pasted-in subject: Portuguese contracts "em o" to "no".
+  const copy = isToday
+    ? {
+        description: t("Where today's plan lands. Tap a muscle to see which exercises train it."),
+        label: t("Muscles planned in today's plan"),
+        emptyNote: t("Nothing in today's plan can be done right now."),
+      }
+    : {
+        description: isPast
+          ? t('What the plan for {date} trained. Tap a muscle to see which exercises worked it.', { date: shortDate })
+          : t('Where the plan for {date} lands. Tap a muscle to see which exercises train it.', { date: shortDate }),
+        label: isPast
+          ? t('Muscles worked in the plan for {date}', { date: shortDate })
+          : t('Muscles planned in the plan for {date}', { date: shortDate }),
+        emptyNote: t('Nothing in the plan for {date} can be done right now.', { date: shortDate }),
+      };
 
   // An enhancement only: without the injuries (still loading or failed) the map simply draws without them.
   const injuriesQuery = useQuery({ ...trpc.profile.listActiveInjuries.queryOptions(), enabled: !isPast });
@@ -119,11 +139,7 @@ function PlanMusclePanelRoot({
 
   return (
     <PanelShell
-      description={
-        isPast
-          ? `What ${subject} trained. Tap a muscle to see which exercises worked it.`
-          : `Where ${subject} lands. Tap a muscle to see which exercises train it.`
-      }
+      description={copy.description}
       distribution={
         isPast
           ? undefined
@@ -136,7 +152,7 @@ function PlanMusclePanelRoot({
     >
       <MuscleLoadView
         load={muscleLoad}
-        label={isPast ? `Muscles worked in ${subject}` : `Muscles planned in ${subject}`}
+        label={copy.label}
         includeUntrained
         isPaired
         selected={selected}
@@ -151,7 +167,7 @@ function PlanMusclePanelRoot({
                 onPoint: (target) => coach.toggleMention(toChip(target)),
               }
         }
-        emptyNote={`Nothing in ${subject} can be done right now.`}
+        emptyNote={copy.emptyNote}
         detail={(muscle) => <MuscleDetail muscle={muscle} exercises={exercises} injury={injured.get(muscle)} />}
       />
     </PanelShell>

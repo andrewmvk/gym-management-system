@@ -1,5 +1,8 @@
-import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+'use client';
+
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { formatWeight } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 export interface StreamedPlanExercise {
@@ -23,8 +26,10 @@ const STAGGER_MS = 60;
 // The plan as the AI writes it: each exercise settles into the list the moment it is finished, so the
 // member watches the plan form instead of waiting on a blank panel. Nothing here is saved yet.
 export function PlanBuildProgress({ exercises, className }: PlanBuildProgressProps) {
+  const { t, tx, muscleLabel } = useI18n();
+
   return (
-    <ol aria-label="Your plan as it is built" aria-live="polite" className={cn('border-y', className)}>
+    <ol aria-label={t('Your plan as it is built')} aria-live="polite" className={cn('border-y', className)}>
       {exercises.map((exercise, index) => {
         const primary = exercise.muscles
           .filter((entry) => entry.role === 'primary')
@@ -36,7 +41,7 @@ export function PlanBuildProgress({ exercises, className }: PlanBuildProgressPro
             className="flex animate-block-in items-start justify-between gap-4 border-b px-5 py-3 last:border-b-0 sm:px-6"
           >
             <div className="min-w-0">
-              <p className="text-base leading-6 font-semibold">{exercise.name}</p>
+              <p className="text-base leading-6 font-semibold">{tx(exercise.name)}</p>
               <p className="font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
                 {primary.join(', ')}
               </p>

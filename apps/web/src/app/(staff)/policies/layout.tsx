@@ -1,7 +1,11 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
+import { getI18n } from '@/lib/i18n/server';
 
-export const metadata: Metadata = { title: 'Access' };
+export async function generateMetadata(): Promise<Metadata> {
+  const { t } = await getI18n();
+  return { title: t('Access') };
+}
 
 export default function PoliciesLayout({ children }: { children: ReactNode }) {
   return children;

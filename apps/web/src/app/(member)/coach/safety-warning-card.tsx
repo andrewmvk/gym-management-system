@@ -1,7 +1,10 @@
+'use client';
+
 import type { CoachBlock, PickerOption } from '@cadence/shared/schemas/coach';
 import { ArrowLeftRightIcon, TriangleAlertIcon } from 'lucide-react';
 import { Prescription } from '@/app/(member)/coach/prescription';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 type SafetyBlock = Extract<CoachBlock, { type: 'safety_warning' }>;
 
@@ -14,16 +17,17 @@ interface SafetyWarningCardProps {
 // Pace Tape means "look at this": the coach found something in the plan that conflicts with what the member
 // reported, and offers safer exercises to put in its place.
 export function SafetyWarningCard({ block, isDisabled, onSwap }: SafetyWarningCardProps) {
+  const { t, tx } = useI18n();
   return (
     <section
-      aria-label={`Safety warning for ${block.exercise.name}`}
+      aria-label={t('Safety warning for {name}', { name: tx(block.exercise.name) })}
       className="animate-block-in flex flex-col gap-2 rounded-lg bg-tape p-3 text-tape-foreground"
     >
       <div className="flex items-start gap-2">
         <TriangleAlertIcon className="mt-0.5 size-5 shrink-0" aria-hidden />
         <div className="flex min-w-0 flex-col gap-0.5">
           <h3 className="font-display text-lg leading-tight font-bold tracking-wide uppercase">
-            {block.exercise.name}
+            {tx(block.exercise.name)}
           </h3>
           <p className="text-sm text-pretty">{block.reason}</p>
         </div>
@@ -33,12 +37,12 @@ export function SafetyWarningCard({ block, isDisabled, onSwap }: SafetyWarningCa
           {block.alternatives.map((option) => (
             <li key={option.exerciseId} className="flex items-center justify-between gap-2">
               <div className="flex min-w-0 flex-col">
-                <span className="text-sm font-semibold text-pretty">{option.name}</span>
+                <span className="text-sm font-semibold text-pretty">{tx(option.name)}</span>
                 <Prescription sets={option.sets} reps={option.reps} className="text-base" />
               </div>
               <Button type="button" size="sm" variant="outline" disabled={isDisabled} onClick={() => onSwap(option)}>
                 <ArrowLeftRightIcon data-icon="inline-start" />
-                Swap in
+                {t('Swap in')}
               </Button>
             </li>
           ))}

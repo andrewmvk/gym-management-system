@@ -10,7 +10,7 @@ export const onboardingRouter = router({
   // Yields `saved` as soon as the information is stored, then the exercises of the plan being built, then `done`.
   submit: authedProcedure.input(OnboardingSubmitInputSchema).mutation(async function* ({ ctx, input }) {
     assertCan(ctx.ability, 'manage', subject('Onboarding', { userId: ctx.user.id }));
-    yield* service.submitStream(ctx.user.id, input);
+    yield* service.submitStream(ctx.user.id, input, ctx.locale);
   }),
 
   getStatus: authedProcedure.query(({ ctx }) => {

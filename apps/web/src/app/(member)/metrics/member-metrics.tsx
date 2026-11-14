@@ -15,7 +15,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { useLaggedValue } from '@/hooks/use-lagged-value';
 import { useUrlState } from '@/hooks/use-url-state';
 import { addDays, toIsoDate } from '@/lib/calendar-date';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 const DEFAULT_RANGE_DAYS = 30;
@@ -26,8 +26,6 @@ function rangeOfLastDays(days: number) {
   const today = new Date();
   return { from: toIsoDate(addDays(today, -(days - 1))), to: toIsoDate(today) };
 }
-
-const numberFormat = new Intl.NumberFormat(undefined, { maximumFractionDigits: 1 });
 
 function Figure({ label, value, unit, help }: { label: string; value: string; unit: string; help: string }) {
   return (
@@ -54,18 +52,19 @@ function FigureSkeleton() {
 }
 
 function BreakdownTable({ heading, rows }: { heading: string; rows: { name: string; completed: number }[] }) {
+  const { t, tx } = useI18n();
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>{heading}</TableHead>
-          <TableHead className="w-28 text-right">Completed</TableHead>
+          <TableHead className="w-28 text-right">{t('Completed')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
         {rows.map((row) => (
           <TableRow key={row.name}>
-            <TableCell className="font-medium">{row.name}</TableCell>
+            <TableCell className="font-medium">{tx(row.name)}</TableCell>
             <TableCell className="numerals text-right text-base font-bold">{row.completed}</TableCell>
           </TableRow>
         ))}
@@ -75,12 +74,13 @@ function BreakdownTable({ heading, rows }: { heading: string; rows: { name: stri
 }
 
 function BreakdownSkeleton() {
+  const { t } = useI18n();
   return (
     <Table>
       <TableHeader>
         <TableRow>
-          <TableHead>Exercise</TableHead>
-          <TableHead className="w-28 text-right">Completed</TableHead>
+          <TableHead>{t('Exercise')}</TableHead>
+          <TableHead className="w-28 text-right">{t('Completed')}</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -105,10 +105,11 @@ function ToolbarSkeleton() {
 }
 
 function MemberMetricsSkeleton() {
+  const { t } = useI18n();
   return (
     <div className="flex flex-col gap-4">
       <ToolbarSkeleton />
-      <Section title="Summary">
+      <Section title={t('Summary')}>
         <div className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
           {Array.from({ length: 4 }, (_, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: static skeleton placeholders, never reordered.
@@ -119,10 +120,10 @@ function MemberMetricsSkeleton() {
         </div>
       </Section>
       <div className="grid gap-4 lg:grid-cols-2">
-        <Section title="By exercise">
+        <Section title={t('By exercise')}>
           <BreakdownSkeleton />
         </Section>
-        <Section title="Muscles worked">
+        <Section title={t('Muscles worked')}>
           <MuscleLoadView.Skeleton className="px-5 py-5 sm:px-6" />
         </Section>
       </div>
@@ -131,6 +132,7 @@ function MemberMetricsSkeleton() {
 }
 
 function MemberMetricsRoot() {
+  const { t, formatPlanDate, formatNumber } = useI18n();
   const trpc = useTRPC();
   const defaults = rangeOfLastDays(DEFAULT_RANGE_DAYS);
   const [from, setFrom] = useUrlState('from', defaults.from, isIsoDate);
@@ -148,10 +150,11 @@ function MemberMetricsRoot() {
   const rangeQuery = useQuery(trpc.metrics.mine.queryOptions(range));
   const shown = useLaggedValue(range, rangeQuery.isPending);
   const metricsQuery = useQuery(trpc.metrics.mine.queryOptions(shown));
+  const oneDecimal = (value: number) => formatNumber(value, { maximumFractionDigits: 1 });
 
   const toolbar = (
     <DateRangePicker
-      aria-label="Date range"
+      aria-label={t('Date range')}
       value={range}
       onChange={(next) => {
         setFrom(next.from);
@@ -175,7 +178,7 @@ function MemberMetricsRoot() {
       <div className="flex flex-col gap-4">
         {toolbar}
         <QueryError
-          title="We couldn't load your metrics"
+          title={t("We couldn't load your metrics")}
           onRetry={() => metricsQuery.refetch()}
           isRetrying={metricsQuery.isRefetching}
         />
@@ -186,6 +189,7 @@ function MemberMetricsRoot() {
   const metrics = metricsQuery.data;
   const { goalProgress, exerciseBreakdown } = metrics;
   const isEmpty = metrics.daysTrained === 0 && goalProgress.plannedExercises === 0;
+  const period = { from: formatPlanDate(metrics.from), to: formatPlanDate(metrics.to) };
 
   return (
     <div className="flex flex-col gap-4">
@@ -195,78 +199,85 @@ function MemberMetricsRoot() {
         <div className="rounded-lg border bg-card">
           <EmptyState
             icon={ChartNoAxesColumnIcon}
-            title="Nothing to show yet"
-            description={`No check-ins or plans between ${formatPlanDate(metrics.from)} and ${formatPlanDate(metrics.to)}. Try a wider range.`}
+            title={t('Nothing to show yet')}
+            description={t('No check-ins or plans between {from} and {to}. Try a wider range.', period)}
           />
         </div>
       ) : (
         <>
           <Section
-            title="Summary"
-            description={`${formatPlanDate(metrics.from)} to ${formatPlanDate(metrics.to)}. Days trained count check-ins at the gym door, nothing else.`}
+            title={t('Summary')}
+            description={t('{from} to {to}. Days trained count check-ins at the gym door, nothing else.', period)}
           >
             <dl className="grid gap-px bg-border sm:grid-cols-2 lg:grid-cols-4">
               <div className="bg-card">
                 <Figure
-                  label="Days trained"
+                  label={t('Days trained')}
                   value={String(metrics.daysTrained)}
-                  unit="days with a check-in"
-                  help="Days with a check-in at the gym door in this range. Plans and ticks do not count."
+                  unit={t('days with a check-in')}
+                  help={t('Days with a check-in at the gym door in this range. Plans and ticks do not count.')}
                 />
               </div>
               <div className="bg-card">
                 <Figure
-                  label="Frequency"
-                  value={numberFormat.format(metrics.trainingFrequency)}
-                  unit="days trained per week"
-                  help="Days trained divided by the number of weeks in this range."
+                  label={t('Frequency')}
+                  value={oneDecimal(metrics.trainingFrequency)}
+                  unit={t('days trained per week')}
+                  help={t('Days trained divided by the number of weeks in this range.')}
                 />
               </div>
               <div className="bg-card">
                 <Figure
-                  label="Reps completed"
-                  value={numberFormat.format(metrics.trainingVolume)}
-                  unit="reps in total"
-                  help="Sets times reps of every exercise you ticked off in this range, added up. The load is not counted."
+                  label={t('Reps completed')}
+                  value={oneDecimal(metrics.trainingVolume)}
+                  unit={t('reps in total')}
+                  help={t(
+                    'Sets times reps of every exercise you ticked off in this range, added up. The load is not counted.',
+                  )}
                 />
               </div>
               <div className="bg-card">
                 <Figure
-                  label="Plan completed"
+                  label={t('Plan completed')}
                   value={`${Math.round(goalProgress.completionRate * 100)}%`}
-                  unit={`${goalProgress.completedExercises} of ${goalProgress.plannedExercises} exercises`}
-                  help="Exercises you ticked off divided by the exercises in your plans in this range."
+                  unit={t('{done} of {total} exercises', {
+                    done: goalProgress.completedExercises,
+                    total: goalProgress.plannedExercises,
+                  })}
+                  help={t('Exercises you ticked off divided by the exercises in your plans in this range.')}
                 />
               </div>
             </dl>
           </Section>
 
           <div className="grid gap-4 lg:grid-cols-2">
-            <Section title="By exercise" description="Completed exercises in this range.">
+            <Section title={t('By exercise')} description={t('Completed exercises in this range.')}>
               {exerciseBreakdown.byExercise.length === 0 ? (
                 <EmptyState
                   icon={ChartNoAxesColumnIcon}
-                  title="No exercises completed"
-                  description="Mark exercises as done in your plan to see them here."
+                  title={t('No exercises completed')}
+                  description={t('Mark exercises as done in your plan to see them here.')}
                 />
               ) : (
-                <BreakdownTable heading="Exercise" rows={exerciseBreakdown.byExercise} />
+                <BreakdownTable heading={t('Exercise')} rows={exerciseBreakdown.byExercise} />
               )}
             </Section>
             <Section
-              title="Muscles worked"
-              description="Counted in weighted sets, not reps: a completed set counts once for a primary muscle and half for a supporting one."
+              title={t('Muscles worked')}
+              description={t(
+                'Counted in weighted sets, not reps: a completed set counts once for a primary muscle and half for a supporting one.',
+              )}
             >
               {Object.keys(exerciseBreakdown.muscleLoad).length === 0 ? (
                 <EmptyState
                   icon={ChartNoAxesColumnIcon}
-                  title="No exercises completed"
-                  description="Mark exercises as done in your plan to see them here."
+                  title={t('No exercises completed')}
+                  description={t('Mark exercises as done in your plan to see them here.')}
                 />
               ) : (
                 <MuscleLoadView
                   load={exerciseBreakdown.muscleLoad}
-                  label="Muscles worked in this range"
+                  label={t('Muscles worked in this range')}
                   className="px-5 py-5 sm:px-6"
                 />
               )}
@@ -275,14 +286,14 @@ function MemberMetricsRoot() {
         </>
       )}
 
-      <Section title="Your goals" description="What you told us in your health profile.">
+      <Section title={t('Your goals')} description={t('What you told us in your health profile.')}>
         {goalProgress.goals ? (
           <p className="max-w-prose px-5 py-4 text-pretty whitespace-pre-line sm:px-6">{goalProgress.goals}</p>
         ) : (
           <EmptyState
             icon={TargetIcon}
-            title="No goals yet"
-            description="Add them in your health profile and they show up here next to your progress."
+            title={t('No goals yet')}
+            description={t('Add them in your health profile and they show up here next to your progress.')}
           />
         )}
       </Section>

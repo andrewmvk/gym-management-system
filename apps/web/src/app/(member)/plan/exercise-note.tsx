@@ -3,6 +3,7 @@
 import { StickyNoteIcon } from 'lucide-react';
 import { type PointerEvent, useEffect, useRef, useState } from 'react';
 import { Popover, PopoverAnchor, PopoverContent } from '@/components/ui/popover';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 const HOVER_CLOSE_DELAY_MS = 120;
@@ -21,6 +22,7 @@ interface ExerciseNoteProps {
 // a click or the keyboard opens it and keeps it open. It is a popover the component opens itself because
 // neither a hover card (no touch, no keyboard) nor a tooltip (the member cannot select or keep it) fits both.
 export function ExerciseNote({ name, notes, className }: ExerciseNoteProps) {
+  const { t } = useI18n();
   const [mode, setMode] = useState<NoteMode>('closed');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -51,7 +53,7 @@ export function ExerciseNote({ name, notes, className }: ExerciseNoteProps) {
         <button
           ref={triggerRef}
           type="button"
-          aria-label={`Note for ${name}`}
+          aria-label={t('Note for {name}', { name })}
           aria-haspopup="dialog"
           aria-expanded={mode !== 'closed'}
           onClick={() => setMode((current) => (current === 'pinned' ? 'closed' : 'pinned'))}
@@ -77,7 +79,7 @@ export function ExerciseNote({ name, notes, className }: ExerciseNoteProps) {
         className="w-72 max-w-[calc(100vw-2rem)] text-sm text-pretty"
       >
         <p className="whitespace-pre-line">
-          <span className="font-semibold">Note: </span>
+          <span className="font-semibold">{t('Note:')} </span>
           {notes}
         </p>
       </PopoverContent>

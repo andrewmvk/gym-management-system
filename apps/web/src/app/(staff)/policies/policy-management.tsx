@@ -5,7 +5,7 @@ import { LockIcon, UsersIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useAppAbility } from '@/abilities';
 import { GroupMatrix } from '@/app/(staff)/policies/group-matrix';
-import { groupLabel, type PolicyDialogState, PolicyDialogs } from '@/app/(staff)/policies/policy-dialogs';
+import { type PolicyDialogState, PolicyDialogs, policyGroupLabel } from '@/app/(staff)/policies/policy-dialogs';
 import { hasException, PolicyUserRow } from '@/app/(staff)/policies/policy-user-row';
 import { Deferred } from '@/components/deferred';
 import { EmptyState } from '@/components/empty-state';
@@ -19,6 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
@@ -41,11 +42,12 @@ function PolicyTabs({
   users: React.ReactNode;
   policies: React.ReactNode;
 } & Pick<React.ComponentProps<typeof Tabs>, 'value' | 'onValueChange'>) {
+  const { t } = useI18n();
   return (
     <Tabs defaultValue="users" {...tabsProps}>
       <TabsList>
-        <TabsTrigger value="users">Users</TabsTrigger>
-        <TabsTrigger value="policies">Policies</TabsTrigger>
+        <TabsTrigger value="users">{t('Users')}</TabsTrigger>
+        <TabsTrigger value="policies">{t('Policies')}</TabsTrigger>
       </TabsList>
       <TabsContent value="users">{users}</TabsContent>
       <TabsContent value="policies">{policies}</TabsContent>
@@ -89,6 +91,7 @@ function PolicyManagementSkeleton() {
 }
 
 function PolicyManagementRoot() {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const ability = useAppAbility();
   const canManage = ability.can('manage', 'UserPolicyAssignment');
@@ -120,8 +123,8 @@ function PolicyManagementRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={LockIcon}
-          title="No access"
-          description="Your account doesn't include policy management. Ask an admin if you need it."
+          title={t('No access')}
+          description={t("Your account doesn't include policy management. Ask an admin if you need it.")}
         />
       </div>
     );
@@ -138,7 +141,7 @@ function PolicyManagementRoot() {
   if (listQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load the policies"
+        title={t("We couldn't load the policies")}
         onRetry={() => listQuery.refetch()}
         isRetrying={listQuery.isRefetching}
       />
@@ -170,7 +173,7 @@ function PolicyManagementRoot() {
                   setSearch(value);
                   pagination.setPage(1);
                 }}
-                placeholder="Search by name or email"
+                placeholder={t('Search by name or email')}
                 className="w-full lg:w-72"
               />
               <Select
@@ -180,14 +183,14 @@ function PolicyManagementRoot() {
                   pagination.setPage(1);
                 }}
               >
-                <SelectTrigger aria-label="Filter by group" className="w-full lg:w-44">
+                <SelectTrigger aria-label={t('Filter by group')} className="w-full lg:w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All groups</SelectItem>
+                  <SelectItem value={ALL}>{t('All groups')}</SelectItem>
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
-                      {groupLabel(group.id)}
+                      {policyGroupLabel(tx, group.id)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -199,29 +202,29 @@ function PolicyManagementRoot() {
                   pagination.setPage(1);
                 }}
               >
-                <SelectTrigger aria-label="Filter by policy" className="w-full lg:w-56">
+                <SelectTrigger aria-label={t('Filter by policy')} className="w-full lg:w-56">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={ALL}>All policies</SelectItem>
+                  <SelectItem value={ALL}>{t('All policies')}</SelectItem>
                   {policies.map((policy) => (
                     <SelectItem key={policy.id} value={policy.id}>
-                      {policy.description}
+                      {tx(policy.description)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               <FilterBar.Trailing>
                 <SegmentedFilter
-                  label="Filter users"
+                  label={t('Filter users')}
                   value={filter}
                   onChange={(value) => {
                     setFilter(value);
                     pagination.setPage(1);
                   }}
                   options={[
-                    { value: 'all', label: 'All', count: matchingSearch.length },
-                    { value: 'attention', label: 'Needs attention', count: attentionCount },
+                    { value: 'all', label: t('All'), count: matchingSearch.length },
+                    { value: 'attention', label: t('Needs attention'), count: attentionCount },
                   ]}
                   className="w-full lg:w-auto"
                 />
@@ -232,18 +235,18 @@ function PolicyManagementRoot() {
               <div className="rounded-lg border bg-card">
                 <EmptyState
                   icon={UsersIcon}
-                  title={filter === 'attention' && !hasFilters ? 'Nothing needs attention' : 'No users'}
+                  title={filter === 'attention' && !hasFilters ? t('Nothing needs attention') : t('No users')}
                   description={
                     hasFilters
-                      ? 'No user matches these filters.'
+                      ? t('No user matches these filters.')
                       : filter === 'attention'
-                        ? 'No denied, expired or soon-to-expire access.'
-                        : 'There are no accounts yet.'
+                        ? t('No denied, expired or soon-to-expire access.')
+                        : t('There are no accounts yet.')
                   }
                   action={
                     hasFilters ? (
                       <Button variant="outline" size="sm" onClick={clearFilters}>
-                        Clear filters
+                        {t('Clear filters')}
                       </Button>
                     ) : undefined
                   }
@@ -271,7 +274,7 @@ function PolicyManagementRoot() {
               pageSize={pagination.pageSize}
               total={pagination.total}
               onPageChange={pagination.setPage}
-              noun="users"
+              noun={t('users')}
             />
           </div>
         }

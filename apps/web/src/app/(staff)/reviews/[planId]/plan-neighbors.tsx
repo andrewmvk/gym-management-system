@@ -8,7 +8,7 @@ import { useQueueFilters } from '@/app/(staff)/reviews/use-queue-filters';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toIsoDate } from '@/lib/calendar-date';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 function PlanNeighborsSkeleton() {
@@ -23,6 +23,7 @@ function PlanNeighborsSkeleton() {
 // Moves through the review queue in the order and with the filters the queue itself shows. A plan that is not in
 // that list any more (its status changed, or the link came from elsewhere) simply has no neighbours.
 function PlanNeighborsRoot({ planId }: { planId: string }) {
+  const { t, formatPlanDate } = useI18n();
   const trpc = useTRPC();
   const queueQuery = useQuery(trpc.reviews.queue.queryOptions());
   const { status, term, when, search } = useQueueFilters();
@@ -36,24 +37,27 @@ function PlanNeighborsRoot({ planId }: { planId: string }) {
 
   const previous = list[index - 1];
   const next = list[index + 1];
-  const position = `Plan ${index + 1} of ${list.length} in the queue`;
+  const position = t('Plan {position} of {total} in the queue', { position: index + 1, total: list.length });
 
   return (
-    <nav aria-label="Plans in the queue" className="flex items-center justify-between gap-3">
+    <nav aria-label={t('Plans in the queue')} className="flex items-center justify-between gap-3">
       {previous ? (
         <Button asChild variant="outline" size="sm">
           <Link
             href={`/reviews/${previous.id}${search}`}
-            aria-label={`Previous plan: ${previous.memberName}, ${formatPlanDate(previous.planDate)}`}
+            aria-label={t('Previous plan: {name}, {date}', {
+              name: previous.memberName,
+              date: formatPlanDate(previous.planDate),
+            })}
           >
             <ChevronLeftIcon data-icon="inline-start" />
-            Previous
+            {t('Previous')}
           </Link>
         </Button>
       ) : (
         <Button variant="outline" size="sm" disabled>
           <ChevronLeftIcon data-icon="inline-start" />
-          Previous
+          {t('Previous')}
         </Button>
       )}
       <p className="numerals text-center text-base text-muted-foreground">{position}</p>
@@ -61,15 +65,18 @@ function PlanNeighborsRoot({ planId }: { planId: string }) {
         <Button asChild variant="outline" size="sm">
           <Link
             href={`/reviews/${next.id}${search}`}
-            aria-label={`Next plan: ${next.memberName}, ${formatPlanDate(next.planDate)}`}
+            aria-label={t('Next plan: {name}, {date}', {
+              name: next.memberName,
+              date: formatPlanDate(next.planDate),
+            })}
           >
-            Next
+            {t('Next')}
             <ChevronRightIcon data-icon="inline-end" />
           </Link>
         </Button>
       ) : (
         <Button variant="outline" size="sm" disabled>
-          Next
+          {t('Next')}
           <ChevronRightIcon data-icon="inline-end" />
         </Button>
       )}

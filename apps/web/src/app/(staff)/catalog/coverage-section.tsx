@@ -7,7 +7,7 @@ import {
   type MuscleCoverage,
   peakLoad,
 } from '@cadence/shared/schemas/muscle-heat';
-import { MUSCLE_IDS, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+import { MUSCLE_IDS, type MuscleId } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { DumbbellIcon, XIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
@@ -23,6 +23,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -33,12 +35,12 @@ const MODE_OPTIONS = [
   { value: 'all', label: 'Catalog' },
   { value: 'available', label: 'Available now' },
   { value: 'lost', label: 'Out of service' },
-] as const satisfies readonly { value: CoverageMode; label: string }[];
+] as const satisfies readonly { value: CoverageMode; label: LabelKey }[];
 
 const MODE_NOTE = {
   all: 'Every exercise in the catalog, counted for each muscle it works.',
   available: 'Only exercises that can be done right now.',
-} as const satisfies Partial<Record<CoverageMode, string>>;
+} as const satisfies Partial<Record<CoverageMode, LabelKey>>;
 
 function PieceChip({
   label,
@@ -51,6 +53,7 @@ function PieceChip({
   isSelected: boolean;
   onClick: () => void;
 }) {
+  const { t } = useI18n();
   return (
     <button
       type="button"
@@ -64,7 +67,7 @@ function PieceChip({
       {label}
       <span className="numerals text-base">
         {count}
-        <span className="sr-only"> {count === 1 ? 'exercise lost' : 'exercises lost'}</span>
+        <span className="sr-only"> {count === 1 ? t('exercise lost') : t('exercises lost')}</span>
       </span>
     </button>
   );
@@ -79,8 +82,9 @@ function modeValue(mode: CoverageMode, entry: MuscleCoverage) {
 }
 
 function CoverageSkeleton() {
+  const { t } = useI18n();
   return (
-    <PanelSection title="Muscle coverage">
+    <PanelSection title={t('Muscle coverage')}>
       <div className="flex flex-col gap-5 px-5 py-5 sm:px-6">
         <Skeleton className="h-11 w-full sm:w-96" />
         <Skeleton className="h-8 w-full sm:w-96" />
@@ -92,6 +96,7 @@ function CoverageSkeleton() {
 }
 
 function CoverageSectionRoot() {
+  const { t, tn, tx, muscleLabel } = useI18n();
   const trpc = useTRPC();
   const exercisesQuery = useQuery(trpc.catalog.list.queryOptions());
   const equipmentQuery = useQuery(trpc.catalog.listEquipment.queryOptions());
@@ -115,7 +120,7 @@ function CoverageSectionRoot() {
   if (exercisesQuery.isError || equipmentQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load the coverage"
+        title={t("We couldn't load the coverage")}
         onRetry={() => {
           exercisesQuery.refetch();
           equipmentQuery.refetch();
@@ -130,8 +135,8 @@ function CoverageSectionRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={DumbbellIcon}
-          title="No exercises yet"
-          description="Coverage shows up once exercises are added with their muscles."
+          title={t('No exercises yet')}
+          description={t('Coverage shows up once exercises are added with their muscles.')}
         />
       </div>
     );
@@ -209,27 +214,47 @@ function CoverageSectionRoot() {
     .sort((a, b) => modeValue(mode, b) - modeValue(mode, a))
     .filter((entry) => modeValue(mode, entry) > 0)
     .slice(0, SUMMARY_MUSCLES);
+  const muscleNames = (muscles: readonly MuscleId[]) => muscles.map((muscle) => muscleLabel(muscle)).join(', ');
   let summary: string;
   if (selectedPiece) {
+    const pieceName = tx(selectedPiece.name);
     summary = selectedImpact
-      ? `With ${selectedPiece.name} out of service, ${selectedImpact.exerciseIds.length} ${selectedImpact.exerciseIds.length === 1 ? 'exercise is' : 'exercises are'} lost, hitting ${selectedImpact.muscles.map(muscleLabel).join(', ')}.`
-      : `${selectedPiece.name} out of service loses nothing, because every exercise that uses it has another option.`;
+      ? t(
+          selectedImpact.exerciseIds.length === 1
+            ? 'With {name} out of service, {count} exercise is lost, hitting {muscles}.'
+            : 'With {name} out of service, {count} exercises are lost, hitting {muscles}.',
+          {
+            name: pieceName,
+            count: selectedImpact.exerciseIds.length,
+            muscles: muscleNames(selectedImpact.muscles),
+          },
+        )
+      : t('{name} out of service loses nothing, because every exercise that uses it has another option.', {
+          name: pieceName,
+        });
   } else if (mode === 'lost') {
     summary =
       items.length > 0
-        ? `Most affected: ${items
-            .slice(0, SUMMARY_MUSCLES)
-            .map((item) => muscleLabel(item.muscle))
-            .join(', ')}.`
-        : 'Nothing is lost. Every exercise can be done.';
+        ? t('Most affected: {muscles}.', {
+            muscles: muscleNames(items.slice(0, SUMMARY_MUSCLES).map((item) => item.muscle)),
+          })
+        : t('Nothing is lost. Every exercise can be done.');
   } else {
     const bestText =
-      best.length > 0 ? `Best covered: ${best.map((entry) => muscleLabel(entry.muscle)).join(', ')}. ` : '';
+      best.length > 0 ? t('Best covered: {muscles}.', { muscles: muscleNames(best.map((entry) => entry.muscle)) }) : '';
     const gapText =
       gaps.length > 0
-        ? `${gaps.length} with no ${mode === 'available' ? 'available ' : ''}exercise: ${gaps.map((entry) => muscleLabel(entry.muscle)).join(', ')}.`
-        : 'Every muscle has an exercise.';
-    summary = `${bestText}${gapText}`;
+        ? t(
+            mode === 'available'
+              ? '{count} with no available exercise: {muscles}.'
+              : '{count} with no exercise: {muscles}.',
+            {
+              count: gaps.length,
+              muscles: muscleNames(gaps.map((entry) => entry.muscle)),
+            },
+          )
+        : t('Every muscle has an exercise.');
+    summary = bestText ? `${bestText} ${gapText}` : gapText;
   }
 
   const detailCoverage = selectedMuscle ? coverageOf(selectedMuscle) : null;
@@ -255,25 +280,25 @@ function CoverageSectionRoot() {
     <div className="min-w-0">
       <div>
         <PanelSection
-          title="Muscle coverage"
-          description="How well the catalog covers each muscle, and what out-of-service equipment costs."
+          title={t('Muscle coverage')}
+          description={t('How well the catalog covers each muscle, and what out-of-service equipment costs.')}
         >
           <div className="flex flex-col gap-5 px-5 py-5 sm:px-6">
             <div className="flex flex-col gap-3">
               <SegmentedFilter
-                label="Coverage view"
+                label={t('Coverage view')}
                 value={mode}
-                options={MODE_OPTIONS}
+                options={MODE_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
                 onChange={changeMode}
                 className="w-full sm:w-fit"
               />
               {/* One slot for both: the view's note, or in the Out of service view the pieces to narrow it by. */}
               <div className="flex items-center sm:min-h-9">
                 {mode === 'lost' && piecesDown.length > 0 ? (
-                  <ul aria-label="Narrow by equipment" className="flex flex-wrap gap-2">
+                  <ul aria-label={t('Narrow by equipment')} className="flex flex-wrap gap-2">
                     <li>
                       <PieceChip
-                        label="All pieces"
+                        label={t('All pieces')}
                         count={lostExerciseCount}
                         isSelected={selectedPiece === null}
                         onClick={() => setSelectedPieceId(null)}
@@ -282,7 +307,7 @@ function CoverageSectionRoot() {
                     {piecesDown.map((piece) => (
                       <li key={piece.id}>
                         <PieceChip
-                          label={piece.name}
+                          label={tx(piece.name)}
                           count={impact.find((entry) => entry.equipmentId === piece.id)?.exerciseIds.length ?? 0}
                           isSelected={piece.id === selectedPiece?.id}
                           onClick={() => setSelectedPieceId(piece.id === selectedPieceId ? null : piece.id)}
@@ -292,7 +317,7 @@ function CoverageSectionRoot() {
                   </ul>
                 ) : (
                   <p className="text-sm text-muted-foreground">
-                    {mode === 'lost' ? 'All equipment is in service, so nothing is lost.' : MODE_NOTE[mode]}
+                    {mode === 'lost' ? t('All equipment is in service, so nothing is lost.') : t(MODE_NOTE[mode])}
                   </p>
                 )}
               </div>
@@ -302,18 +327,18 @@ function CoverageSectionRoot() {
               <div className="flex flex-col gap-3 md:min-h-112">
                 <MuscleMap
                   marks={marks}
-                  label="Muscle coverage of the catalog"
+                  label={t('Muscle coverage of the catalog')}
                   selected={selectedMuscle}
                   highlighted={hoveredMuscle}
                   onSelect={toggleMuscle}
                   onHover={setHoveredMuscle}
                 />
                 <MuscleLegend
-                  lowLabel={mode === 'lost' || selectedPiece ? 'Less lost' : 'Fewer exercises'}
-                  highLabel={mode === 'lost' || selectedPiece ? 'More lost' : 'More exercises'}
+                  lowLabel={mode === 'lost' || selectedPiece ? t('Less lost') : t('Fewer exercises')}
+                  highLabel={mode === 'lost' || selectedPiece ? t('More lost') : t('More exercises')}
                   hasLost={mode === 'lost' || Boolean(selectedPiece)}
                   hasGap={!selectedPiece && mode !== 'lost'}
-                  gapLabel={mode === 'available' ? 'No exercise available now' : 'No exercise trains it'}
+                  gapLabel={mode === 'available' ? t('No exercise available now') : t('No exercise trains it')}
                 />
               </div>
               {/* The map sets the height; this column fills it and scrolls inside, so a long list never stretches the card. */}
@@ -331,21 +356,24 @@ function CoverageSectionRoot() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
-                          aria-label={`Close ${muscleLabel(selectedMuscle)} details`}
+                          aria-label={t('Close {muscle} details', { muscle: muscleLabel(selectedMuscle) })}
                           onClick={() => setSelectedMuscle(null)}
                         >
                           <XIcon />
                         </Button>
                       </div>
                       {detailExercises.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">No exercise trains this muscle yet.</p>
+                        <p className="text-sm text-muted-foreground">{t('No exercise trains this muscle yet.')}</p>
                       ) : (
                         <>
                           <p className="text-sm text-muted-foreground">
-                            <span className="numerals text-base font-bold text-foreground">
-                              {detailCoverage.available}/{detailCoverage.total}
-                            </span>{' '}
-                            exercises available.
+                            {tn('{ratio} exercises available.', {
+                              ratio: (
+                                <span className="numerals text-base font-bold text-foreground">
+                                  {detailCoverage.available}/{detailCoverage.total}
+                                </span>
+                              ),
+                            })}
                           </p>
                           <ul className="flex flex-col gap-1.5">
                             {detailExercises.map(({ exercise, role }) => (
@@ -356,26 +384,28 @@ function CoverageSectionRoot() {
                                     !exercise.isAvailable && 'text-muted-foreground line-through',
                                   )}
                                 >
-                                  {exercise.name}
+                                  {tx(exercise.name)}
                                 </span>
                                 <span className="flex shrink-0 items-center gap-2">
-                                  <Badge variant={role === 'primary' ? 'default' : 'outline'}>{role}</Badge>
-                                  {!exercise.isAvailable && <Badge variant="unavailable">Out of service</Badge>}
+                                  <Badge variant={role === 'primary' ? 'default' : 'outline'}>
+                                    {role === 'primary' ? t('role::primary') : t('role::supporting')}
+                                  </Badge>
+                                  {!exercise.isAvailable && <Badge variant="unavailable">{t('Out of service')}</Badge>}
                                 </span>
                               </li>
                             ))}
                           </ul>
                           <p className="text-sm">
-                            <span className="font-semibold">Equipment: </span>
+                            <span className="font-semibold">{t('Equipment')}: </span>
                             {detailEquipment.length === 0
-                              ? 'bodyweight only'
+                              ? t('bodyweight only')
                               : detailEquipment.map((piece, index) => (
                                   <span
                                     key={piece.id}
                                     className={cn(!piece.isAvailable && 'text-muted-foreground line-through')}
                                   >
                                     {index > 0 && ', '}
-                                    {piece.name}
+                                    {tx(piece.name)}
                                   </span>
                                 ))}
                           </p>
@@ -385,7 +415,7 @@ function CoverageSectionRoot() {
                   )}
                   {items.length > 0 && (
                     <MuscleRankList
-                      label="Muscle coverage, ranked"
+                      label={t('Muscle coverage, ranked')}
                       items={items}
                       selected={selectedMuscle}
                       onSelect={toggleMuscle}

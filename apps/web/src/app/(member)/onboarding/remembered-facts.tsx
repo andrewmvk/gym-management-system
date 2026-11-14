@@ -1,12 +1,6 @@
 'use client';
 
-import { muscleLabel } from '@cadence/shared/schemas/muscles';
-import {
-  injuryMuscles,
-  PROFILE_EVENT_LABELS,
-  PROFILE_EVENT_TYPES,
-  type ProfileEventType,
-} from '@cadence/shared/schemas/profile-events';
+import { injuryMuscles, PROFILE_EVENT_TYPES, type ProfileEventType } from '@cadence/shared/schemas/profile-events';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { BrainIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -17,7 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -33,23 +27,25 @@ interface RememberedEvent {
   resolvedAt: string | Date | null;
 }
 
-function describeFact(event: RememberedEvent) {
+function describeFact(event: RememberedEvent, fallback: string) {
   const payload = event.payload;
   if (typeof payload === 'object' && payload !== null && 'description' in payload) {
     const { description } = payload;
     if (typeof description === 'string' && description.trim()) return description;
   }
-  return PROFILE_EVENT_LABELS[event.eventType];
+  return fallback;
 }
 
 function SectionShell({ children }: { children: ReactNode }) {
+  const { t } = useI18n();
   return (
-    <section aria-label="What your coach remembers" className="overflow-hidden rounded-lg border bg-card">
+    <section aria-label={t('What your coach remembers')} className="overflow-hidden rounded-lg border bg-card">
       <div className="border-b px-5 py-4 sm:px-6">
-        <h2 className="font-display text-xl font-bold tracking-wide uppercase">What your coach remembers</h2>
+        <h2 className="font-display text-xl font-bold tracking-wide uppercase">{t('What your coach remembers')}</h2>
         <p className="max-w-prose text-sm text-pretty text-muted-foreground">
-          Your coach asks before it keeps something from a chat, and uses these facts when it builds your plans. If one
-          is wrong or no longer true, say so and the coach stops using it.
+          {t(
+            'Your coach asks before it keeps something from a chat, and uses these facts when it builds your plans. If one is wrong or no longer true, say so and the coach stops using it.',
+          )}
         </p>
       </div>
       {children}
@@ -90,6 +86,7 @@ interface FactRowProps {
 }
 
 function FactRow({ event, isPending, onToggle, isTypeShown }: FactRowProps) {
+  const { t, tn, formatDateTime, muscleLabel, factTypeLabel } = useI18n();
   const isResolved = event.resolvedAt !== null;
   const muscles = injuryMuscles(event.payload).map(muscleLabel);
 
@@ -102,14 +99,16 @@ function FactRow({ event, isPending, onToggle, isTypeShown }: FactRowProps) {
             isResolved && 'text-muted-foreground line-through decoration-2',
           )}
         >
-          {isTypeShown && <span className="font-normal">{PROFILE_EVENT_LABELS[event.eventType]}: </span>}
-          {describeFact(event)}
+          {isTypeShown && <span className="font-normal">{factTypeLabel(event.eventType)}: </span>}
+          {describeFact(event, factTypeLabel(event.eventType))}
         </p>
-        {muscles.length > 0 && <p className="text-sm text-muted-foreground">Affects: {muscles.join(', ')}</p>}
+        {muscles.length > 0 && (
+          <p className="text-sm text-muted-foreground">{t('Affects: {muscles}', { muscles: muscles.join(', ') })}</p>
+        )}
         <p className="numerals text-base font-semibold text-muted-foreground">{formatDateTime(event.createdAt)}</p>
         {event.sourceMessage && (
           <p className="line-clamp-2 text-sm break-words text-muted-foreground">
-            You said: <q className="italic">{event.sourceMessage}</q>
+            {tn('You said: {quote}', { quote: <q className="italic">{event.sourceMessage}</q> })}
           </p>
         )}
       </div>
@@ -120,13 +119,14 @@ function FactRow({ event, isPending, onToggle, isTypeShown }: FactRowProps) {
         disabled={isPending}
         onClick={() => onToggle(!isResolved)}
       >
-        {isResolved ? 'Applies again' : 'No longer true'}
+        {isResolved ? t('Applies again') : t('No longer true')}
       </Button>
     </li>
   );
 }
 
 function RememberedFactsRoot() {
+  const { t, factTypeLabel } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const eventsQuery = useQuery(trpc.profile.listMine.queryOptions());
@@ -146,13 +146,13 @@ function RememberedFactsRoot() {
       },
       onError: (_error, _input, context) => {
         if (context?.previous !== undefined) queryClient.setQueryData(listKey, context.previous);
-        toast.error("We couldn't save that change. Nothing was changed. Try again.");
+        toast.error(t("We couldn't save that change. Nothing was changed. Try again."));
       },
       onSuccess: (_data, input) => {
         toast.message(
           input.resolved
-            ? 'Marked as no longer true. Your coach ignores it from now on.'
-            : 'Applies again. Your coach uses it for your plans.',
+            ? t('Marked as no longer true. Your coach ignores it from now on.')
+            : t('Applies again. Your coach uses it for your plans.'),
         );
       },
       // Only the last of several quick taps refetches, so an early response never overwrites a later tap.
@@ -171,15 +171,15 @@ function RememberedFactsRoot() {
 
   const confirmFact = useMutation(
     trpc.profile.confirmFacts.mutationOptions({
-      onSuccess: () => toast.message('Saved. Your coach uses it from now on.'),
-      onError: () => toast.error("We couldn't save that. Nothing was changed. Try again."),
+      onSuccess: () => toast.message(t('Saved. Your coach uses it from now on.')),
+      onError: () => toast.error(t("We couldn't save that. Nothing was changed. Try again.")),
       onSettled: invalidateFacts,
     }),
   );
   const dismissFact = useMutation(
     trpc.profile.dismissFact.mutationOptions({
-      onSuccess: () => toast.message('Dismissed.'),
-      onError: () => toast.error("We couldn't dismiss that. Nothing was changed. Try again."),
+      onSuccess: () => toast.message(t('Dismissed.')),
+      onError: () => toast.error(t("We couldn't dismiss that. Nothing was changed. Try again.")),
       onSettled: invalidateFacts,
     }),
   );
@@ -196,7 +196,7 @@ function RememberedFactsRoot() {
     return (
       <SectionShell>
         <QueryError
-          title="We couldn't load what your coach remembers"
+          title={t("We couldn't load what your coach remembers")}
           onRetry={() => eventsQuery.refetch()}
           isRetrying={eventsQuery.isRefetching}
           className="m-5 sm:m-6"
@@ -216,8 +216,10 @@ function RememberedFactsRoot() {
       <SectionShell>
         <EmptyState
           icon={BrainIcon}
-          title="Nothing remembered yet"
-          description="Tell the coach about an injury or a change in your routine in the chat and it shows up here."
+          title={t('Nothing remembered yet')}
+          description={t(
+            'Tell the coach about an injury or a change in your routine in the chat and it shows up here.',
+          )}
         />
       </SectionShell>
     );
@@ -237,7 +239,7 @@ function RememberedFactsRoot() {
       {waiting.length > 0 && (
         <div>
           <h3 className="border-b bg-muted/60 px-5 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase sm:px-6">
-            Waiting for your confirmation ({waiting.length})
+            {t('Waiting for your confirmation ({count})', { count: waiting.length })}
           </h3>
           <ul>
             {waiting.map((event) => (
@@ -246,7 +248,7 @@ function RememberedFactsRoot() {
                 fact={{
                   id: event.id,
                   eventType: event.eventType,
-                  description: describeFact(event),
+                  description: describeFact(event, factTypeLabel(event.eventType)),
                   payload: event.payload,
                   sourceMessage: event.sourceMessage,
                   createdAt: event.createdAt,
@@ -261,13 +263,15 @@ function RememberedFactsRoot() {
       )}
       {groups.length === 0 && waiting.length === 0 && (
         <p className="border-b px-5 py-4 text-sm text-muted-foreground sm:px-6">
-          Everything your coach remembered is marked as no longer true, so nothing is used for your plans right now.
+          {t(
+            'Everything your coach remembered is marked as no longer true, so nothing is used for your plans right now.',
+          )}
         </p>
       )}
       {groups.map((group) => (
         <div key={group.type}>
           <h3 className="border-b bg-muted/60 px-5 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase sm:px-6">
-            {PROFILE_EVENT_LABELS[group.type]}
+            {factTypeLabel(group.type)}
           </h3>
           <ul>
             {group.events.map((event) => (
@@ -284,7 +288,7 @@ function RememberedFactsRoot() {
       {resolved.length > 0 && (
         <div>
           <h3 className="border-b bg-muted/60 px-5 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase sm:px-6">
-            No longer true
+            {t('No longer true')}
           </h3>
           <ul>
             {resolved.map((event) => (

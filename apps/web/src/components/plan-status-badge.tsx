@@ -1,5 +1,8 @@
+'use client';
+
 import { MessageSquareIcon, PencilLineIcon, SparklesIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface PlanStatusBadgeProps {
   status: 'ai_published' | 'trainer_edited';
@@ -8,11 +11,13 @@ interface PlanStatusBadgeProps {
 }
 
 export function PlanStatusBadge({ status, hasNote }: PlanStatusBadgeProps) {
+  const { t } = useI18n();
+
   if (status === 'trainer_edited') {
     return (
       <Badge variant="tape">
         <PencilLineIcon data-icon="inline-start" />
-        Trainer edited
+        {t('Trainer edited')}
       </Badge>
     );
   }
@@ -20,14 +25,14 @@ export function PlanStatusBadge({ status, hasNote }: PlanStatusBadgeProps) {
     return (
       <Badge variant="secondary">
         <MessageSquareIcon data-icon="inline-start" />
-        Trainer note
+        {t('Trainer note')}
       </Badge>
     );
   }
   return (
     <Badge variant="outline">
       <SparklesIcon data-icon="inline-start" />
-      AI published
+      {t('AI published')}
     </Badge>
   );
 }

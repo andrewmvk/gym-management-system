@@ -4,6 +4,7 @@ import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 import { SearchInput } from '@/components/search-input';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface MultiSelectOption {
@@ -35,6 +36,7 @@ export function MultiSelect({
   searchFrom = 8,
   'aria-label': ariaLabel,
 }: MultiSelectProps) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const term = query.trim().toLowerCase();
@@ -62,7 +64,7 @@ export function MultiSelect({
             className="group flex h-10 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-card py-2 pr-2.5 pl-3 text-base transition-[border-color,box-shadow] outline-none hover:border-foreground/30 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/25 data-[state=open]:border-ring data-[state=open]:ring-3 data-[state=open]:ring-ring/25 md:text-sm dark:bg-input/10"
           >
             <span className={cn('truncate', picked.length === 0 && 'text-muted-foreground')}>
-              {picked.length === 0 ? placeholder : `${picked.length} selected`}
+              {picked.length === 0 ? placeholder : t('{count} selected', { count: picked.length })}
             </span>
             <ChevronDownIcon
               className="size-4 shrink-0 text-muted-foreground transition-transform duration-150 group-data-[state=open]:rotate-180"
@@ -99,7 +101,7 @@ export function MultiSelect({
         </PopoverContent>
       </Popover>
       {picked.length > 0 && (
-        <ul aria-label="Selected" className="flex flex-wrap gap-1.5">
+        <ul aria-label={t('Selected')} className="flex flex-wrap gap-1.5">
           {picked.map((option) => (
             <li
               key={option.value}
@@ -108,7 +110,7 @@ export function MultiSelect({
               <span className="break-words">{option.label}</span>
               <button
                 type="button"
-                aria-label={`Remove ${option.label}`}
+                aria-label={t('Remove {name}', { name: option.label })}
                 onClick={() => toggle(option.value)}
                 className="flex size-6 items-center justify-center rounded-xs text-muted-foreground outline-none hover:bg-muted hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/45"
               >

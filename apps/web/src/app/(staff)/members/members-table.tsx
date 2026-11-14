@@ -15,6 +15,7 @@ import { SegmentedFilter } from '@/components/segmented-filter';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
@@ -24,12 +25,13 @@ const STATUS_FILTERS = ['all', 'active', 'inactive'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
 
 function MembersHead() {
+  const { t } = useI18n();
   return (
     <TableHeader>
       <TableRow>
-        <TableHead>Member</TableHead>
-        <TableHead className="hidden sm:table-cell">Plan</TableHead>
-        <TableHead>Membership</TableHead>
+        <TableHead>{t('Member')}</TableHead>
+        <TableHead className="hidden sm:table-cell">{t('membership::Plan')}</TableHead>
+        <TableHead>{t('Membership')}</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -71,6 +73,7 @@ function MembersTableSkeleton() {
 }
 
 function MembersTableRoot() {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const ability = useAppAbility();
   const canRead = ability.can('read', 'Member');
@@ -92,8 +95,8 @@ function MembersTableRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={LockIcon}
-          title="No access"
-          description="Your account doesn't include the member list. Ask an admin if you need it."
+          title={t('No access')}
+          description={t("Your account doesn't include the member list. Ask an admin if you need it.")}
         />
       </div>
     );
@@ -110,7 +113,7 @@ function MembersTableRoot() {
   if (membersQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load the members"
+        title={t("We couldn't load the members")}
         onRetry={() => membersQuery.refetch()}
         isRetrying={membersQuery.isRefetching}
       />
@@ -122,8 +125,8 @@ function MembersTableRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={UsersIcon}
-          title="No members yet"
-          description="Members show up here once they finish signing up and set a password."
+          title={t('No members yet')}
+          description={t('Members show up here once they finish signing up and set a password.')}
         />
       </div>
     );
@@ -141,21 +144,21 @@ function MembersTableRoot() {
             setSearch(value);
             pagination.setPage(1);
           }}
-          placeholder="Search by name or email"
+          placeholder={t('Search by name or email')}
           className="w-full lg:w-72"
         />
         <FilterBar.Trailing>
           <SegmentedFilter
-            label="Filter by membership"
+            label={t('Filter by membership')}
             value={status}
             onChange={(value) => {
               setStatus(value);
               pagination.setPage(1);
             }}
             options={[
-              { value: 'all', label: 'All', count: countOf('all') },
-              { value: 'active', label: 'Active', count: countOf('active') },
-              { value: 'inactive', label: 'Inactive', count: countOf('inactive') },
+              { value: 'all', label: t('membership::All'), count: countOf('all') },
+              { value: 'active', label: t('membership::Active'), count: countOf('active') },
+              { value: 'inactive', label: t('membership::Inactive'), count: countOf('inactive') },
             ]}
             className="w-full lg:w-auto"
           />
@@ -163,7 +166,11 @@ function MembersTableRoot() {
       </FilterBar>
       {filtered.length === 0 ? (
         <div className="rounded-lg border bg-card">
-          <EmptyState icon={SearchXIcon} title="No matches" description="Try another name, email or status." />
+          <EmptyState
+            icon={SearchXIcon}
+            title={t('No matches')}
+            description={t('Try another name, email or status.')}
+          />
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border bg-card">
@@ -181,7 +188,7 @@ function MembersTableRoot() {
                     </Link>
                     <p className="max-w-64 truncate text-muted-foreground">{member.email}</p>
                   </TableCell>
-                  <TableCell className="hidden sm:table-cell">{member.membershipPlan ?? 'None'}</TableCell>
+                  <TableCell className="hidden sm:table-cell">{member.membershipPlan ?? t('None')}</TableCell>
                   <TableCell>
                     <MembershipControl userId={member.id} name={member.name} status={member.membershipStatus} />
                   </TableCell>
@@ -197,7 +204,7 @@ function MembersTableRoot() {
         pageSize={pagination.pageSize}
         total={pagination.total}
         onPageChange={pagination.setPage}
-        noun="members"
+        noun={t('members')}
       />
     </div>
   );

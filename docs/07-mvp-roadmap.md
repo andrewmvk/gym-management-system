@@ -96,6 +96,8 @@ stage is additive and does not change MVP 1-5's validation.
   phone can actually install it, `P-34` (done, except actually creating the accounts and deploying - see
   `docs/10-deployment.md`). Along the way, `P-34` found and fixed a pre-existing migration-ordering bug
   that blocks any fresh or far-behind database, not only this deployment's.
+- Portuguese and English (FR-73, audit-log item 33): the whole interface and the AI coach in Brazilian
+  Portuguese (default) or English, chosen in the browser, `P-35` (done).
 - Optional, later: wrap the same PWA for the Play Store (Bubblewrap/Trusted Web Activity) and the App Store
   (Capacitor), without a separate native codebase.
 

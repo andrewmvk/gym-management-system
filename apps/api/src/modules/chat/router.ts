@@ -9,7 +9,7 @@ export const chatRouter = router({
   // Streams the reply text first, then each component (proposal, picker, explainer, facts, ...) as it is ready.
   send: authedProcedure.input(CoachSendInputSchema).mutation(async function* ({ ctx, input }) {
     assertCan(ctx.ability, 'create', subject('ProfileEvent', { userId: ctx.user.id }));
-    yield* service.sendMessage(ctx.user.id, input);
+    yield* service.sendMessage(ctx.user.id, input, { locale: ctx.locale });
   }),
 
   // update_own_plans (scope self): applying a proposal is a write on the member's own TrainingPlan, same

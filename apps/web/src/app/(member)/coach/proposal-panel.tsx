@@ -9,7 +9,7 @@ import { ProposalRow } from '@/app/(member)/coach/proposal-row';
 import type { CoachDraftApi, CoachDraftState } from '@/app/(member)/coach/use-coach-draft';
 import { AiButton } from '@/components/ai-button';
 import { Button } from '@/components/ui/button';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface ProposalPanelProps {
@@ -24,6 +24,7 @@ interface ProposalPanelProps {
 // The whole proposal, beside the chat on a wide screen and over it on a phone. Every number can be changed
 // by hand, an exercise can be taken out or pointed at for the coach, and nothing reaches the plan until Apply.
 export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap, className }: ProposalPanelProps) {
+  const { t, tx, formatPlanDate } = useI18n();
   const diff = diffDraft(draft.before, draft.rows);
   const changeCount = countChanges(diff);
   const mentionedKeys = new Set(mentions.map(mentionKey));
@@ -32,7 +33,7 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
   const date = formatPlanDate(draft.date, { day: 'numeric', month: 'short' });
 
   return (
-    <aside aria-label="Proposed plan" className={cn('flex min-h-0 flex-col bg-card', className)}>
+    <aside aria-label={t('Proposed plan')} className={cn('flex min-h-0 flex-col bg-card', className)}>
       <div className="flex items-start gap-3 border-b px-4 pt-4 pb-3">
         <Button
           type="button"
@@ -42,22 +43,22 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
           onClick={() => api.setIsPanelOpen(false)}
         >
           <ArrowLeftIcon data-icon="inline-start" />
-          <span className="lg:sr-only">Chat</span>
+          <span className="lg:sr-only">{t('Chat')}</span>
         </Button>
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <h2 className="font-display text-xl font-bold tracking-wide uppercase">Plan for {date}</h2>
+          <h2 className="font-display text-xl font-bold tracking-wide uppercase">{t('Plan for {date}', { date })}</h2>
           {draft.summary && <p className="text-sm text-pretty text-muted-foreground">{draft.summary}</p>}
         </div>
         <span className="numerals shrink-0 text-3xl leading-none font-bold">
           {changeCount}
-          <span className="sr-only"> {changeCount === 1 ? 'change' : 'changes'}</span>
+          <span className="sr-only"> {changeCount === 1 ? t('change') : t('changes')}</span>
         </span>
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isEmpty ? (
           <p className="px-4 py-6 text-sm text-pretty text-muted-foreground">
-            Nothing is left in this plan. Put an exercise back below, or discard the proposal.
+            {t('Nothing is left in this plan. Put an exercise back below, or discard the proposal.')}
           </p>
         ) : (
           <ul>
@@ -84,9 +85,9 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
         )}
 
         {diff.removed.length > 0 && (
-          <section aria-label="Taken out of the plan" className="border-t">
+          <section aria-label={t('Taken out of the plan')} className="border-t">
             <h3 className="bg-muted/60 px-4 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase">
-              Taken out
+              {t('Taken out')}
             </h3>
             <ul>
               {diff.removed.map((row) => (
@@ -96,13 +97,13 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
                 >
                   <span className="flex min-w-0 flex-col">
                     <span className="truncate text-sm font-semibold text-muted-foreground line-through decoration-2">
-                      {row.name}
+                      {tx(row.name)}
                     </span>
                     <Prescription sets={row.sets} reps={row.reps} load={row.load} isStruck className="text-base" />
                   </span>
                   <Button type="button" size="sm" variant="outline" onClick={() => api.restoreRow(row.exerciseId)}>
                     <Undo2Icon data-icon="inline-start" />
-                    Put back
+                    {t('Put back')}
                   </Button>
                 </li>
               ))}
@@ -114,8 +115,9 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
       <div className="flex flex-col gap-2 border-t bg-muted/60 px-4 py-3">
         {isBlocked && (
           <p role="status" className="text-xs text-pretty text-muted-foreground">
-            Accept the safety {api.unacknowledgedWarnings.length === 1 ? 'warning' : 'warnings'} above to apply this
-            plan.
+            {api.unacknowledgedWarnings.length === 1
+              ? t('Accept the safety warning above to apply this plan.')
+              : t('Accept the safety warnings above to apply this plan.')}
           </p>
         )}
         <div className="flex items-center gap-2">
@@ -124,14 +126,14 @@ export function ProposalPanel({ draft, api, mentions, onMention, onAskSaferSwap,
             mark="tempo"
             className="min-w-0 flex-1"
             isPending={api.isApplying}
-            pendingLabel="Applying..."
+            pendingLabel={t('Applying...')}
             disabled={isBlocked || isEmpty}
             onClick={api.apply}
           >
-            Apply to plan for {date}
+            {t('Apply to plan for {date}', { date })}
           </AiButton>
           <Button type="button" variant="ghost" disabled={api.isApplying} onClick={api.discard}>
-            Discard
+            {t('Discard')}
           </Button>
         </div>
       </div>

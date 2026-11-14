@@ -13,6 +13,7 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 const VISIBLE_ROWS = 5;
 const WHEEL_ROW_PX = 80;
@@ -283,11 +284,13 @@ function TimePicker({
   onBlur,
   minuteStep = 5,
   id,
-  'aria-label': ariaLabel = 'Time',
+  'aria-label': ariaLabelProp,
   'aria-invalid': isInvalid,
   disabled,
   className,
 }: TimePickerProps) {
+  const { t } = useI18n();
+  const ariaLabel = ariaLabelProp ?? t('Time');
   const triggerRef = useRef<HTMLButtonElement>(null);
   const hourColumnRef = useRef<HTMLDivElement>(null);
   const minuteColumnRef = useRef<HTMLDivElement>(null);
@@ -378,7 +381,7 @@ function TimePicker({
             <button
               type="button"
               tabIndex={-1}
-              aria-label="Confirm time"
+              aria-label={t('Confirm time')}
               onClick={commit}
               className="absolute inset-0 cursor-default bg-background/90 duration-150 animate-in fade-in-0 motion-reduce:animate-none"
             />
@@ -391,7 +394,7 @@ function TimePicker({
             >
               <Wheel
                 ref={hourColumnRef}
-                label="Hour"
+                label={t('Hour')}
                 options={hourOptions}
                 value={draft.hour}
                 onSelect={(hour) => setDraft((previous) => ({ ...previous, hour }))}
@@ -402,7 +405,7 @@ function TimePicker({
               </span>
               <Wheel
                 ref={minuteColumnRef}
-                label="Minute"
+                label={t('Minute')}
                 options={minuteOptions}
                 value={draft.minute}
                 onSelect={(minute) => setDraft((previous) => ({ ...previous, minute }))}

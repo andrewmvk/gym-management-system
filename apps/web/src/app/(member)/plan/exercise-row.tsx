@@ -1,12 +1,13 @@
 'use client';
 
-import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
+import type { ExerciseMuscle } from '@cadence/shared/schemas/muscles';
 import { AtSignIcon, CheckIcon } from 'lucide-react';
 import { ExerciseNote } from '@/app/(member)/plan/exercise-note';
 import { PrescriptionFields, type PrescriptionNumbers } from '@/components/prescription-fields';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface ExerciseRowProps {
@@ -34,10 +35,18 @@ interface ExerciseRowProps {
   isEditPending?: boolean;
 }
 
+// "Leg press is out of service" or "Bench, Barbell are out of service", the pieces named in the current language.
+export function describeEquipmentDown({ t, tx }: Pick<I18n, 't' | 'tx'>, equipmentDown: readonly string[]) {
+  const equipment = equipmentDown.map((piece) => tx(piece)).join(', ');
+  return equipmentDown.length === 1
+    ? t('{equipment} is out of service', { equipment })
+    : t('{equipment} are out of service', { equipment });
+}
+
 // onToggle is only passed for today's plan; the rows of other days omit it and render read-only or locked.
 function ExerciseRowRoot({
   index,
-  name,
+  name: sourceName,
   muscles,
   isDimmed,
   instructions,
@@ -55,6 +64,9 @@ function ExerciseRowRoot({
   onEditNumbers,
   isEditPending,
 }: ExerciseRowProps) {
+  const i18n = useI18n();
+  const { t, tx, muscleLabel } = i18n;
+  const name = tx(sourceName);
   const primaryLabels = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
   const secondaryLabels = muscles
     .filter((entry) => entry.role === 'secondary')
@@ -78,13 +90,13 @@ function ExerciseRowRoot({
           aria-pressed={pointing.isMarked}
           className="absolute inset-0 z-10 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
         >
-          <span className="sr-only">Point the coach at {name}</span>
+          <span className="sr-only">{t('Point the coach at {name}', { name })}</span>
         </button>
       )}
       {pointing?.isMarked && (
         <span className="absolute top-2 right-3 z-10 flex h-6 items-center gap-1 rounded-sm bg-primary px-2 font-display text-xs font-semibold tracking-widest text-primary-foreground uppercase">
           <AtSignIcon className="size-3" aria-hidden />
-          Pointed at
+          {t('Pointed at')}
         </span>
       )}
       {onToggle || isTickLocked ? (
@@ -93,12 +105,14 @@ function ExerciseRowRoot({
           disabled={isTickLocked || !isPerformable || disabled}
           onCheckedChange={(checked) => onToggle?.(checked === true)}
           className="mt-0.5 size-6 after:-inset-2.5 [&_svg]:size-4.5!"
-          aria-label={isTickLocked ? `${name}, can be ticked on the day` : `Mark ${name} as completed`}
+          aria-label={
+            isTickLocked ? t('{name}, can be ticked on the day', { name }) : t('Mark {name} as completed', { name })
+          }
         />
       ) : (
         <span
           role="img"
-          aria-label={completed ? 'Completed' : 'Not completed'}
+          aria-label={completed ? t('Completed') : t('Not completed')}
           className={cn(
             'mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-sm border-2',
             completed ? 'border-primary bg-primary text-primary-foreground' : 'border-dashed border-input',
@@ -146,12 +160,10 @@ function ExerciseRowRoot({
         </div>
         {!isPerformable && (
           <Badge variant="outline" className="text-muted-foreground">
-            {equipmentDown?.length
-              ? `${equipmentDown.join(', ')} ${equipmentDown.length === 1 ? 'is' : 'are'} out of service`
-              : 'Out of service'}
+            {equipmentDown?.length ? describeEquipmentDown(i18n, equipmentDown) : t('Out of service')}
           </Badge>
         )}
-        <p className="max-w-prose text-sm text-pretty text-muted-foreground">{instructions}</p>
+        <p className="max-w-prose text-sm text-pretty text-muted-foreground">{tx(instructions)}</p>
       </div>
     </div>
   );

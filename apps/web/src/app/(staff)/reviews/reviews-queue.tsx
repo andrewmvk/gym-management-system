@@ -30,28 +30,30 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
 import { toIsoDate } from '@/lib/calendar-date';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
 const PAGE_SIZE = 10;
 
-const WHEN_SCOPE_PHRASES: Record<WhenFilter, string> = {
+const WHEN_SCOPE_PHRASES: Record<WhenFilter, LabelKey | ''> = {
   upcoming: 'dated today or later',
   past: 'dated before today',
   all: '',
 };
 
 function QueueHead() {
+  const { t } = useI18n();
   return (
     <TableHeader>
       <TableRow>
-        <TableHead>Member</TableHead>
-        <TableHead className="hidden sm:table-cell">Plan date</TableHead>
-        <TableHead>Status</TableHead>
-        <TableHead className="hidden lg:table-cell">Last note</TableHead>
+        <TableHead>{t('Member')}</TableHead>
+        <TableHead className="hidden sm:table-cell">{t('Plan date')}</TableHead>
+        <TableHead>{t('review::Status')}</TableHead>
+        <TableHead className="hidden lg:table-cell">{t('Last note')}</TableHead>
         <TableHead className="w-10">
-          <span className="sr-only">Open</span>
+          <span className="sr-only">{t('review::Open')}</span>
         </TableHead>
       </TableRow>
     </TableHeader>
@@ -99,6 +101,7 @@ function ReviewsQueueSkeleton() {
 }
 
 function ReviewsQueueRoot() {
+  const { t, tn, formatPlanDate } = useI18n();
   const trpc = useTRPC();
   const queueQuery = useQuery(trpc.reviews.queue.queryOptions());
   const [search, setSearch] = useUrlState<string>('q', '');
@@ -123,7 +126,7 @@ function ReviewsQueueRoot() {
   if (queueQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load the queue"
+        title={t("We couldn't load the queue")}
         onRetry={() => queueQuery.refetch()}
         isRetrying={queueQuery.isRefetching}
       />
@@ -135,8 +138,8 @@ function ReviewsQueueRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={ClipboardListIcon}
-          title="No plans yet"
-          description="Plans show up here as soon as members generate them. There's nothing waiting on you."
+          title={t('No plans yet')}
+          description={t("Plans show up here as soon as members generate them. There's nothing waiting on you.")}
         />
       </div>
     );
@@ -145,7 +148,7 @@ function ReviewsQueueRoot() {
   const inScope = entries.filter((entry) => matchesWhen(entry, when, today));
   const countOf = (value: StatusFilter) => inScope.filter((entry) => matchesStatus(entry, value)).length;
   const scopePhrase = WHEN_SCOPE_PHRASES[when];
-  const scopeSuffix = scopePhrase ? ` ${scopePhrase}` : '';
+  const scope = scopePhrase ? ` ${t(scopePhrase)}` : '';
 
   return (
     <div className="flex flex-col gap-4">
@@ -156,32 +159,32 @@ function ReviewsQueueRoot() {
             setSearch(value);
             pagination.setPage(1);
           }}
-          placeholder="Search by member"
+          placeholder={t('Search by member')}
           className="w-full lg:w-72"
         />
         <FilterBar.Trailing>
           <SegmentedFilter
-            label="Filter by plan date"
+            label={t('Filter by plan date')}
             value={when}
             onChange={(value) => {
               setWhenParam(value);
               pagination.setPage(1);
             }}
-            options={WHEN_FILTERS.map((value) => ({ value, label: WHEN_LABELS[value] }))}
+            options={WHEN_FILTERS.map((value) => ({ value, label: t(WHEN_LABELS[value]) }))}
             className="w-full lg:w-auto"
           />
           <SegmentedFilter
-            label="Filter by status"
+            label={t('Filter by status')}
             value={status}
             onChange={(value) => {
               setStatus(value);
               pagination.setPage(1);
             }}
             options={[
-              { value: 'all', label: 'All', count: countOf('all') },
-              { value: 'must_review', label: 'Must review', count: countOf('must_review') },
-              { value: 'ai_published', label: 'AI', count: countOf('ai_published') },
-              { value: 'trainer_edited', label: 'Trainer', count: countOf('trainer_edited') },
+              { value: 'all', label: t('review::All'), count: countOf('all') },
+              { value: 'must_review', label: t('Must review'), count: countOf('must_review') },
+              { value: 'ai_published', label: t('AI'), count: countOf('ai_published') },
+              { value: 'trainer_edited', label: t('Trainer'), count: countOf('trainer_edited') },
             ]}
             className="w-full lg:w-auto"
           />
@@ -191,15 +194,20 @@ function ReviewsQueueRoot() {
         <div className="rounded-lg border bg-card">
           <EmptyState
             icon={SearchXIcon}
-            title="No matches"
+            title={t('No matches')}
             description={
               search.trim()
-                ? `No plan${scopeSuffix} matches that name and status. Try another name, status or date range.`
+                ? t('No plan{scope} matches that name and status. Try another name, status or date range.', { scope })
                 : status === 'must_review'
-                  ? `No plan${scopeSuffix} holds an exercise that cannot be done right now or a safety warning the member accepted.`
+                  ? t(
+                      'No plan{scope} holds an exercise that cannot be done right now or a safety warning the member accepted.',
+                      {
+                        scope,
+                      },
+                    )
                   : status === 'trainer_edited'
-                    ? `No trainer has edited or left a note on a plan${scopeSuffix}.`
-                    : `No plan${scopeSuffix} is in the queue for this status.`
+                    ? t('No trainer has edited or left a note on a plan{scope}.', { scope })
+                    : t('No plan{scope} is in the queue for this status.', { scope })
             }
           />
         </div>
@@ -227,14 +235,16 @@ function ReviewsQueueRoot() {
                       <PlanStatusBadge status={entry.status} hasNote={entry.noteCount > 0} />
                       {entry.unavailableCount > 0 && (
                         <Badge variant="tape">
-                          Must review <span className="numerals text-sm">{entry.unavailableCount}</span>
+                          {tn('Must review {count}', {
+                            count: <span className="numerals text-sm">{entry.unavailableCount}</span>,
+                          })}
                         </Badge>
                       )}
-                      {entry.riskCount > 0 && <Badge variant="tape">Safety warning accepted</Badge>}
+                      {entry.riskCount > 0 && <Badge variant="tape">{t('Safety warning accepted')}</Badge>}
                     </span>
                   </TableCell>
                   <TableCell className="hidden max-w-80 truncate text-muted-foreground lg:table-cell">
-                    {entry.lastNote ?? <span className="italic">No notes yet</span>}
+                    {entry.lastNote ?? <span className="italic">{t('No notes yet')}</span>}
                   </TableCell>
                   <TableCell>
                     <ChevronRightIcon className="size-4 text-muted-foreground" />
@@ -251,7 +261,7 @@ function ReviewsQueueRoot() {
         pageSize={pagination.pageSize}
         total={pagination.total}
         onPageChange={pagination.setPage}
-        noun="plans"
+        noun={t('plans')}
       />
     </div>
   );

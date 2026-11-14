@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { SearchInput } from '@/components/search-input';
 import { Badge } from '@/components/ui/badge';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface PickableExercise {
@@ -20,10 +21,13 @@ interface ExercisePickerProps {
 
 // The catalog has far more exercises than a plain select can scan, so the list filters as the trainer types.
 export function ExercisePicker({ exercises, onPick }: ExercisePickerProps) {
+  const { t, tx } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const term = query.trim().toLowerCase();
-  const matches = exercises.filter((exercise) => !term || exercise.name.toLowerCase().includes(term));
+  const matches = exercises.filter(
+    (exercise) => !term || exercise.name.toLowerCase().includes(term) || tx(exercise.name).toLowerCase().includes(term),
+  );
 
   return (
     <Popover
@@ -36,17 +40,19 @@ export function ExercisePicker({ exercises, onPick }: ExercisePickerProps) {
       <PopoverTrigger asChild>
         <button
           type="button"
-          aria-label="Add an exercise from the catalog"
+          aria-label={t('Add an exercise from the catalog')}
           className="flex h-10 w-full items-center justify-between gap-1.5 rounded-md border border-input bg-card py-2 pr-2.5 pl-3 text-base text-muted-foreground transition-colors outline-none hover:border-foreground/30 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm dark:bg-input/10"
         >
-          Add an exercise from the catalog
+          {t('Add an exercise from the catalog')}
           <ChevronDownIcon className="size-4" aria-hidden />
         </button>
       </PopoverTrigger>
       <PopoverContent className="flex w-(--radix-popover-trigger-width) flex-col gap-2 p-2">
-        <SearchInput value={query} onChange={setQuery} placeholder="Search exercises" />
-        <ul aria-label="Exercises" className="max-h-64 overflow-y-auto">
-          {matches.length === 0 && <li className="px-3 py-3 text-sm text-muted-foreground">No exercise matches.</li>}
+        <SearchInput value={query} onChange={setQuery} placeholder={t('Search exercises')} />
+        <ul aria-label={t('Exercises')} className="max-h-64 overflow-y-auto">
+          {matches.length === 0 && (
+            <li className="px-3 py-3 text-sm text-muted-foreground">{t('No exercise matches.')}</li>
+          )}
           {matches.map((exercise) => (
             <li key={exercise.id}>
               <button
@@ -61,8 +67,8 @@ export function ExercisePicker({ exercises, onPick }: ExercisePickerProps) {
                   !exercise.isAvailable && 'text-muted-foreground',
                 )}
               >
-                <span className="min-w-0 truncate">{exercise.name}</span>
-                {!exercise.isAvailable && <Badge variant="unavailable">Out of service</Badge>}
+                <span className="min-w-0 truncate">{tx(exercise.name)}</span>
+                {!exercise.isAvailable && <Badge variant="unavailable">{t('Out of service')}</Badge>}
               </button>
             </li>
           ))}

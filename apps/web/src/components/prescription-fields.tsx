@@ -2,6 +2,7 @@
 
 import { UpdateExerciseInputSchema } from '@cadence/shared/schemas/coach';
 import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 export interface PrescriptionNumbers {
@@ -115,6 +116,7 @@ export function PrescriptionFields({
   isStruck,
   className,
 }: PrescriptionFieldsProps) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState({ sets: String(sets), reps: String(reps), load: text(load) });
   const wrapperRef = useRef<HTMLDivElement>(null);
   const stored = { sets: String(sets), reps: String(reps), load: text(load) };
@@ -183,7 +185,7 @@ export function PrescriptionFields({
       <div className={cn('flex items-baseline', sizes.numeral)}>
         <Field
           {...bind('sets')}
-          label={`Sets for ${name}`}
+          label={t('Sets for {name}', { name })}
           inputMode="numeric"
           pattern={INTEGER}
           className={cn(sizes.sets, isStruck && 'line-through decoration-2')}
@@ -193,7 +195,7 @@ export function PrescriptionFields({
         </span>
         <Field
           {...bind('reps')}
-          label={`Reps for ${name}`}
+          label={t('Reps for {name}', { name })}
           inputMode="numeric"
           pattern={INTEGER}
           className={cn(sizes.reps, isStruck && 'line-through decoration-2')}
@@ -203,7 +205,7 @@ export function PrescriptionFields({
         <div className={cn('flex items-baseline gap-1 font-semibold text-muted-foreground', sizes.unit)}>
           <Field
             {...bind('load')}
-            label={`Weight in kilograms for ${name}`}
+            label={t('Weight in kilograms for {name}', { name })}
             inputMode="decimal"
             pattern={DECIMAL}
             placeholder="0"

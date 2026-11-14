@@ -2,15 +2,15 @@
 
 import type { BeforeRow, ProposalRow as ProposalRowData, SafetyWarning } from '@cadence/shared/schemas/coach';
 import type { DiffChange } from '@cadence/shared/schemas/coach-draft';
-import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import { AtSignIcon, TriangleAlertIcon, XIcon } from 'lucide-react';
 import type { ExerciseNumbers } from '@/app/(member)/coach/use-coach-draft';
 import { PrescriptionFields } from '@/components/prescription-fields';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
-const CHANGE_LABELS: Record<Exclude<DiffChange, 'unchanged'>, string> = { added: 'New', changed: 'Changed' };
+const CHANGE_LABELS: Record<Exclude<DiffChange, 'unchanged'>, 'New' | 'Changed'> = { added: 'New', changed: 'Changed' };
 
 interface ProposalRowProps {
   row: ProposalRowData;
@@ -41,6 +41,8 @@ export function ProposalRow({
   onAcknowledge,
   onAskSaferSwap,
 }: ProposalRowProps) {
+  const { t, tx, muscleLabel } = useI18n();
+  const name = tx(row.name);
   const primary = row.muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
 
   return (
@@ -51,36 +53,43 @@ export function ProposalRow({
             type="button"
             onClick={onMention}
             aria-pressed={isMentioned}
-            aria-label={`Point the coach at ${row.name}`}
+            aria-label={t('Point the coach at {name}', { name })}
             className={cn(
               'group flex min-h-8 w-fit max-w-full items-center gap-1.5 rounded-sm text-left text-base font-semibold outline-none focus-visible:ring-3 focus-visible:ring-ring/45',
               isMentioned && 'text-primary',
             )}
           >
-            <span className="min-w-0 text-pretty">{row.name}</span>
+            <span className="min-w-0 text-pretty">{name}</span>
             <AtSignIcon
               className="size-3.5 shrink-0 text-muted-foreground transition-colors group-hover:text-primary group-focus-visible:text-primary"
               aria-hidden
             />
           </button>
           <p className="truncate font-display text-xs font-semibold tracking-widest text-muted-foreground uppercase">
-            {change !== 'unchanged' && <span className="text-primary">{CHANGE_LABELS[change]} </span>}
+            {change !== 'unchanged' && <span className="text-primary">{t(CHANGE_LABELS[change])} </span>}
             {change === 'changed' && previous && (
               <span className="numerals text-sm normal-case">
-                was {previous.sets}&times;{previous.reps}
-                {previous.load ? ` ${previous.load} kg` : ''}{' '}
+                {t('was {numbers}', {
+                  numbers: `${previous.sets}×${previous.reps}${previous.load ? ` ${previous.load} kg` : ''}`,
+                })}{' '}
               </span>
             )}
             {primary.join(', ')}
           </p>
         </div>
-        <Button type="button" size="icon-sm" variant="ghost" onClick={onRemove} aria-label={`Remove ${row.name}`}>
+        <Button
+          type="button"
+          size="icon-sm"
+          variant="ghost"
+          onClick={onRemove}
+          aria-label={t('Remove {name}', { name })}
+        >
           <XIcon />
         </Button>
       </div>
 
       <PrescriptionFields
-        name={row.name}
+        name={name}
         size="md"
         sets={row.sets}
         reps={row.reps}
@@ -105,7 +114,7 @@ export function ProposalRow({
               onCheckedChange={(checked) => onAcknowledge(checked === true)}
               className="border-tape-foreground/60"
             />
-            I understand and want this exercise anyway
+            {t('I understand and want this exercise anyway')}
           </label>
           <Button
             type="button"
@@ -114,7 +123,7 @@ export function ProposalRow({
             className="w-fit border-tape-foreground/30"
             onClick={onAskSaferSwap}
           >
-            Ask for a safer swap
+            {t('Ask for a safer swap')}
           </Button>
         </div>
       )}

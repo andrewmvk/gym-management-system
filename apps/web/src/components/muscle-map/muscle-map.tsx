@@ -1,6 +1,6 @@
 'use client';
 
-import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { TriangleAlertIcon } from 'lucide-react';
 import { memo, type PointerEvent, useCallback, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -13,6 +13,8 @@ import {
 } from '@/components/muscle-map/muscle-paths';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { cn } from '@/lib/utils';
 
 export interface MuscleMark {
@@ -43,9 +45,9 @@ const TOOLTIP_ROOM = 96;
 const HEAT_FILL = ['fill-heat-0', 'fill-heat-1', 'fill-heat-2', 'fill-heat-3', 'fill-heat-4', 'fill-heat-5'] as const;
 
 const VIEWS = {
-  front: { label: 'Front', paths: FRONT_PATHS, box: FRONT_VIEWBOX },
-  back: { label: 'Back', paths: BACK_PATHS, box: BACK_VIEWBOX },
-} as const;
+  front: { label: 'view::Front', paths: FRONT_PATHS, box: FRONT_VIEWBOX },
+  back: { label: 'view::Back', paths: BACK_PATHS, box: BACK_VIEWBOX },
+} as const satisfies Record<string, { label: LabelKey; paths: unknown; box: unknown }>;
 
 type ViewKey = keyof typeof VIEWS;
 const VIEW_OPTIONS = (Object.keys(VIEWS) as ViewKey[]).map((value) => ({ value, label: VIEWS[value].label }));
@@ -117,6 +119,7 @@ const MuscleShape = memo(function MuscleShape({
   hasTitle,
   onSelect,
 }: MuscleShapeProps) {
+  const { t, muscleLabel } = useI18n();
   const isOutlined = isSelected || isHighlighted || isInjured;
   const isDashed = !isOutlined && isGap;
   const outlineWidth = isSelected || (isInjured && !isHighlighted) ? 3 : 2;
@@ -130,7 +133,9 @@ const MuscleShape = memo(function MuscleShape({
       className={cn(isInteractive && 'cursor-pointer')}
       onClick={isInteractive ? () => onSelect?.(muscle) : undefined}
     >
-      {hasTitle && <title>{isInjured ? `${muscleLabel(muscle)}, injured` : muscleLabel(muscle)}</title>}
+      {hasTitle && (
+        <title>{isInjured ? t('{muscle}, injured', { muscle: muscleLabel(muscle) }) : muscleLabel(muscle)}</title>
+      )}
       {hasHalo &&
         shapes?.map((shape, index) => (
           <path
@@ -209,6 +214,7 @@ const BodyView = memo(function BodyView(props: BodyViewProps) {
     isSkeleton,
     className,
   } = props;
+  const { t } = useI18n();
   const hatchId = `hatch-${useId().replace(/:/g, '')}`;
   const isInteractive = Boolean(onSelect) && !isSkeleton;
   const lit = highlightedMuscles(highlighted);
@@ -232,7 +238,7 @@ const BodyView = memo(function BodyView(props: BodyViewProps) {
     <svg
       viewBox={`0 0 ${box.width} ${box.height}`}
       role="img"
-      aria-label={`${label}, ${viewLabel.toLowerCase()} view`}
+      aria-label={t('{label}, {view} view', { label, view: viewLabel.toLowerCase() })}
       className={cn('h-auto w-full', className)}
       onPointerMove={isInteractive ? trackHover : undefined}
       onPointerLeave={isInteractive ? (event) => setHovered(event, null) : undefined}
@@ -290,6 +296,7 @@ const BodyView = memo(function BodyView(props: BodyViewProps) {
 // The Popover pattern: Card-colored, Hairline border, Popover shadow. It follows the pointer and never
 // takes it, so the muscle under it keeps receiving hover.
 function MuscleTooltip({ target, mark }: { target: PointerTarget; mark?: MuscleMark }) {
+  const { muscleLabel } = useI18n();
   const half = 72;
   // Above the pointer, unless that would leave the screen: a sticky header or the top edge never covers it.
   const isBelow = target.y < TOOLTIP_ROOM;
@@ -329,6 +336,7 @@ function MuscleMapRoot({
   hasTooltip,
   ...props
 }: MuscleMapProps & { isSingleView?: boolean; isPaired?: boolean }) {
+  const { t } = useI18n();
   const [view, setView] = useState<ViewKey>('front');
   const [pointer, setPointer] = useState<PointerTarget | null>(null);
 
@@ -370,9 +378,9 @@ function MuscleMapRoot({
   return (
     <div className={cn('flex flex-col gap-3', className)}>
       <SegmentedFilter
-        label="Body view"
+        label={t('Body view')}
         value={view}
-        options={VIEW_OPTIONS}
+        options={VIEW_OPTIONS.map((option) => ({ value: option.value, label: t(option.label) }))}
         onChange={setView}
         className={cn(isPaired ? 'hidden' : !isSingleView && 'sm:hidden')}
       />
@@ -388,7 +396,7 @@ function MuscleMapRoot({
             {...props}
             paths={VIEWS[value].paths}
             box={VIEWS[value].box}
-            viewLabel={VIEWS[value].label}
+            viewLabel={t(VIEWS[value].label)}
             onPointer={hasTooltip ? trackPointer : undefined}
             className={cn(!isPaired && view !== value && hiddenBelowSm, 'mx-auto', isPaired ? 'max-h-72' : 'max-h-120')}
           />
@@ -408,6 +416,7 @@ function MuscleMapSkeleton({
   isSingleView?: boolean;
   isPaired?: boolean;
 }) {
+  const { t } = useI18n();
   const hiddenBelowSm = isSingleView ? 'hidden' : 'hidden sm:block';
   return (
     <div className={cn('flex flex-col gap-3', className)}>
@@ -422,10 +431,10 @@ function MuscleMapSkeleton({
           <BodyView
             key={value}
             marks={{}}
-            label="Loading"
+            label={t('Loading')}
             paths={VIEWS[value].paths}
             box={VIEWS[value].box}
-            viewLabel={VIEWS[value].label}
+            viewLabel={t(VIEWS[value].label)}
             isSkeleton
             className={cn(
               value === 'back' && !isPaired && hiddenBelowSm,

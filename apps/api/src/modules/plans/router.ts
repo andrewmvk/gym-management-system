@@ -18,7 +18,7 @@ export const plansRouter = router({
   // confirmation the member must answer first).
   generateToday: authedProcedure.input(GenerateTodayInputSchema).mutation(async function* ({ ctx, input }) {
     assertCan(ctx.ability, 'update', subject('TrainingPlan', { userId: ctx.user.id }));
-    yield* service.streamGenerateForDate(ctx.user.id, todayLocal(), input.confirmOverwrite);
+    yield* service.streamGenerateForDate(ctx.user.id, todayLocal(), input.confirmOverwrite, { locale: ctx.locale });
   }),
 
   getToday: authedProcedure.query(({ ctx }) => {

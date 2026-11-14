@@ -98,6 +98,7 @@ See [01-product-overview.md](./01-product-overview.md) for roles and context.
 - FR-70: What takes time arrives in parts and says so. The chat reply streams as text, then each block as it is complete and validated; a plan being built or rebuilt shows its exercises as the AI writes them; saving the Health profile confirms the save at once and then shows the plan being built. Every button whose action takes time changes its label to what is happening and moves its mark (the Coach Mark, see [DESIGN.md](../DESIGN.md)). Nothing is saved from a stream that breaks: a failed plan build saves no plan (FR-59), a reply that breaks off leaves the plan untouched and offers a retry.
 - FR-71: Trainers see what members changed without them. The plan review page has a change log of coach changes and member edits, oldest first: the member's request, what was added, changed and removed, and any safety warning the member accepted. A plan dated today or later where the member accepted a safety warning is a **must-review plan** (FR-53) until a trainer leaves a note or an edit on it after that change; the flag is derived on every read, shows in the queue as "Safety warning accepted", in the Overview's must-review lines and as a banner on the plan review page, and never blocks publication (FR-18).
 - FR-72: Facts waiting for the member's confirmation (only injuries and medication changes, FR-27) are listed first on the Health profile page, each with the member's own words and Confirm, Edit and Dismiss actions, so nothing is lost when the chat is closed. They shape no plan and are not shown to staff until confirmed.
+- FR-73: The whole interface (member, staff, kiosk and public pages) is available in Brazilian Portuguese, the default, and in English. A language switch is on the login and signup pages, in the public header and in the account menu (the settings). The choice is stored in the browser (a cookie, like the theme), not on the account, and applies at once to every screen: all text, dates, times and numbers in the Brazilian or US format, and the names of catalog exercises and muscles. The AI coach and the plan builder write what the member reads in the chosen language (the API reads the same cookie). What a person typed (names, notes, remembered facts) is shown as written and never translated.
 
 ## 2. Non-Functional Requirements
 
@@ -106,7 +107,7 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - NFR-1: **Responsive** - usable on mobile and desktop viewports (the member-facing app in particular must work well on phones).
 - NFR-2: **Reasonable performance** - no specific benchmark targets; standard SPA/SSR responsiveness is sufficient.
 - NFR-3: **Basic security hygiene** - passwords hashed, authenticated routes actually protected (JWT verified server-side), the auth cookie is `httpOnly` and `sameSite=lax` always, and `Secure` whenever `NODE_ENV=production` (off for local Docker Compose demo runs, since `Secure` cookies are dropped over plain HTTP), file uploads validated by type/size, secrets kept out of source control (`.env`, not committed).
-- NFR-4: **No accessibility (WCAG), i18n, or scale requirements** - explicitly out of scope.
+- NFR-4: **No accessibility (WCAG) or scale requirements** - explicitly out of scope. Internationalization is limited to the two languages of FR-73 (Portuguese and English).
 - NFR-5: **No SLA/uptime requirement** - the system only needs to run reliably for local development/demo via Docker Compose, and, once deployed (NFR-7), on a free hosting tier with no uptime guarantee.
 - NFR-6: **No password-reset/account-recovery flow** - explicitly out of scope; a forgotten password is a non-issue for this academic demo.
 - NFR-7: **Installable as a Progressive Web App** (decided 2026-10-13, audit-log item 32) - a valid web app manifest and icons (reusing the existing brand mark) so the member/staff app can be added to a phone's home screen and launched standalone, once served over HTTPS. No service-worker-based offline caching, background sync, or push notifications are required - this is about installability, not offline use. A later, optional step may wrap the same PWA for the Play Store/App Store (e.g. Bubblewrap/Capacitor) without a separate native codebase.
@@ -131,6 +132,7 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - Admin-editable weekly opening hours.
 - Seeded, fixed-credential demo trainer/admin accounts.
 - Explicit, recorded LGPD consent for biometric processing before a face embedding is ever computed.
+- The interface and the AI coach in Brazilian Portuguese (default) or English, chosen in the browser from the login and signup pages, the public header or the account menu (FR-73).
 - A PWA-installable member/staff app (manifest, brand icons, standalone launch, NFR-7) and a free-tier public deployment (separate from the local Docker Compose grading environment) so it can be reached and installed from a phone.
 
 ### Out of Scope
@@ -147,7 +149,7 @@ Kept intentionally minimal, given this is an academic, non-deployed project:
 - A stored "reviewed" or "acknowledged" state on a plan, rejecting or rewriting a plan automatically because of the must-review flag, and delivering any notification (email, push) to trainers or members about it.
 - Notifications to staff of any kind.
 - Password reset/account recovery.
-- Accessibility compliance, internationalization, offline support, per-user timezone handling.
+- Accessibility compliance, a language beyond Portuguese and English, a language saved on the account, offline support, per-user timezone handling.
 - Production-grade infra concerns (autoscaling, CDN, uptime monitoring, real object storage, hardened kiosk network boundary). Local Docker Compose stays the primary dev/grading environment; a free-tier public deployment (NFR-7) is for phone access and distribution only, and does not need to meet any production-hardening bar.
 - Service-worker-based offline caching, background sync, and push notifications (NFR-7 covers installability only, not offline use).
 - A paid custom domain - a free subdomain from the hosting provider (with its own valid HTTPS certificate) is sufficient for installability and store packaging.

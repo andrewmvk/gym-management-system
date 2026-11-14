@@ -1,6 +1,7 @@
 import { env } from '@api/config/env';
 import type { OnboardingSubmission, ProfileEvent, TrainingPlan, TrainingPlanExercise } from '@api/db/schema';
 import { localDateString, startOfLocalDay, todayLocal } from '@api/lib/dates';
+import { withLanguage } from '@api/lib/locale';
 import { type AiResult, type AiStreamItem, streamStructured } from '@api/modules/ai';
 import { findUserById } from '@api/modules/auth/repository';
 import { listExercises } from '@api/modules/catalog/service';
@@ -9,6 +10,7 @@ import { findSubmissionsByUserId } from '@api/modules/onboarding/repository';
 import type { DemandRow, MemberReviewRow, PlanExerciseInput, PlanHistoryRow } from '@api/modules/plans/repository';
 import * as repository from '@api/modules/plans/repository';
 import { WEIGHT_KG_MAX } from '@cadence/shared/schemas/coach';
+import type { Locale } from '@cadence/shared/schemas/locale';
 import { computeMuscleLoad, type MuscleLoad, rankMuscles } from '@cadence/shared/schemas/muscle-heat';
 import { type ExerciseMuscle, MUSCLE_IDS, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
 import { TRPCError } from '@trpc/server';
@@ -297,10 +299,10 @@ type PlanGeneration = z.infer<typeof PlanGenerationSchema>;
 
 export type EvaluatePlan = (contextPrompt: string) => Promise<AiResult<PlanGeneration>>;
 
-function defaultStreamPlan(contextPrompt: string): AsyncGenerator<AiStreamItem<PlanGeneration>> {
+function defaultStreamPlan(contextPrompt: string, locale: Locale): AsyncGenerator<AiStreamItem<PlanGeneration>> {
   return streamStructured({
     purpose: 'plan',
-    system: PLAN_SYSTEM_PROMPT,
+    system: withLanguage(PLAN_SYSTEM_PROMPT, locale),
     user: contextPrompt,
     schema: PlanGenerationSchema,
   });
@@ -373,6 +375,8 @@ export interface GenerateForDateOverrides {
   generator?: PlanGeneratorMode;
   // A member request (from chat) appended to the prompt; the placeholder generator cannot use it.
   instruction?: string;
+  // The language the member picked in the app; the notes the AI writes come back in it. English when not given.
+  locale?: Locale;
 }
 
 export type OverwriteReason = 'trainer_edited' | 'has_completed';
@@ -466,7 +470,7 @@ export async function* streamGenerateForDate(
       result = await overrides.evaluatePlan(prompt);
     } else {
       const seen = new Set<string>();
-      for await (const item of defaultStreamPlan(prompt)) {
+      for await (const item of defaultStreamPlan(prompt, overrides.locale ?? 'en')) {
         if (item.type === 'result') {
           result = item.result;
           break;

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Brand } from '@/components/brand';
+import { LocaleToggle } from '@/components/locale-switch';
 
 interface AuthShellProps {
   tagline: string;
@@ -9,7 +10,8 @@ interface AuthShellProps {
   children: ReactNode;
 }
 
-// Nobody on these pages has access to the app yet, so there is no app header: just the brand and the task.
+// Nobody on these pages has access to the app yet, so there is no app header: just the brand and the task,
+// with the language switch under the card for someone who lands here in a language they cannot read.
 export function AuthShell({ tagline, subline, footer, children }: AuthShellProps) {
   return (
     <main className="flex flex-1 flex-col items-center justify-center gap-6 px-4 py-10 sm:py-16">
@@ -28,6 +30,7 @@ export function AuthShell({ tagline, subline, footer, children }: AuthShellProps
         <div className="p-5 sm:p-8">{children}</div>
       </div>
       <p className="text-sm text-muted-foreground">{footer}</p>
+      <LocaleToggle />
     </main>
   );
 }

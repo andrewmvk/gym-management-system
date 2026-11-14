@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 import type { MentionChip } from '@/app/(member)/coach/coach-context';
 import type { PlanProposalBlock } from '@/app/(member)/coach/use-coach-draft';
 import { useStreamAction } from '@/hooks/use-stream-action';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC, useTRPCClient } from '@/lib/trpc';
 
 export interface CoachMessage {
@@ -42,11 +43,10 @@ function toApiMention(chip: MentionChip): Mention {
   return { type: 'distribution' };
 }
 
-const FAILED_MESSAGE = "We couldn't finish that reply. Nothing was changed. Try again.";
-
 // FR-25/FR-26: messages live only in this hook's state, so a reload forgets them. Durability lives in the
 // facts the coach asks the member to confirm and in the plans the member applies.
 export function useCoachChat({ onProposal, viewedDate }: UseCoachChatOptions) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const client = useTRPCClient();
   const queryClient = useQueryClient();
@@ -83,7 +83,7 @@ export function useCoachChat({ onProposal, viewedDate }: UseCoachChatOptions) {
     onSuccess: (input) => patchAssistant(input.assistantId, (message) => ({ ...message, status: 'done' })),
     onError: (_error, input) => {
       patchAssistant(input.assistantId, (message) => ({ ...message, status: 'error' }));
-      toast.error(FAILED_MESSAGE);
+      toast.error(t("We couldn't finish that reply. Nothing was changed. Try again."));
     },
   });
 

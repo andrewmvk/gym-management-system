@@ -1,11 +1,11 @@
-import { PROFILE_EVENT_LABELS, type ProfileEventType } from '@cadence/shared/schemas/profile-events';
+import type { ProfileEventType } from '@cadence/shared/schemas/profile-events';
 import { TriangleAlertIcon } from 'lucide-react';
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { useAppAbility } from '@/abilities';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime, formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { isSafetyEvent, PROFILE_EVENT_ORDER } from '@/lib/profile-event-order';
 
 interface MemberContextFact {
@@ -51,11 +51,12 @@ function None({ children }: { children: ReactNode }) {
 }
 
 function Header() {
+  const { t } = useI18n();
   return (
     <CardHeader>
-      <CardTitle>What the AI knew</CardTitle>
+      <CardTitle>{t('What the AI knew')}</CardTitle>
       <CardDescription>
-        The inputs the AI used to build this plan, as they stand now. Read them next to the exercises.
+        {t('The inputs the AI used to build this plan, as they stand now. Read them next to the exercises.')}
       </CardDescription>
     </CardHeader>
   );
@@ -87,6 +88,7 @@ function MemberContextCardSkeleton() {
 }
 
 function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
+  const { t, tn, factTypeLabel, formatDateTime, formatPlanDate } = useI18n();
   const ability = useAppAbility();
   const { onboarding, facts } = context;
   const orderedFacts = [...facts].sort(
@@ -101,42 +103,44 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
           {context.name}
           {context.age !== null && (
             <span className="font-normal text-muted-foreground">
-              , <span className="numerals text-lg font-semibold text-foreground">{context.age}</span> years old
+              {tn(', {age} years old', {
+                age: <span className="numerals text-lg font-semibold text-foreground">{context.age}</span>,
+              })}
             </span>
           )}
         </p>
 
-        <Block label="Health profile">
+        <Block label={t('Health profile')}>
           {onboarding ? (
             <div className="flex flex-col gap-2 text-sm">
               <dl className="flex flex-col gap-2">
                 <div>
-                  <dt className="font-semibold">Height and weight</dt>
+                  <dt className="font-semibold">{t('Height and weight')}</dt>
                   <dd>
                     <span className="numerals text-base font-semibold">{onboarding.heightCm}</span> cm,{' '}
                     <span className="numerals text-base font-semibold">{onboarding.weightKg}</span> kg
                   </dd>
                 </div>
                 <div>
-                  <dt className="font-semibold">Goals</dt>
+                  <dt className="font-semibold">{t('Goals')}</dt>
                   <dd className="text-pretty break-words whitespace-pre-line">{onboarding.goals}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold">Medications</dt>
-                  <dd>{onboarding.medications.length > 0 ? onboarding.medications.join(', ') : 'None listed'}</dd>
+                  <dt className="font-semibold">{t('Medications')}</dt>
+                  <dd>{onboarding.medications.length > 0 ? onboarding.medications.join(', ') : t('None listed')}</dd>
                 </div>
                 <div>
-                  <dt className="font-semibold">Physical conditions</dt>
-                  <dd>{onboarding.conditions.length > 0 ? onboarding.conditions.join(', ') : 'None listed'}</dd>
+                  <dt className="font-semibold">{t('Physical conditions')}</dt>
+                  <dd>{onboarding.conditions.length > 0 ? onboarding.conditions.join(', ') : t('None listed')}</dd>
                 </div>
                 {onboarding.otherNotes && (
                   <div>
-                    <dt className="font-semibold">Other notes</dt>
+                    <dt className="font-semibold">{t('Other notes')}</dt>
                     <dd className="text-pretty break-words whitespace-pre-line">{onboarding.otherNotes}</dd>
                   </div>
                 )}
                 <div>
-                  <dt className="font-semibold">Medical exams</dt>
+                  <dt className="font-semibold">{t('Medical exams')}</dt>
                   <dd>
                     {onboarding.exams.length > 0 ? (
                       <ul className="flex flex-col gap-1.5">
@@ -157,24 +161,27 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
                         ))}
                       </ul>
                     ) : (
-                      'None listed'
+                      t('None listed')
                     )}
                   </dd>
                 </div>
               </dl>
               <p className="text-muted-foreground">
-                Submitted{' '}
-                <span className="numerals text-base font-semibold">{formatDateTime(onboarding.submittedAt)}</span>
+                {tn('Submitted {date}', {
+                  date: (
+                    <span className="numerals text-base font-semibold">{formatDateTime(onboarding.submittedAt)}</span>
+                  ),
+                })}
               </p>
             </div>
           ) : (
-            <None>No health profile submitted yet.</None>
+            <None>{t('No health profile submitted yet.')}</None>
           )}
         </Block>
 
-        <Block label="Remembered from chat">
+        <Block label={t('Remembered from chat')}>
           {orderedFacts.length === 0 ? (
-            <None>Nothing remembered that still applies.</None>
+            <None>{t('Nothing remembered that still applies.')}</None>
           ) : (
             <ul className="flex flex-col gap-3">
               {orderedFacts.map((fact) => (
@@ -183,7 +190,7 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
                     {isSafetyEvent(fact.eventType) && (
                       <TriangleAlertIcon className="mr-1 mb-0.5 inline size-4 text-destructive" aria-hidden />
                     )}
-                    <span className="font-semibold">{PROFILE_EVENT_LABELS[fact.eventType]}: </span>
+                    <span className="font-semibold">{factTypeLabel(fact.eventType)}: </span>
                     {fact.description}
                   </p>
                   <p className="numerals text-base font-semibold text-muted-foreground">
@@ -191,7 +198,7 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
                   </p>
                   {fact.sourceMessage && (
                     <p className="line-clamp-3 break-words text-muted-foreground">
-                      Member said: <q className="italic">{fact.sourceMessage}</q>
+                      {tn('Member said: {quote}', { quote: <q className="italic">{fact.sourceMessage}</q> })}
                     </p>
                   )}
                 </li>
@@ -205,7 +212,7 @@ function MemberContextCardRoot({ memberId, context }: MemberContextCardProps) {
             href={`/members/${memberId}`}
             className="w-fit rounded-sm font-display text-sm font-semibold tracking-widest text-primary uppercase underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/45"
           >
-            Open full member page
+            {t('Open full member page')}
           </Link>
         )}
       </CardContent>

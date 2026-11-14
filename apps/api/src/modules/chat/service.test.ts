@@ -548,6 +548,18 @@ describe('chat', () => {
       expect(stream.mock.calls[0]![0].system).toContain('Never ask the member in the reply whether they want');
     });
 
+    it("asks the coach to answer in the member's language", async () => {
+      const member = await createMember();
+      const portuguese = answering({});
+      const english = answering({});
+
+      await collect(sendMessage(member.id, message('Oi'), { stream: portuguese, locale: 'pt' }));
+      await collect(sendMessage(member.id, message('Hi'), { stream: english }));
+
+      expect(portuguese.mock.calls[0]![0].system).toContain('Brazilian Portuguese');
+      expect(english.mock.calls[0]![0].system).not.toContain('Brazilian Portuguese');
+    });
+
     it('keeps the reply when one component is malformed, and clamps numbers instead of rejecting them', async () => {
       const member = await createMember();
       const lungeId = await exerciseIdByName('Walking Lunge');

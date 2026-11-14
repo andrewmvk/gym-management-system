@@ -1,6 +1,9 @@
-import { type ExerciseMuscle, type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+'use client';
+
+import type { ExerciseMuscle, MuscleId } from '@cadence/shared/schemas/muscles';
 import { TriangleAlertIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 export interface PanelExercise {
@@ -20,6 +23,7 @@ interface MuscleDetailProps {
 
 // What one muscle does in a plan: the exercises that hit it.
 export function MuscleDetail({ muscle, exercises, injury }: MuscleDetailProps) {
+  const { t, tx, muscleLabel } = useI18n();
   const hits = exercises.flatMap((exercise) => {
     const entry = exercise.muscles.find((candidate) => candidate.muscle === muscle);
     return entry ? [{ exercise, role: entry.role }] : [];
@@ -32,22 +36,24 @@ export function MuscleDetail({ muscle, exercises, injury }: MuscleDetailProps) {
         <p className="flex items-start gap-2 rounded-sm bg-tape/20 px-3 py-2 text-sm text-pretty">
           <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
           <span>
-            <span className="font-semibold">You reported: </span>
+            <span className="font-semibold">{t('You reported:')} </span>
             {injury}
           </span>
         </p>
       )}
       {hits.length === 0 ? (
-        <p className="text-sm text-muted-foreground">Nothing in this plan trains it.</p>
+        <p className="text-sm text-muted-foreground">{t('Nothing in this plan trains it.')}</p>
       ) : (
         <ul className="flex flex-col gap-1.5">
           {hits.map(({ exercise, role }) => (
             <li key={exercise.id} className="flex items-center justify-between gap-3 text-sm">
               <span className={cn('font-semibold', !exercise.isPerformable && 'text-muted-foreground line-through')}>
-                {exercise.exerciseName}
+                {tx(exercise.exerciseName)}
               </span>
               <span className="flex shrink-0 items-center gap-2">
-                <Badge variant={role === 'primary' ? 'default' : 'outline'}>{role}</Badge>
+                <Badge variant={role === 'primary' ? 'default' : 'outline'}>
+                  {role === 'primary' ? t('role::primary') : t('role::secondary')}
+                </Badge>
                 <span className="numerals text-lg leading-none font-bold">{exercise.sets}</span>
               </span>
             </li>

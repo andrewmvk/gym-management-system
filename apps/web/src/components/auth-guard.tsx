@@ -7,6 +7,7 @@ import { createContext, type ReactNode, useEffect, useMemo } from 'react';
 import { AbilityProvider } from '@/abilities';
 import { PageMessage } from '@/components/page-message';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { homePathFor, loginPathFor } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 
@@ -20,6 +21,7 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ action, subject, children }: AuthGuardProps) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const router = useRouter();
   const pathname = usePathname();
@@ -47,16 +49,16 @@ export function AuthGuard({ action, subject, children }: AuthGuardProps) {
 
   if (me.isError) {
     return (
-      <PageMessage title="We couldn't check your session.">
+      <PageMessage title={t("We couldn't check your session.")}>
         <Button variant="outline" onClick={() => me.refetch()}>
-          Try again
+          {t('Try again')}
         </Button>
       </PageMessage>
     );
   }
 
   if (!isAllowed) {
-    return <PageMessage title="Your account has no access to this app yet." />;
+    return <PageMessage title={t('Your account has no access to this app yet.')} />;
   }
 
   return (

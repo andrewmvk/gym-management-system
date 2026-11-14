@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { serverMessage } from '@/lib/error-message';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 interface EquipmentToggleProps {
@@ -24,17 +25,20 @@ interface EquipmentToggleProps {
   isAvailable: boolean;
 }
 
-function plans(count: number) {
-  return `${count} ${count === 1 ? 'plan' : 'plans'}`;
+function plans({ t }: I18n, count: number) {
+  return count === 1 ? t('1 plan') : t('{count} plans', { count });
 }
 
-function members(count: number) {
-  return `${count} ${count === 1 ? 'member' : 'members'}`;
+function members({ t }: I18n, count: number) {
+  return count === 1 ? t('1 member') : t('{count} members', { count });
 }
 
 // Putting a piece back is one click; taking it out asks first, with the plans it would flag in front of the
 // admin. The switch always shows the saved state, so a failed save leaves it where it was.
 export function EquipmentToggle({ id, name, isAvailable }: EquipmentToggleProps) {
+  const i18n = useI18n();
+  const { t, tn, tx } = i18n;
+  const pieceName = tx(name);
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [isConfirming, setIsConfirming] = useState(false);
@@ -60,11 +64,15 @@ export function EquipmentToggle({ id, name, isAvailable }: EquipmentToggleProps)
           queryClient.invalidateQueries({ queryKey: key });
         }
         setIsConfirming(false);
-        toast.success(variables.isAvailable ? `${name} is back in service.` : `${name} is out of service.`);
+        toast.success(
+          variables.isAvailable
+            ? t('{name} is back in service.', { name: pieceName })
+            : t('{name} is out of service.', { name: pieceName }),
+        );
       },
       onError: (error) => {
         setIsConfirming(false);
-        toast.error(serverMessage(error, `We couldn't update ${name}. Try again.`));
+        toast.error(tx(serverMessage(error, t("We couldn't update {name}. Try again.", { name: pieceName }))));
       },
     }),
   );
@@ -77,7 +85,7 @@ export function EquipmentToggle({ id, name, isAvailable }: EquipmentToggleProps)
         id={`equipment-${id}`}
         checked={isAvailable}
         disabled={setAvailability.isPending}
-        aria-label={`${name} in service`}
+        aria-label={t('{name} in service', { name: pieceName })}
         onCheckedChange={(checked) => {
           if (checked) setAvailability.mutate({ id, isAvailable: true });
           else setIsConfirming(true);
@@ -86,7 +94,7 @@ export function EquipmentToggle({ id, name, isAvailable }: EquipmentToggleProps)
       <AlertDialog open={isConfirming} onOpenChange={(open) => !setAvailability.isPending && setIsConfirming(open)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Take {name} out of service?</AlertDialogTitle>
+            <AlertDialogTitle>{t('Take {name} out of service?', { name: pieceName })}</AlertDialogTitle>
             <AlertDialogDescription asChild>
               <div className="flex flex-col gap-2">
                 {impactQuery.isPending && (
@@ -97,41 +105,49 @@ export function EquipmentToggle({ id, name, isAvailable }: EquipmentToggleProps)
                 )}
                 {impactQuery.isError && (
                   <p>
-                    We couldn&apos;t check which plans depend on it. You can still take it out of service, and any plan
-                    that needs it is flagged as Must review.
+                    {t(
+                      "We couldn't check which plans depend on it. You can still take it out of service, and any plan that needs it is flagged as Must review.",
+                    )}
                   </p>
                 )}
-                {impact && impact.newlyBlockedPlanCount === 0 && <p>No plan depends on it.</p>}
+                {impact && impact.newlyBlockedPlanCount === 0 && <p>{t('No plan depends on it.')}</p>}
                 {impact && impact.newlyBlockedPlanCount > 0 && (
                   <p>
-                    <span className="numerals text-base font-semibold text-foreground">
-                      {plans(impact.newlyBlockedPlanCount)}
-                    </span>{' '}
-                    dated today or later will be marked Must review (
-                    <span className="numerals text-base font-semibold text-foreground">
-                      {members(impact.affectedMemberCount)}
-                    </span>{' '}
-                    affected).
+                    {tn('{plans} dated today or later will be marked Must review ({members} affected).', {
+                      plans: (
+                        <span className="numerals text-base font-semibold text-foreground">
+                          {plans(i18n, impact.newlyBlockedPlanCount)}
+                        </span>
+                      ),
+                      members: (
+                        <span className="numerals text-base font-semibold text-foreground">
+                          {members(i18n, impact.affectedMemberCount)}
+                        </span>
+                      ),
+                    })}
                   </p>
                 )}
                 {impact && (
                   <p>
-                    <span className="numerals text-base font-semibold text-foreground">
-                      {plans(impact.todayPlanCount)}
-                    </span>{' '}
-                    dated today use it.
+                    {tn('{plans} dated today use it.', {
+                      plans: (
+                        <span className="numerals text-base font-semibold text-foreground">
+                          {plans(i18n, impact.todayPlanCount)}
+                        </span>
+                      ),
+                    })}
                   </p>
                 )}
               </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={setAvailability.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={setAvailability.isPending}>{t('Cancel')}</AlertDialogCancel>
             <Button
               disabled={setAvailability.isPending || impactQuery.isPending}
               onClick={() => setAvailability.mutate({ id, isAvailable: false })}
             >
-              {setAvailability.isPending ? 'Saving...' : 'Take out of service'}
+              {setAvailability.isPending ? t('Saving...') : t('Take out of service')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

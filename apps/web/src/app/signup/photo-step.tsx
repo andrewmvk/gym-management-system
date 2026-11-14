@@ -6,6 +6,8 @@ import { FileDropzone } from '@/components/file-dropzone';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { fileToCanvas, IMAGE_ACCEPTED_TYPES } from '@/lib/image';
 
 export type CapturedPhoto = { dataUrl: string; mirrored: boolean };
@@ -14,13 +16,13 @@ interface PhotoStepProps {
   photo: CapturedPhoto | null;
   onPhotoChange: (photo: CapturedPhoto | null) => void;
   // Why the backend rejected the last photo, shown until a new one is picked.
-  rejection: string | null;
+  rejection: LabelKey | null;
   onContinue: () => void;
 }
 
 type PhotoMode = 'camera' | 'upload';
 
-export const PHOTO_REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', string> = {
+export const PHOTO_REJECTION_MESSAGES: Record<'no_face' | 'multiple_faces' | 'unavailable', LabelKey> = {
   no_face: "We couldn't detect a face in that photo. Make sure your face is centered and well lit, then try again.",
   multiple_faces: 'More than one face was detected. Make sure you are alone in the frame, then try again.',
   unavailable: "We couldn't process that photo right now. Try again.",
@@ -35,12 +37,13 @@ function FrameGuide() {
 }
 
 export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: PhotoStepProps) {
+  const { t } = useI18n();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [mode, setMode] = useState<PhotoMode>('camera');
   const [cameraReady, setCameraReady] = useState(false);
-  const [cameraError, setCameraError] = useState<string | null>(null);
-  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [cameraError, setCameraError] = useState<LabelKey | null>(null);
+  const [uploadError, setUploadError] = useState<LabelKey | null>(null);
 
   const cameraActive = mode === 'camera' && !photo;
 
@@ -98,15 +101,17 @@ export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: Photo
 
   return (
     <StepPanel
-      title="Reference photo"
-      description="Used for face recognition at check-in. Face the camera in good light, alone in the frame, or upload a clear photo."
+      title={t('Reference photo')}
+      description={t(
+        'Used for face recognition at check-in. Face the camera in good light, alone in the frame, or upload a clear photo.',
+      )}
     >
       {rejection && (
         <p
           role="alert"
           className="rounded-md border-2 border-dashed border-destructive/60 px-4 py-3 text-sm text-destructive"
         >
-          {rejection}
+          {t(rejection)}
         </p>
       )}
 
@@ -121,11 +126,11 @@ export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: Photo
           <TabsList>
             <TabsTrigger value="camera">
               <CameraIcon data-icon="inline-start" />
-              Camera
+              {t('Camera')}
             </TabsTrigger>
             <TabsTrigger value="upload">
               <UploadIcon data-icon="inline-start" />
-              Upload
+              {t('Upload')}
             </TabsTrigger>
           </TabsList>
         </Tabs>
@@ -134,9 +139,9 @@ export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: Photo
       {cameraActive && cameraError && (
         <div className="flex aspect-square w-full flex-col items-center justify-center gap-3 rounded-lg border-2 border-dashed border-destructive/50 p-6 text-center">
           <CameraOffIcon className="size-8 text-destructive" />
-          <p className="max-w-xs text-sm text-muted-foreground">{cameraError}</p>
+          <p className="max-w-xs text-sm text-muted-foreground">{t(cameraError)}</p>
           <Button variant="outline" onClick={() => setMode('upload')}>
-            Upload a photo instead
+            {t('Upload a photo instead')}
           </Button>
         </div>
       )}
@@ -155,7 +160,7 @@ export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: Photo
           <div className="absolute inset-x-0 bottom-4 flex justify-center">
             <Button size="lg" onClick={capture} disabled={!cameraReady}>
               <CameraIcon data-icon="inline-start" />
-              Take photo
+              {t('Take photo')}
             </Button>
           </div>
         </div>
@@ -166,12 +171,12 @@ export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: Photo
           <FileDropzone
             id="reference-photo-upload"
             accept={IMAGE_ACCEPTED_TYPES.join(',')}
-            hint="JPEG or PNG. Your face centered, alone in the frame."
+            hint={t('JPEG or PNG. Your face centered, alone in the frame.')}
             onFiles={handleFiles}
           />
           {uploadError && (
             <p role="alert" className="text-sm text-destructive">
-              {uploadError}
+              {t(uploadError)}
             </p>
           )}
         </>
@@ -182,16 +187,16 @@ export function PhotoStep({ photo, onPhotoChange, rejection, onContinue }: Photo
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={photo.dataUrl}
-            alt="Selected reference"
+            alt={t('Selected reference')}
             className={`aspect-square w-full rounded-lg object-cover ${photo.mirrored ? '-scale-x-100' : ''}`}
           />
           <div className="grid grid-cols-2 gap-2">
             <Button variant="outline" size="lg" onClick={() => onPhotoChange(null)}>
               <RotateCcwIcon data-icon="inline-start" />
-              {photo.mirrored ? 'Retake' : 'Choose another'}
+              {photo.mirrored ? t('Retake') : t('Choose another')}
             </Button>
             <Button size="lg" onClick={onContinue}>
-              Use this photo
+              {t('Use this photo')}
             </Button>
           </div>
         </>

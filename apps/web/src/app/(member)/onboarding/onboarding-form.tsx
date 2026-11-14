@@ -19,6 +19,7 @@ import {
 } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 export interface OnboardingInitialValues {
   heightCm: number;
@@ -43,6 +44,7 @@ function toNumber(value: string) {
 }
 
 export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit, onCancel }: OnboardingFormProps) {
+  const { t } = useI18n();
   const form = useForm<OnboardingFormInput, unknown, OnboardingFormOutput>({
     resolver: zodResolver(OnboardingSubmitInputSchema),
     defaultValues: {
@@ -60,11 +62,11 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
       <div className="grid gap-10 p-5 sm:p-8 lg:grid-cols-5 lg:gap-12">
         <div className="flex min-w-0 flex-col gap-10 lg:col-span-2">
           <FieldSet>
-            <FieldLegend>About you</FieldLegend>
+            <FieldLegend>{t('About you')}</FieldLegend>
             <FieldDescription>
               {isUpdate
-                ? 'Filled in from your last update. Change what is different.'
-                : 'Your coach sizes the load of your plan to these.'}
+                ? t('Filled in from your last update. Change what is different.')
+                : t('Your coach sizes the load of your plan to these.')}
             </FieldDescription>
             <FieldGroup className="grid grid-cols-2 gap-4">
               <Controller
@@ -72,7 +74,7 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="onboarding-height">Height (cm)</FieldLabel>
+                    <FieldLabel htmlFor="onboarding-height">{t('Height (cm)')}</FieldLabel>
                     <Input
                       id="onboarding-height"
                       ref={field.ref}
@@ -83,7 +85,7 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
                       aria-invalid={fieldState.invalid}
                       value={field.value ?? ''}
                       onChange={(event) => field.onChange(toNumber(event.target.value))}
-                      placeholder="e.g. 175"
+                      placeholder={t('e.g. 175')}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -94,7 +96,7 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
                 control={form.control}
                 render={({ field, fieldState }) => (
                   <Field data-invalid={fieldState.invalid}>
-                    <FieldLabel htmlFor="onboarding-weight">Weight (kg)</FieldLabel>
+                    <FieldLabel htmlFor="onboarding-weight">{t('Weight (kg)')}</FieldLabel>
                     <Input
                       id="onboarding-weight"
                       ref={field.ref}
@@ -106,7 +108,7 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
                       aria-invalid={fieldState.invalid}
                       value={field.value ?? ''}
                       onChange={(event) => field.onChange(toNumber(event.target.value))}
-                      placeholder="e.g. 72.5"
+                      placeholder={t('e.g. 72.5')}
                     />
                     {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                   </Field>
@@ -116,18 +118,18 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
           </FieldSet>
 
           <FieldSet>
-            <FieldLegend>Goals</FieldLegend>
+            <FieldLegend>{t('Goals')}</FieldLegend>
             <Controller
               name="goals"
               control={form.control}
               render={({ field, fieldState }) => (
                 <Field data-invalid={fieldState.invalid}>
-                  <FieldLabel htmlFor="onboarding-goals">What do you want to achieve?</FieldLabel>
+                  <FieldLabel htmlFor="onboarding-goals">{t('What do you want to achieve?')}</FieldLabel>
                   <Textarea
                     {...field}
                     id="onboarding-goals"
                     aria-invalid={fieldState.invalid}
-                    placeholder="e.g. Run a 10k by March, get stronger without hurting my back"
+                    placeholder={t('e.g. Run a 10k by March, get stronger without hurting my back')}
                   />
                   {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                 </Field>
@@ -137,9 +139,11 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
         </div>
 
         <FieldSet className="min-w-0 lg:col-span-3">
-          <FieldLegend>Health</FieldLegend>
+          <FieldLegend>{t('Health')}</FieldLegend>
           <FieldDescription>
-            Only what applies to you. Leave a list empty if you have none. You can add more later by telling your coach.
+            {t(
+              'Only what applies to you. Leave a list empty if you have none. You can add more later by telling your coach.',
+            )}
           </FieldDescription>
           <FieldGroup>
             <Controller
@@ -148,8 +152,8 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
               render={({ field }) => (
                 <StringListField
                   id="onboarding-medications"
-                  label="Medications"
-                  placeholder="e.g. Ibuprofen"
+                  label={t('Medications')}
+                  placeholder={t('e.g. Ibuprofen')}
                   values={field.value ?? []}
                   onChange={field.onChange}
                 />
@@ -161,8 +165,8 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
               render={({ field }) => (
                 <StringListField
                   id="onboarding-conditions"
-                  label="Physical conditions and limitations"
-                  placeholder="e.g. Left knee injury"
+                  label={t('Physical conditions and limitations')}
+                  placeholder={t('e.g. Left knee injury')}
                   values={field.value ?? []}
                   onChange={field.onChange}
                 />
@@ -174,7 +178,7 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
               control={form.control}
               render={({ field }) => (
                 <Field>
-                  <FieldLabel htmlFor="onboarding-other-notes">Anything else we should know?</FieldLabel>
+                  <FieldLabel htmlFor="onboarding-other-notes">{t('Anything else we should know?')}</FieldLabel>
                   <Textarea
                     id="onboarding-other-notes"
                     ref={field.ref}
@@ -192,11 +196,11 @@ export function OnboardingForm({ isUpdate, initialValues, isSubmitting, onSubmit
       <div className="flex flex-col-reverse gap-2 border-t bg-muted/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-end sm:px-8">
         {onCancel && (
           <Button type="button" variant="ghost" disabled={isSubmitting} onClick={onCancel}>
-            Cancel
+            {t('Cancel')}
           </Button>
         )}
-        <AiButton type="submit" isPending={isSubmitting} pendingLabel="Saving and building your plan...">
-          {isUpdate ? 'Save and update my plan' : 'Save and build my plan'}
+        <AiButton type="submit" isPending={isSubmitting} pendingLabel={t('Saving and building your plan...')}>
+          {isUpdate ? t('Save and update my plan') : t('Save and build my plan')}
         </AiButton>
       </div>
     </form>

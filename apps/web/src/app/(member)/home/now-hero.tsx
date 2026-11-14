@@ -1,5 +1,6 @@
 'use client';
 
+import { WEEKDAYS, type Weekday } from '@cadence/shared/schemas/gym';
 import { useQuery } from '@tanstack/react-query';
 import { DoorOpenIcon, LogInIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
@@ -7,6 +8,7 @@ import { currentWeek } from '@/app/(member)/home/current-week';
 import { Deferred } from '@/components/deferred';
 import { Skeleton } from '@/components/ui/skeleton';
 import { isSameDay } from '@/lib/calendar-date';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 const GYM_REFRESH_MS = 60_000;
@@ -22,6 +24,8 @@ interface HeroLineProps {
 
 // A failed read is its own state: a dashed chip with a retry, never a made-up value.
 function HeroLine({ icon, isPending, isError, failedLabel, onRetry, children }: HeroLineProps) {
+  const { t } = useI18n();
+
   if (isPending) {
     return (
       <Deferred>
@@ -34,7 +38,7 @@ function HeroLine({ icon, isPending, isError, failedLabel, onRetry, children }: 
       <p className="flex w-fit items-center gap-2 rounded-sm border border-dashed border-kit-muted px-2 py-0.5">
         <span>{failedLabel}</span>
         <button type="button" onClick={onRetry} className="font-semibold underline underline-offset-4">
-          Retry
+          {t('Retry')}
         </button>
       </p>
     );
@@ -47,32 +51,38 @@ function HeroLine({ icon, isPending, isError, failedLabel, onRetry, children }: 
   );
 }
 
-function describeGym(data: {
-  isOpen: boolean;
-  todayHours: { open: string; close: string } | null;
-  nextChange: { event: 'opens' | 'closes'; day: string; time: string } | null;
-  occupancyEstimate: number;
-}) {
+function describeGym(
+  { t, weekdayLabel }: I18n,
+  data: {
+    isOpen: boolean;
+    todayHours: { open: string; close: string } | null;
+    nextChange: { event: 'opens' | 'closes'; day: string; time: string } | null;
+    occupancyEstimate: number;
+  },
+) {
   const { isOpen, nextChange, todayHours } = data;
   if (isOpen) {
     const closes = nextChange?.event === 'closes' ? nextChange.time : todayHours?.close;
-    return `Open${closes ? ` until ${closes}` : ''}, about ${data.occupancyEstimate} on the floor (estimate)`;
+    return closes
+      ? t('Open until {time}, about {count} on the floor (estimate)', { time: closes, count: data.occupancyEstimate })
+      : t('Open, about {count} on the floor (estimate)', { count: data.occupancyEstimate });
   }
-  if (!nextChange) return 'Closed all week';
-  if (nextChange.day === 'today') return `Closed, opens at ${nextChange.time}`;
-  if (nextChange.day === 'tomorrow') return `Closed, opens tomorrow at ${nextChange.time}`;
-  return `Closed, opens ${nextChange.day} at ${nextChange.time}`;
-}
-
-function clockTime(value: string | Date) {
-  return new Date(value).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  if (!nextChange) return t('Closed all week');
+  if (nextChange.day === 'today') return t('Closed, opens at {time}', { time: nextChange.time });
+  if (nextChange.day === 'tomorrow') return t('Closed, opens tomorrow at {time}', { time: nextChange.time });
+  const day = (WEEKDAYS as readonly string[]).includes(nextChange.day)
+    ? weekdayLabel(nextChange.day as Weekday)
+    : nextChange.day;
+  return t('Closed, opens {day} at {time}', { day, time: nextChange.time });
 }
 
 // Compact ink strip with the sleeve stripes once in its top-right corner, so its right side is padded clear of them.
 function HeroShell({ title, tally, children }: { title: ReactNode; tally: ReactNode; children: ReactNode }) {
+  const { t } = useI18n();
+
   return (
     <section
-      aria-label="Today"
+      aria-label={t('Today')}
       className="kit-corner flex flex-col gap-4 overflow-hidden rounded-lg bg-kit py-5 pr-20 pl-5 text-kit-foreground sm:pl-6"
     >
       <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
@@ -105,6 +115,8 @@ function NowHeroSkeleton() {
 }
 
 function NowHeroRoot() {
+  const i18n = useI18n();
+  const { t, tn, formatDate, formatTime } = i18n;
   const trpc = useTRPC();
   const me = useQuery(trpc.auth.me.queryOptions());
   const planQuery = useQuery(trpc.plans.getToday.queryOptions());
@@ -133,7 +145,7 @@ function NowHeroRoot() {
       <p className="numerals text-5xl leading-none font-extrabold" aria-live="polite">
         {done}
         <span className="text-kit-muted">/{total}</span>
-        <span className="sr-only"> exercises done</span>
+        <span className="sr-only"> {t('exercises done')}</span>
       </p>
     );
   }
@@ -147,9 +159,12 @@ function NowHeroRoot() {
           </p>
           <div className="flex min-w-0 flex-col gap-1 pb-1">
             <h1 className="font-display text-3xl leading-none font-extrabold text-balance uppercase sm:text-4xl">
-              {firstName ? `Let's go, ${firstName}` : "Let's go"}
+              {firstName ? t("Let's go, {name}", { name: firstName }) : t("Let's go")}
             </h1>
-            <p className="text-kit-muted">{now.toLocaleDateString(undefined, { weekday: 'long', month: 'long' })}</p>
+            {/* Built from two parts: Intl orders a bare weekday and month oddly ("outubro terça-feira"). */}
+            <p className="text-kit-muted">
+              {formatDate(now, { weekday: 'long' })}, {formatDate(now, { month: 'long' })}
+            </p>
           </div>
         </div>
       }
@@ -159,25 +174,23 @@ function NowHeroRoot() {
         icon={<LogInIcon className="size-4 shrink-0 text-kit-muted" aria-hidden />}
         isPending={weekQuery.isPending}
         isError={weekQuery.isError}
-        failedLabel="Couldn't load your check-in"
+        failedLabel={t("Couldn't load your check-in")}
         onRetry={() => weekQuery.refetch()}
       >
-        {isCheckedInToday && lastCheckIn ? (
-          <>
-            Checked in at <span className="numerals text-base font-semibold">{clockTime(lastCheckIn)}</span>
-          </>
-        ) : (
-          'Not checked in yet'
-        )}
+        {isCheckedInToday && lastCheckIn
+          ? tn('Checked in at {time}', {
+              time: <span className="numerals text-base font-semibold">{formatTime(lastCheckIn)}</span>,
+            })
+          : t('Not checked in yet')}
       </HeroLine>
       <HeroLine
         icon={<DoorOpenIcon className="size-4 shrink-0 text-kit-muted" aria-hidden />}
         isPending={gymQuery.isPending}
         isError={gymQuery.isError}
-        failedLabel="Couldn't load the gym status"
+        failedLabel={t("Couldn't load the gym status")}
         onRetry={() => gymQuery.refetch()}
       >
-        {gymQuery.data ? describeGym(gymQuery.data) : null}
+        {gymQuery.data ? describeGym(i18n, gymQuery.data) : null}
       </HeroLine>
     </HeroShell>
   );

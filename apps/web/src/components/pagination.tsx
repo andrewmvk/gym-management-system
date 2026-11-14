@@ -1,5 +1,8 @@
+'use client';
+
 import { ChevronLeftIcon, ChevronRightIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface PaginationProps {
@@ -19,29 +22,27 @@ function pageWindow(page: number, pageCount: number): (number | 'gap')[] {
   return sorted.flatMap((p, index) => (index > 0 && p - sorted[index - 1]! > 1 ? ['gap' as const, p] : [p]));
 }
 
-export function Pagination({
-  page,
-  pageCount,
-  pageSize,
-  total,
-  onPageChange,
-  noun = 'items',
-  className,
-}: PaginationProps) {
+export function Pagination({ page, pageCount, pageSize, total, onPageChange, noun, className }: PaginationProps) {
+  const { t, tn } = useI18n();
   if (total === 0) return null;
   const first = (page - 1) * pageSize + 1;
   const last = Math.min(page * pageSize, total);
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t('Pagination')}
       className={cn('flex flex-col-reverse items-center justify-between gap-3 sm:flex-row', className)}
     >
       <p className="text-sm text-muted-foreground">
-        <span key={first} className="numerals inline-block animate-tick text-base font-semibold text-foreground">
-          {first}-{last}
-        </span>{' '}
-        of <span className="numerals text-base font-semibold text-foreground">{total}</span> {noun}
+        {tn('{range} of {total} {noun}', {
+          range: (
+            <span key={first} className="numerals inline-block animate-tick text-base font-semibold text-foreground">
+              {first}-{last}
+            </span>
+          ),
+          total: <span className="numerals text-base font-semibold text-foreground">{total}</span>,
+          noun: noun ?? t('items'),
+        })}
       </p>
       {pageCount > 1 && (
         <div className="flex items-center gap-1">
@@ -50,7 +51,7 @@ export function Pagination({
             size="icon-sm"
             disabled={page === 1}
             onClick={() => onPageChange(page - 1)}
-            aria-label="Previous page"
+            aria-label={t('Previous page')}
           >
             <ChevronLeftIcon />
           </Button>
@@ -67,7 +68,7 @@ export function Pagination({
                 size="icon-sm"
                 className="numerals text-base"
                 aria-current={item === page ? 'page' : undefined}
-                aria-label={`Page ${item}`}
+                aria-label={t('Page {page}', { page: item })}
                 onClick={() => onPageChange(item)}
               >
                 {item}
@@ -79,7 +80,7 @@ export function Pagination({
             size="icon-sm"
             disabled={page === pageCount}
             onClick={() => onPageChange(page + 1)}
-            aria-label="Next page"
+            aria-label={t('Next page')}
           >
             <ChevronRightIcon />
           </Button>

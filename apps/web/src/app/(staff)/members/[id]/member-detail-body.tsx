@@ -13,14 +13,19 @@ import { EmptyState } from '@/components/empty-state';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 import { QueryError } from '@/components/query-error';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
-const BACK = { href: '/members', label: 'All members' };
+function useBackLink() {
+  const { t } = useI18n();
+  return { href: '/members', label: t('All members') };
+}
 
 export function MemberDetailSkeleton() {
+  const back = useBackLink();
   return (
     <PageContainer>
-      <PageHeading.Skeleton back={BACK} />
+      <PageHeading.Skeleton back={back} />
       <MemberProfileSection.Skeleton />
       <MemberFactsSection.Skeleton />
       <MemberPlansSection.Skeleton />
@@ -30,6 +35,8 @@ export function MemberDetailSkeleton() {
 }
 
 export function MemberDetailBody({ userId }: { userId: string }) {
+  const { t, tn, formatDate } = useI18n();
+  const back = useBackLink();
   const trpc = useTRPC();
   const ability = useAppAbility();
   const canRead = ability.can('read', 'Member');
@@ -38,12 +45,12 @@ export function MemberDetailBody({ userId }: { userId: string }) {
   if (!canRead) {
     return (
       <PageContainer>
-        <PageHeading title="Member" back={BACK} />
+        <PageHeading title={t('Member')} back={back} />
         <div className="rounded-lg border bg-card">
           <EmptyState
             icon={LockIcon}
-            title="No access"
-            description="Your account doesn't include the member list. Ask an admin if you need it."
+            title={t('No access')}
+            description={t("Your account doesn't include the member list. Ask an admin if you need it.")}
           />
         </div>
       </PageContainer>
@@ -61,18 +68,18 @@ export function MemberDetailBody({ userId }: { userId: string }) {
   if (memberQuery.isError) {
     return (
       <PageContainer>
-        <PageHeading title="Member" back={BACK} />
+        <PageHeading title={t('Member')} back={back} />
         {memberQuery.error.data?.code === 'NOT_FOUND' ? (
           <div className="rounded-lg border bg-card">
             <EmptyState
               icon={UserXIcon}
-              title="Member not found"
-              description="No member has this link. The link may be wrong."
+              title={t('Member not found')}
+              description={t('No member has this link. The link may be wrong.')}
             />
           </div>
         ) : (
           <QueryError
-            title="We couldn't load this member"
+            title={t("We couldn't load this member")}
             onRetry={() => memberQuery.refetch()}
             isRetrying={memberQuery.isRefetching}
           />
@@ -86,7 +93,7 @@ export function MemberDetailBody({ userId }: { userId: string }) {
   return (
     <PageContainer>
       <PageHeading
-        back={BACK}
+        back={back}
         title={profile.name}
         description={
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -94,15 +101,14 @@ export function MemberDetailBody({ userId }: { userId: string }) {
             {profile.phone && <span>{profile.phone}</span>}
             {profile.age !== null && (
               <span>
-                <span className="numerals text-lg font-semibold text-foreground">{profile.age}</span> years old
+                {tn('{age} years old', {
+                  age: <span className="numerals text-lg font-semibold text-foreground">{profile.age}</span>,
+                })}
               </span>
             )}
             <span>
-              Member since{' '}
-              {new Date(profile.memberSince).toLocaleDateString(undefined, {
-                day: 'numeric',
-                month: 'short',
-                year: 'numeric',
+              {t('Member since {date}', {
+                date: formatDate(new Date(profile.memberSince), { day: 'numeric', month: 'short', year: 'numeric' }),
               })}
             </span>
           </span>

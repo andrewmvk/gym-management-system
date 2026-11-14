@@ -11,6 +11,7 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { toIsoDate } from '@/lib/calendar-date';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 type OnboardingForm = UseFormReturn<OnboardingFormInput, unknown, OnboardingFormOutput>;
 
@@ -27,6 +28,7 @@ function readAsBase64(file: File): Promise<string> {
 }
 
 function ExamAttachment({ form, index }: { form: OnboardingForm; index: number }) {
+  const { t } = useI18n();
   const inputRef = useRef<HTMLInputElement>(null);
   const attachment = useWatch({ control: form.control, name: `exams.${index}.attachment` });
   const attachmentPath = useWatch({ control: form.control, name: `exams.${index}.attachmentPath` });
@@ -34,11 +36,11 @@ function ExamAttachment({ form, index }: { form: OnboardingForm; index: number }
   async function attach(file: File | undefined) {
     if (!file) return;
     if (!ACCEPTED_TYPES.includes(file.type)) {
-      toast.error('Attach a JPEG, PNG or PDF file.');
+      toast.error(t('Attach a JPEG, PNG or PDF file.'));
       return;
     }
     if (file.size > MAX_ATTACHMENT_BYTES) {
-      toast.error('That file is larger than 5 MB.');
+      toast.error(t('That file is larger than 5 MB.'));
       return;
     }
     const base64 = await readAsBase64(file);
@@ -62,15 +64,15 @@ function ExamAttachment({ form, index }: { form: OnboardingForm; index: number }
       {hasFile ? (
         <span className="flex h-8 min-w-0 items-center gap-2 rounded-sm bg-secondary pr-1 pl-3 text-sm font-medium">
           <FileIcon className="size-4 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 truncate">{attachment ? attachment.filename : 'File already on record'}</span>
+          <span className="min-w-0 truncate">{attachment ? attachment.filename : t('File already on record')}</span>
           <Button type="button" variant="ghost" size="xs" onClick={detach}>
-            Remove file
+            {t('Remove file')}
           </Button>
         </span>
       ) : null}
       <Button type="button" variant="outline" size="sm" onClick={() => inputRef.current?.click()}>
         <PaperclipIcon data-icon="inline-start" />
-        {hasFile ? 'Replace file' : 'Attach file'}
+        {hasFile ? t('Replace file') : t('Attach file')}
       </Button>
       <input
         ref={inputRef}
@@ -78,7 +80,7 @@ function ExamAttachment({ form, index }: { form: OnboardingForm; index: number }
         accept={ACCEPTED_TYPES.join(',')}
         className="sr-only"
         tabIndex={-1}
-        aria-label={`Exam ${index + 1} file`}
+        aria-label={t('Exam {number} file', { number: index + 1 })}
         onChange={(event) => {
           void attach(event.target.files?.[0]);
           event.target.value = '';
@@ -89,6 +91,7 @@ function ExamAttachment({ form, index }: { form: OnboardingForm; index: number }
 }
 
 function ExamRow({ form, index, onRemove }: { form: OnboardingForm; index: number; onRemove: () => void }) {
+  const { t } = useI18n();
   const id = `onboarding-exam-${index}`;
 
   return (
@@ -99,12 +102,12 @@ function ExamRow({ form, index, onRemove }: { form: OnboardingForm; index: numbe
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor={`${id}-name`}>Exam</FieldLabel>
+              <FieldLabel htmlFor={`${id}-name`}>{t('Exam')}</FieldLabel>
               <Input
                 {...field}
                 id={`${id}-name`}
                 aria-invalid={fieldState.invalid}
-                placeholder="e.g. Resting ECG, knee X-ray"
+                placeholder={t('e.g. Resting ECG, knee X-ray')}
               />
               {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
             </Field>
@@ -116,7 +119,7 @@ function ExamRow({ form, index, onRemove }: { form: OnboardingForm; index: numbe
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor={`${id}-date`}>
-                Date <span className="font-normal text-muted-foreground">(optional)</span>
+                {t('Date')} <span className="font-normal text-muted-foreground">{t('(optional)')}</span>
               </FieldLabel>
               <DatePicker
                 id={`${id}-date`}
@@ -138,12 +141,12 @@ function ExamRow({ form, index, onRemove }: { form: OnboardingForm; index: numbe
         control={form.control}
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor={`${id}-findings`}>What did it find?</FieldLabel>
+            <FieldLabel htmlFor={`${id}-findings`}>{t('What did it find?')}</FieldLabel>
             <Textarea
               {...field}
               id={`${id}-findings`}
               aria-invalid={fieldState.invalid}
-              placeholder="Type the result in your own words. Your coach reads this text, not the file."
+              placeholder={t('Type the result in your own words. Your coach reads this text, not the file.')}
             />
             {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
           </Field>
@@ -153,7 +156,7 @@ function ExamRow({ form, index, onRemove }: { form: OnboardingForm; index: numbe
         <ExamAttachment form={form} index={index} />
         <Button type="button" variant="ghost" size="sm" className="text-muted-foreground" onClick={onRemove}>
           <Trash2Icon data-icon="inline-start" />
-          Remove exam
+          {t('Remove exam')}
         </Button>
       </div>
     </li>
@@ -161,18 +164,20 @@ function ExamRow({ form, index, onRemove }: { form: OnboardingForm; index: numbe
 }
 
 export function ExamEntriesField({ form }: { form: OnboardingForm }) {
+  const { t } = useI18n();
   const { fields, append, remove } = useFieldArray({ control: form.control, name: 'exams' });
 
   return (
     <Field>
-      <FieldLabel>Medical exams</FieldLabel>
+      <FieldLabel>{t('Medical exams')}</FieldLabel>
       <FieldDescription>
-        Recent exams that matter for training. A file is optional supporting material for your trainers; the AI only
-        reads what you type.
+        {t(
+          'Recent exams that matter for training. A file is optional supporting material for your trainers; the AI only reads what you type.',
+        )}
       </FieldDescription>
       {fields.length === 0 ? (
         <p className="rounded-md border border-dashed px-4 py-3 text-sm text-muted-foreground">
-          No exams. That is fine, leave this empty if you have none.
+          {t('No exams. That is fine, leave this empty if you have none.')}
         </p>
       ) : (
         <ul className="flex flex-col divide-y rounded-md border">
@@ -183,7 +188,7 @@ export function ExamEntriesField({ form }: { form: OnboardingForm }) {
       )}
       <Button type="button" variant="outline" className="w-fit" onClick={() => append({ name: '', findings: '' })}>
         <PlusIcon data-icon="inline-start" />
-        Add exam
+        {t('Add exam')}
       </Button>
     </Field>
   );

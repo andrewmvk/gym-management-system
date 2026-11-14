@@ -4,6 +4,7 @@ import { logger } from '@api/lib/logger';
 import { saveUpload } from '@api/lib/uploads';
 import * as repository from '@api/modules/onboarding/repository';
 import { type StreamedPlanExercise, streamGenerateForDate } from '@api/modules/plans/service';
+import type { Locale } from '@cadence/shared/schemas/locale';
 import type { ExamEntry, ExamInput, OnboardingSubmitInput } from '@cadence/shared/schemas/onboarding';
 import { TRPCError } from '@trpc/server';
 
@@ -50,6 +51,7 @@ export type OnboardingStreamEvent =
 export async function* submitStream(
   userId: string,
   input: OnboardingSubmitInput,
+  locale: Locale = 'en',
 ): AsyncGenerator<OnboardingStreamEvent> {
   const exams = await Promise.all((input.exams ?? []).map((exam) => toStoredExam(userId, exam)));
 
@@ -70,7 +72,7 @@ export async function* submitStream(
   // exercises on an existing plan) is skipped on purpose: nothing here may overwrite the member's work.
   let plan: 'built' | 'kept' | 'failed' = 'failed';
   try {
-    for await (const event of streamGenerateForDate(userId, todayLocal(), false)) {
+    for await (const event of streamGenerateForDate(userId, todayLocal(), false, { locale })) {
       if (event.type === 'exercise') yield event;
       else plan = event.result.status === 'ok' ? 'built' : 'kept';
     }

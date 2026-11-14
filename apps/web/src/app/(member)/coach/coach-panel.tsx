@@ -19,11 +19,9 @@ import { isDockedViewport } from '@/app/(member)/coach/viewport';
 import { AiMark } from '@/components/ai-mark';
 import { Button } from '@/components/ui/button';
 import { toIsoDate } from '@/lib/calendar-date';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
-
-const STARTERS = ['My left knee hurts today', 'I only have 30 minutes', 'I started a new medication'];
 
 // A toast, or a confirmation dialog opening on top of the chat, is not the member leaving it.
 function isOverlayTarget(target: EventTarget | null) {
@@ -34,6 +32,8 @@ function isOverlayTarget(target: EventTarget | null) {
 // the thread and opens beside the chat to be edited; nothing it says reaches the database until the member
 // applies it, and the chat itself is not saved.
 export function CoachPanel() {
+  const i18n = useI18n();
+  const { t, tx, formatPlanDate } = i18n;
   const trpc = useTRPC();
   const ability = useAppAbility();
   const coach = useCoach();
@@ -60,10 +60,14 @@ export function CoachPanel() {
   const lastMessageId = chat.messages.at(-1)?.id;
   const planExercises = planQuery.data?.exercises ?? [];
   const mentionOptions = buildMentionOptions(
+    i18n,
     planExercises.map((exercise) => ({ exerciseId: exercise.exerciseId, name: exercise.exerciseName })),
     coach.viewedDate && coach.viewedDate !== toIsoDate(new Date()) ? formatPlanDate(planDate) : null,
   );
-  const starters = planExercises[0] ? [`How do I do ${planExercises[0].exerciseName}?`, ...STARTERS] : STARTERS;
+  const baseStarters = [t('My left knee hurts today'), t('I only have 30 minutes'), t('I started a new medication')];
+  const starters = planExercises[0]
+    ? [t('How do I do {exercise}?', { exercise: tx(planExercises[0].exerciseName) }), ...baseStarters]
+    : baseStarters;
   const openDraft = draftApi.openDraft;
   const isDocked = openDraft !== null && draftApi.isPanelOpen;
 
@@ -85,7 +89,7 @@ export function CoachPanel() {
 
   function askSaferSwap(row: ProposalRow) {
     chat.send(
-      `Swap ${row.name} for something safer for me`,
+      t('Swap {exercise} for something safer for me', { exercise: row.name }),
       [{ type: 'exercise', exerciseId: row.exerciseId, name: row.name }],
       draftApi.sendableDraft,
     );
@@ -103,7 +107,7 @@ export function CoachPanel() {
               className="fixed right-4 bottom-4 z-40 animate-block-in rounded-full px-5 shadow-fab sm:right-6 sm:bottom-6"
             >
               <AiMark className="size-5" data-icon="inline-start" />
-              Coach
+              {t('Coach')}
             </Button>
           </Dialog.Trigger>
         )}
@@ -131,11 +135,12 @@ export function CoachPanel() {
                 <div className="flex-1">
                   <Dialog.Title className="flex items-center gap-2 font-display text-xl font-bold tracking-wide uppercase">
                     <AiMark className="size-5" />
-                    AI coach
+                    {t('AI coach')}
                   </Dialog.Title>
                   <Dialog.Description className="text-xs text-kit-muted">
-                    I remember what matters, and ask before saving an injury or a medication. The chat itself isn&apos;t
-                    saved.
+                    {t(
+                      "I remember what matters, and ask before saving an injury or a medication. The chat itself isn't saved.",
+                    )}
                   </Dialog.Description>
                 </div>
                 <Dialog.Close asChild>
@@ -146,7 +151,7 @@ export function CoachPanel() {
                     className="-mt-1 -mr-3 size-11 text-kit-foreground hover:bg-white/10"
                   >
                     <XIcon className="size-5" />
-                    <span className="sr-only">Close chat</span>
+                    <span className="sr-only">{t('Close chat')}</span>
                   </Button>
                 </Dialog.Close>
               </div>
@@ -155,8 +160,9 @@ export function CoachPanel() {
                 {chat.messages.length === 0 && (
                   <div className="flex flex-col gap-3 py-2">
                     <p className="text-sm text-muted-foreground">
-                      Ask about your plan, report an injury or share an update. Type @ to point me at an exercise, a
-                      muscle, a muscle group or your whole plan.
+                      {t(
+                        'Ask about your plan, report an injury or share an update. Type @ to point me at an exercise, a muscle, a muscle group or your whole plan.',
+                      )}
                     </p>
                     <div className="flex flex-wrap gap-2">
                       {starters.map((prompt) => (

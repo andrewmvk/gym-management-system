@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart } from 'recharts';
 import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 export interface RadarPoint {
@@ -37,6 +38,7 @@ function MuscleRadarChartRoot({
   onSelect,
   className,
 }: MuscleRadarChartProps) {
+  const { t } = useI18n();
   const peak = Math.max(0, ...points.map((point) => point.value));
 
   const renderDot = (props: { cx?: number; cy?: number; index: number }): ReactNode => {
@@ -133,7 +135,7 @@ function MuscleRadarChartRoot({
           }
         />
         <Radar
-          name="Work"
+          name={t('Work')}
           dataKey="value"
           fill="var(--heat-4)"
           fillOpacity={0.28}

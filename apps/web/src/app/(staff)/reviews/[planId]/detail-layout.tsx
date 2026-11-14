@@ -6,6 +6,7 @@ import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface DetailLayoutProps {
   heading: ReactNode;
@@ -44,9 +45,10 @@ function DetailLayoutRoot({ heading, navigation, context, alerts, preview, edito
 }
 
 function DetailLayoutSkeleton() {
+  const { t } = useI18n();
   return (
     <DetailLayoutRoot
-      heading={<PageHeading.Skeleton back={{ href: '/reviews', label: 'Back to queue' }} />}
+      heading={<PageHeading.Skeleton back={{ href: '/reviews', label: t('Back to queue') }} />}
       navigation={
         <div className="flex items-center justify-between gap-3">
           <Skeleton className="h-8 w-28" />
@@ -57,8 +59,8 @@ function DetailLayoutSkeleton() {
       editor={
         <Card>
           <CardHeader>
-            <CardTitle>Exercises</CardTitle>
-            <CardDescription>Changes publish to the member as soon as you save.</CardDescription>
+            <CardTitle>{t('Exercises')}</CardTitle>
+            <CardDescription>{t('Changes publish to the member as soon as you save.')}</CardDescription>
           </CardHeader>
           <CardContent className="flex flex-col gap-3">
             {Array.from({ length: 4 }, (_, index) => (

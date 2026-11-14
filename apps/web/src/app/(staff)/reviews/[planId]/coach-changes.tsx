@@ -3,7 +3,8 @@ import { diffDraft } from '@cadence/shared/schemas/coach-draft';
 import { SparklesIcon, TriangleAlertIcon, UserPenIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatDateTime, formatWeight } from '@/lib/format';
+import { formatWeight } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface ChangeExercise {
   exerciseId: string;
@@ -42,19 +43,20 @@ function Numbers({ row }: { row: Pick<ChangeExercise, 'sets' | 'reps' | 'load'> 
 }
 
 function Diff({ change }: { change: CoachChange }) {
+  const { t, tx } = useI18n();
   const diff = diffDraft(change.before.map(toBefore), change.after.map(toAfter));
   const rows = diff.rows.filter((entry) => entry.change !== 'unchanged');
   if (rows.length === 0 && diff.removed.length === 0) {
-    return <p className="text-sm text-muted-foreground">No exercise changed.</p>;
+    return <p className="text-sm text-muted-foreground">{t('No exercise changed.')}</p>;
   }
   return (
     <ul className="flex flex-col gap-0.5 text-sm">
       {rows.map(({ row, change: kind, previous }) => (
         <li key={row.exerciseId} className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-semibold">{row.name}</span>
+          <span className="font-semibold">{tx(row.name)}</span>
           {kind === 'added' ? (
             <>
-              <Badge variant="secondary">Added</Badge>
+              <Badge variant="secondary">{t('Added')}</Badge>
               <Numbers row={row} />
             </>
           ) : (
@@ -62,7 +64,7 @@ function Diff({ change }: { change: CoachChange }) {
               <span className="inline-flex items-baseline gap-1">
                 <Numbers row={previous} />
                 <span aria-hidden>&rarr;</span>
-                <span className="sr-only">changed to</span>
+                <span className="sr-only">{t('changed to')}</span>
                 <Numbers row={row} />
               </span>
             )
@@ -71,8 +73,8 @@ function Diff({ change }: { change: CoachChange }) {
       ))}
       {diff.removed.map((row) => (
         <li key={row.exerciseId} className="flex flex-wrap items-baseline gap-x-2">
-          <span className="font-semibold text-muted-foreground line-through decoration-2">{row.name}</span>
-          <Badge variant="outline">Removed</Badge>
+          <span className="font-semibold text-muted-foreground line-through decoration-2">{tx(row.name)}</span>
+          <Badge variant="outline">{t('Removed')}</Badge>
         </li>
       ))}
     </ul>
@@ -82,12 +84,13 @@ function Diff({ change }: { change: CoachChange }) {
 // What the member changed on this plan without a trainer: through the coach, or by editing the numbers
 // themselves. Oldest first, like the review history.
 export function CoachChanges({ changes }: { changes: readonly CoachChange[] }) {
+  const { t, tn, tx, formatDateTime } = useI18n();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Changed through the coach</CardTitle>
+        <CardTitle>{t('Changed through the coach')}</CardTitle>
         <CardDescription>
-          What the member changed on this plan themselves. The plan was published as they left it.
+          {t('What the member changed on this plan themselves. The plan was published as they left it.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="py-2">
@@ -99,12 +102,12 @@ export function CoachChanges({ changes }: { changes: readonly CoachChange[] }) {
               </span>
               <div className="flex min-w-0 flex-col gap-2">
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
-                  <Badge variant="secondary">{change.kind === 'coach' ? 'Coach change' : 'Member edit'}</Badge>
+                  <Badge variant="secondary">{change.kind === 'coach' ? t('Coach change') : t('Member edit')}</Badge>
                   <span className="numerals text-base text-muted-foreground">{formatDateTime(change.createdAt)}</span>
                 </p>
                 {change.request && (
                   <p className="text-sm text-pretty break-words">
-                    Asked: <q className="italic">{change.request}</q>
+                    {tn('Asked: {request}', { request: <q className="italic">{change.request}</q> })}
                   </p>
                 )}
                 <Diff change={change} />
@@ -112,11 +115,11 @@ export function CoachChanges({ changes }: { changes: readonly CoachChange[] }) {
                   <div className="flex gap-2 rounded-sm bg-tape px-3 py-2 text-sm text-tape-foreground">
                     <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
                     <div className="flex min-w-0 flex-col gap-0.5">
-                      <p className="font-semibold">Member accepted a safety warning</p>
+                      <p className="font-semibold">{t('Member accepted a safety warning')}</p>
                       <ul>
                         {change.acknowledgedWarnings.map((warning) => (
                           <li key={`${warning.exerciseId}:${warning.reason}`} className="text-pretty">
-                            <span className="font-semibold">{warning.name}</span>: {warning.reason}
+                            <span className="font-semibold">{tx(warning.name)}</span>: {warning.reason}
                           </li>
                         ))}
                       </ul>

@@ -1,8 +1,10 @@
 'use client';
 
 import { TriangleAlertIcon } from 'lucide-react';
+import { describeEquipmentDown } from '@/app/(member)/plan/exercise-row';
 import { useRebuildPlan } from '@/app/(member)/plan/use-rebuild-plan';
 import { AiButton } from '@/components/ai-button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface NoticeExercise {
@@ -22,12 +24,14 @@ interface NeedsReviewNoticeProps {
 // Pace Tape means "look at this": a plan with an exercise that cannot be done is flagged for the trainers
 // too, and the member can skip the wait by rebuilding it from what is available.
 export function NeedsReviewNotice({ exercises, canRebuild = true, className }: NeedsReviewNoticeProps) {
+  const i18n = useI18n();
+  const { t, tx } = i18n;
   const rebuild = useRebuildPlan({ successMessage: "Your plan was rebuilt without what can't be done." });
   const blocked = exercises.filter((exercise) => !exercise.isPerformable);
 
   return (
     <section
-      aria-label="Plan needs a review"
+      aria-label={t('Plan needs a review')}
       className={cn(
         'flex flex-col gap-4 bg-tape px-5 py-4 text-tape-foreground sm:flex-row sm:items-center sm:justify-between sm:px-6',
         className,
@@ -36,17 +40,19 @@ export function NeedsReviewNotice({ exercises, canRebuild = true, className }: N
       <div className="flex min-w-0 gap-3">
         <TriangleAlertIcon className="mt-1 size-5 shrink-0" aria-hidden />
         <div className="flex min-w-0 flex-col gap-1">
-          <h2 className="font-display text-xl font-bold tracking-wide uppercase">This plan needs a review</h2>
+          <h2 className="font-display text-xl font-bold tracking-wide uppercase">{t('This plan needs a review')}</h2>
           <p className="text-sm text-pretty">
-            {blocked.length === 1 ? "1 exercise can't" : `${blocked.length} exercises can't`} be done right now, so your
-            trainers see this plan flagged.
+            {blocked.length === 1
+              ? t("1 exercise can't be done right now, so your trainers see this plan flagged.")
+              : t("{count} exercises can't be done right now, so your trainers see this plan flagged.", {
+                  count: blocked.length,
+                })}
           </p>
           <ul className="flex flex-col text-sm">
             {blocked.map((exercise) => (
               <li key={exercise.id}>
-                <span className="font-semibold">{exercise.exerciseName}</span>
-                {exercise.equipmentDown.length > 0 &&
-                  `: ${exercise.equipmentDown.join(', ')} ${exercise.equipmentDown.length === 1 ? 'is' : 'are'} out of service`}
+                <span className="font-semibold">{tx(exercise.exerciseName)}</span>
+                {exercise.equipmentDown.length > 0 && `: ${describeEquipmentDown(i18n, exercise.equipmentDown)}`}
               </li>
             ))}
           </ul>
@@ -57,10 +63,10 @@ export function NeedsReviewNotice({ exercises, canRebuild = true, className }: N
           variant="outline"
           className="shrink-0"
           isPending={rebuild.isPending}
-          pendingLabel="Rebuilding..."
+          pendingLabel={t('Rebuilding...')}
           onClick={rebuild.requestRebuild}
         >
-          Rebuild today without them
+          {t('Rebuild today without them')}
         </AiButton>
       )}
       {rebuild.dialog}

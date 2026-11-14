@@ -1,3 +1,7 @@
+'use client';
+
+import { useI18n } from '@/lib/i18n/i18n-provider';
+
 interface QuickRepliesProps {
   replies: readonly string[];
   isDisabled?: boolean;
@@ -6,9 +10,10 @@ interface QuickRepliesProps {
 
 // The coach's guess at what the member will say next; picking one sends it like a typed message.
 export function QuickReplies({ replies, isDisabled, onPick }: QuickRepliesProps) {
+  const { t } = useI18n();
   return (
     <fieldset className="m-0 flex min-w-0 animate-block-in flex-wrap gap-2 border-0 p-0">
-      <legend className="sr-only">Suggested replies</legend>
+      <legend className="sr-only">{t('Suggested replies')}</legend>
       {replies.map((reply) => (
         <button
           key={reply}

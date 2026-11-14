@@ -4,14 +4,19 @@ import { TurnstileSettings } from '@/app/(staff)/settings/turnstile/turnstile-se
 import { GuardedContent } from '@/components/guarded-content';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
-const TITLE = 'Turnstile';
-const DESCRIPTION = 'The request sent to the turnstile API on every check-in.';
+function TurnstileSettingsHeading() {
+  const { t } = useI18n();
+  return (
+    <PageHeading title={t('Turnstile')} description={t('The request sent to the turnstile API on every check-in.')} />
+  );
+}
 
 function TurnstileSettingsPageSkeleton() {
   return (
     <PageContainer>
-      <PageHeading title={TITLE} description={DESCRIPTION} />
+      <TurnstileSettingsHeading />
       <TurnstileSettings.Skeleton />
     </PageContainer>
   );
@@ -21,7 +26,7 @@ export default function TurnstileSettingsPage() {
   return (
     <GuardedContent skeleton={<TurnstileSettingsPageSkeleton />}>
       <PageContainer>
-        <PageHeading title={TITLE} description={DESCRIPTION} />
+        <TurnstileSettingsHeading />
         <TurnstileSettings />
       </PageContainer>
     </GuardedContent>

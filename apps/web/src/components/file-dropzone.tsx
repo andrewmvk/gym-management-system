@@ -2,6 +2,7 @@
 
 import { UploadIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface FileDropzoneProps {
@@ -14,7 +15,9 @@ interface FileDropzoneProps {
 }
 
 export function FileDropzone({ id, accept, multiple, hint, onFiles, disabled }: FileDropzoneProps) {
+  const { t, tn } = useI18n();
   const [isDragging, setIsDragging] = useState(false);
+  const browse = <span className="text-primary">{t('browse')}</span>;
 
   return (
     <label
@@ -39,7 +42,7 @@ export function FileDropzone({ id, accept, multiple, hint, onFiles, disabled }: 
         <UploadIcon className="size-5" />
       </span>
       <span className="font-display text-lg font-bold tracking-wide uppercase">
-        Drop {multiple ? 'files' : 'a file'} or <span className="text-primary">browse</span>
+        {multiple ? tn('Drop files or {browse}', { browse }) : tn('Drop a file or {browse}', { browse })}
       </span>
       <span className="text-sm text-muted-foreground">{hint}</span>
       <input

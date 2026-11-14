@@ -6,6 +6,7 @@ import { useMemo } from 'react';
 
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 function FieldSet({ className, ...props }: React.ComponentProps<'fieldset'>) {
   return (
@@ -169,6 +170,8 @@ function FieldError({
 }: React.ComponentProps<'div'> & {
   errors?: Array<{ message?: string } | undefined>;
 }) {
+  // Validation messages come from the shared zod schemas, in English, so they are translated where they show.
+  const { tx } = useI18n();
   const content = useMemo(() => {
     if (children) {
       return children;
@@ -181,15 +184,16 @@ function FieldError({
     const uniqueErrors = [...new Map(errors.map((error) => [error?.message, error])).values()];
 
     if (uniqueErrors?.length === 1) {
-      return uniqueErrors[0]?.message;
+      const message = uniqueErrors[0]?.message;
+      return message && tx(message);
     }
 
     return (
       <ul className="ml-4 flex list-disc flex-col gap-1">
-        {uniqueErrors.map((error) => error?.message && <li key={error.message}>{error.message}</li>)}
+        {uniqueErrors.map((error) => error?.message && <li key={error.message}>{tx(error.message)}</li>)}
       </ul>
     );
-  }, [children, errors]);
+  }, [children, errors, tx]);
 
   if (!content) {
     return null;

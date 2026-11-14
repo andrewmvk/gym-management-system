@@ -1,17 +1,19 @@
 import type { AppAbility } from '@cadence/shared/auth';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { MEMBER_HOME_PATH, STAFF_HOME_PATH } from '@/lib/routes';
 
 export type AppArea = 'member' | 'staff';
 
+// Labels are message keys, translated where the header draws them.
 export interface NavItem {
   href: string;
-  label: string;
+  label: LabelKey;
   isVisible?: (ability: AppAbility) => boolean;
 }
 
 // A dropdown of related pages, so the header keeps a handful of entries however many pages the area has.
 export interface NavGroup {
-  label: string;
+  label: LabelKey;
   items: NavItem[];
 }
 

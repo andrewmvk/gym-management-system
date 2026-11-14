@@ -9,6 +9,7 @@ import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface PasswordStepProps {
   onSubmit: (password: string) => void;
@@ -28,6 +29,7 @@ type FormValues = z.input<typeof FormSchema>;
 
 // The last step: submitting it is the one request that creates the account (FR-9).
 export function PasswordStep({ onSubmit, isSubmitting }: PasswordStepProps) {
+  const { t } = useI18n();
   const form = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: { password: '', confirmPassword: '' },
@@ -36,8 +38,8 @@ export function PasswordStep({ onSubmit, isSubmitting }: PasswordStepProps) {
   return (
     <StepPanel
       icon={LockKeyholeIcon}
-      title="Choose a password"
-      description="Last step. Your account is created when you submit, and you can sign in right away."
+      title={t('Choose a password')}
+      description={t('Last step. Your account is created when you submit, and you can sign in right away.')}
     >
       <form noValidate onSubmit={form.handleSubmit((values) => onSubmit(values.password))}>
         <FieldGroup>
@@ -46,9 +48,9 @@ export function PasswordStep({ onSubmit, isSubmitting }: PasswordStepProps) {
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="signup-password">Password</FieldLabel>
+                <FieldLabel htmlFor="signup-password">{t('Password')}</FieldLabel>
                 <FieldDescription id="signup-password-rules">
-                  Use at least {PASSWORD_MIN_LENGTH} characters.
+                  {t('Use at least {count} characters.', { count: PASSWORD_MIN_LENGTH })}
                 </FieldDescription>
                 <Input
                   {...field}
@@ -67,7 +69,7 @@ export function PasswordStep({ onSubmit, isSubmitting }: PasswordStepProps) {
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="signup-confirm-password">Confirm password</FieldLabel>
+                <FieldLabel htmlFor="signup-confirm-password">{t('Confirm password')}</FieldLabel>
                 <Input
                   {...field}
                   id="signup-confirm-password"
@@ -80,7 +82,7 @@ export function PasswordStep({ onSubmit, isSubmitting }: PasswordStepProps) {
             )}
           />
           <Button type="submit" size="lg" className="mt-4 w-full" disabled={isSubmitting}>
-            {isSubmitting ? 'Creating account...' : 'Create account'}
+            {isSubmitting ? t('Creating account...') : t('Create account')}
           </Button>
         </FieldGroup>
       </form>

@@ -3,11 +3,13 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { inferOutput } from '@trpc/tanstack-react-query';
 import { toast } from 'sonner';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 // Ticking an exercise updates today's plan and the done count of today in the day strip at once, and rolls
 // both back with a toast if the save fails.
 export function useToggleExercise() {
+  const { t } = useI18n();
   const trpc = useTRPC();
   type PlanDays = inferOutput<typeof trpc.plans.listDays>;
   const queryClient = useQueryClient();
@@ -45,7 +47,7 @@ export function useToggleExercise() {
       onError: (_error, _input, context) => {
         if (context?.previous !== undefined) queryClient.setQueryData(todayKey, context.previous);
         for (const [key, data] of context?.previousDays ?? []) queryClient.setQueryData(key, data);
-        toast.error("We couldn't update that exercise. Try again.");
+        toast.error(t("We couldn't update that exercise. Try again."));
       },
       onSettled: () => {
         queryClient.invalidateQueries({ queryKey: todayKey });

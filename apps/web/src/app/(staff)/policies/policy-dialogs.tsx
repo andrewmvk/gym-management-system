@@ -27,7 +27,8 @@ import { Field, FieldDescription, FieldError, FieldLabel } from '@/components/ui
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { fromIsoDate, toIsoDate } from '@/lib/calendar-date';
-import { formatDateTime } from '@/lib/format';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -49,46 +50,46 @@ export interface GroupOption {
 
 // Typed over every subject and action, so adding one to the shared auth types is a compile error here until it has a
 // readable name, instead of a raw identifier like "GymSettings" reaching the screen.
-const SUBJECT_LABELS: Record<Subject, string> = {
-  TrainingPlan: 'training plans',
-  PlanReview: 'plan reviews',
-  Catalog: 'the catalog',
-  Onboarding: 'onboarding',
-  ProfileEvent: 'remembered facts',
-  CheckIn: 'check-ins',
-  TurnstileConfig: 'turnstile settings',
-  GymInfo: 'gym information',
-  GymSettings: 'gym settings',
-  Metrics: 'metrics',
-  Member: 'members',
-  UserPolicyAssignment: 'policy assignments',
-  MemberApp: 'the member app',
-  StaffApp: 'the staff app',
+const SUBJECT_LABELS: Record<Subject, LabelKey> = {
+  TrainingPlan: 'subject::training plans',
+  PlanReview: 'subject::plan reviews',
+  Catalog: 'subject::the catalog',
+  Onboarding: 'subject::onboarding',
+  ProfileEvent: 'subject::remembered facts',
+  CheckIn: 'subject::check-ins',
+  TurnstileConfig: 'subject::turnstile settings',
+  GymInfo: 'subject::gym information',
+  GymSettings: 'subject::gym settings',
+  Metrics: 'subject::metrics',
+  Member: 'subject::members',
+  UserPolicyAssignment: 'subject::policy assignments',
+  MemberApp: 'subject::the member app',
+  StaffApp: 'subject::the staff app',
 };
 
-const ACTION_LABELS: Record<Action, string> = {
-  create: 'Create',
-  read: 'Read',
-  update: 'Update',
-  delete: 'Delete',
-  manage: 'Manage',
+const ACTION_LABELS: Record<Action, LabelKey> = {
+  create: 'action::Create',
+  read: 'action::Read',
+  update: 'action::Update',
+  delete: 'action::Delete',
+  manage: 'action::Manage',
 };
 
-const SCOPE_LABELS: Record<Scope, string> = {
-  self: 'their own only',
-  all: 'everyone',
+const SCOPE_LABELS: Record<Scope, LabelKey> = {
+  self: 'scope::their own only',
+  all: 'scope::everyone',
 };
 
 // The policy's permission in words. An identifier the maps do not know falls back to itself, so a policy is never hidden.
-export function policyMeta(policy: Pick<PolicyOption, 'operation' | 'resource' | 'scope'>) {
-  const action = ACTION_LABELS[policy.operation as Action] ?? policy.operation;
-  const subject = SUBJECT_LABELS[policy.resource as Subject] ?? policy.resource;
-  const scope = SCOPE_LABELS[policy.scope as Scope] ?? policy.scope;
+export function policyMeta(t: I18n['t'], policy: Pick<PolicyOption, 'operation' | 'resource' | 'scope'>) {
+  const action = policy.operation in ACTION_LABELS ? t(ACTION_LABELS[policy.operation as Action]) : policy.operation;
+  const subject = policy.resource in SUBJECT_LABELS ? t(SUBJECT_LABELS[policy.resource as Subject]) : policy.resource;
+  const scope = policy.scope in SCOPE_LABELS ? t(SCOPE_LABELS[policy.scope as Scope]) : policy.scope;
   return `${action} ${subject}, ${scope}`;
 }
 
-export function groupLabel(groupId: string) {
-  return groupId.charAt(0).toUpperCase() + groupId.slice(1);
+export function policyGroupLabel(tx: I18n['tx'], groupId: string) {
+  return tx(groupId.charAt(0).toUpperCase() + groupId.slice(1));
 }
 
 export interface DialogTarget {
@@ -124,6 +125,11 @@ interface PolicyDialogsProps {
   onClose: () => void;
 }
 
+interface ServerError {
+  data?: { code?: string } | null;
+  message: string;
+}
+
 // An expiry date means "through the end of that day", in the admin's own time zone.
 function endOfDayIso(isoDate: string) {
   const day = fromIsoDate(isoDate);
@@ -132,10 +138,10 @@ function endOfDayIso(isoDate: string) {
   return day.toISOString();
 }
 
-function errorMessage(error: { data?: { code?: string } | null; message: string }) {
+function errorMessage({ t, tx }: Pick<I18n, 't' | 'tx'>, error: ServerError) {
   return error.data?.code === 'BAD_REQUEST' || error.data?.code === 'NOT_FOUND'
-    ? error.message
-    : "We couldn't save that change. Try again.";
+    ? tx(error.message)
+    : t("We couldn't save that change. Try again.");
 }
 
 function useRefreshList() {
@@ -145,18 +151,19 @@ function useRefreshList() {
 }
 
 function ExpiryField({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const { t } = useI18n();
   return (
     <Field>
-      <FieldLabel htmlFor="policy-expiry">Expires on (optional)</FieldLabel>
+      <FieldLabel htmlFor="policy-expiry">{t('Expires on (optional)')}</FieldLabel>
       <DatePicker
         id="policy-expiry"
         value={value}
         onChange={onChange}
         min={toIsoDate(new Date())}
-        placeholder="No expiry"
+        placeholder={t('No expiry')}
         isClearable
       />
-      <FieldDescription>Leave empty for no expiry. It ends at the close of that day.</FieldDescription>
+      <FieldDescription>{t('Leave empty for no expiry. It ends at the close of that day.')}</FieldDescription>
     </Field>
   );
 }
@@ -172,17 +179,18 @@ function PolicyPicker({
   value: string;
   onChange: (policyId: string) => void;
 }) {
+  const { t, tx } = useI18n();
   const [query, setQuery] = useState('');
   const term = query.trim().toLowerCase();
   const matches = policies.filter(
-    (policy) => !term || `${policy.description} ${policyMeta(policy)} ${policy.id}`.toLowerCase().includes(term),
+    (policy) => !term || `${tx(policy.description)} ${policyMeta(t, policy)} ${policy.id}`.toLowerCase().includes(term),
   );
 
   return (
     <div className="flex flex-col gap-2">
-      <SearchInput value={query} onChange={setQuery} placeholder="Search policies" />
-      <ul aria-label="Policies" className="max-h-56 divide-y overflow-y-auto rounded-md border">
-        {matches.length === 0 && <li className="px-3 py-3 text-sm text-muted-foreground">No policy matches.</li>}
+      <SearchInput value={query} onChange={setQuery} placeholder={t('Search policies')} />
+      <ul aria-label={t('Policies')} className="max-h-56 divide-y overflow-y-auto rounded-md border">
+        {matches.length === 0 && <li className="px-3 py-3 text-sm text-muted-foreground">{t('No policy matches.')}</li>}
         {matches.map((policy) => (
           <li key={policy.id}>
             <button
@@ -194,10 +202,10 @@ function PolicyPicker({
                 policy.id === value ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted',
               )}
             >
-              <span className="text-sm font-medium">{policy.description}</span>
+              <span className="text-sm font-medium">{tx(policy.description)}</span>
               <span className="text-xs text-muted-foreground">
-                {policyMeta(policy)}
-                {heldPolicyIds.includes(policy.id) && ' · already held, saving replaces it'}
+                {policyMeta(t, policy)}
+                {heldPolicyIds.includes(policy.id) && ` · ${t('already held, saving replaces it')}`}
               </span>
             </button>
           </li>
@@ -218,8 +226,9 @@ function GroupPicker({
   value: string;
   onChange: (groupId: string) => void;
 }) {
+  const { t, tn, tx } = useI18n();
   return (
-    <ul aria-label="Groups" className="divide-y overflow-hidden rounded-md border">
+    <ul aria-label={t('Groups')} className="divide-y overflow-hidden rounded-md border">
       {groups.map((group) => (
         <li key={group.id}>
           <button
@@ -231,11 +240,13 @@ function GroupPicker({
               group.id === value ? 'bg-secondary text-secondary-foreground' : 'hover:bg-muted',
             )}
           >
-            <span className="text-sm font-medium">{groupLabel(group.id)}</span>
+            <span className="text-sm font-medium">{policyGroupLabel(tx, group.id)}</span>
             <span className="text-xs text-muted-foreground">
-              {group.description}
-              <span className="numerals text-sm font-semibold"> {group.policyIds.length}</span> policies
-              {heldGroupIds.includes(group.id) && ' · already a member, saving replaces the expiry'}
+              {tx(group.description)}{' '}
+              {tn('{count} policies', {
+                count: <span className="numerals text-sm font-semibold">{group.policyIds.length}</span>,
+              })}
+              {heldGroupIds.includes(group.id) && ` · ${t('already a member, saving replaces the expiry')}`}
             </span>
           </button>
         </li>
@@ -255,6 +266,8 @@ function GrantDialogBody({
   groups: GroupOption[];
   onClose: () => void;
 }) {
+  const i18n = useI18n();
+  const { t, tx } = i18n;
   const trpc = useTRPC();
   const refreshList = useRefreshList();
   const [type, setType] = useState<'group' | 'policy'>(state.preset ? 'policy' : 'group');
@@ -273,10 +286,15 @@ function GrantDialogBody({
     trpc.policies.assignGroup.mutationOptions({
       onSuccess: async (_data, variables) => {
         await refreshList();
-        toast.success(`Added ${state.userName} to the ${groupLabel(variables.groupId)} group.`);
+        toast.success(
+          t('Added {name} to the {group} group.', {
+            name: state.userName,
+            group: policyGroupLabel(tx, variables.groupId),
+          }),
+        );
         onClose();
       },
-      onError: (error) => toast.error(errorMessage(error)),
+      onError: (error) => toast.error(errorMessage(i18n, error)),
     }),
   );
 
@@ -284,15 +302,17 @@ function GrantDialogBody({
     trpc.policies.grant.mutationOptions({
       onSuccess: async (_data, variables) => {
         await refreshList();
-        const label = policies.find((policy) => policy.id === variables.policyId)?.description ?? variables.policyId;
+        const label = tx(
+          policies.find((policy) => policy.id === variables.policyId)?.description ?? variables.policyId,
+        );
         toast.success(
           variables.effect === 'denied'
-            ? `Denied "${label}" for ${state.userName}.`
-            : `Granted "${label}" to ${state.userName}.`,
+            ? t('Denied "{label}" for {name}.', { label, name: state.userName })
+            : t('Granted "{label}" to {name}.', { label, name: state.userName }),
         );
         onClose();
       },
-      onError: (error) => toast.error(errorMessage(error)),
+      onError: (error) => toast.error(errorMessage(i18n, error)),
     }),
   );
 
@@ -302,37 +322,44 @@ function GrantDialogBody({
   return (
     <>
       <AlertDialogHeader>
-        <AlertDialogTitle>Add access</AlertDialogTitle>
+        <AlertDialogTitle>{t('Add access')}</AlertDialogTitle>
         <AlertDialogDescription>
-          Changes what {state.userName} can do. Adding something they already have replaces its expiry
-          {type === 'policy' ? ' and effect' : ''}.
+          {type === 'policy'
+            ? t('Changes what {name} can do. Adding something they already have replaces its expiry and effect.', {
+                name: state.userName,
+              })
+            : t('Changes what {name} can do. Adding something they already have replaces its expiry.', {
+                name: state.userName,
+              })}
         </AlertDialogDescription>
       </AlertDialogHeader>
 
       <div className="flex flex-col gap-4">
         <SegmentedFilter
-          label="What to add"
+          label={t('What to add')}
           value={type}
           onChange={setType}
           options={[
-            { value: 'group', label: 'A group' },
-            { value: 'policy', label: 'A policy' },
+            { value: 'group', label: t('A group') },
+            { value: 'policy', label: t('A policy') },
           ]}
           className="w-full"
         />
 
         {type === 'group' ? (
           <Field>
-            <FieldLabel>Group</FieldLabel>
+            <FieldLabel>{t('Group')}</FieldLabel>
             <GroupPicker groups={groups} heldGroupIds={state.heldGroupIds} value={groupId} onChange={setGroupId} />
             <FieldDescription>
-              A group gives every policy it contains. To take one away from this user, deny that policy afterwards.
+              {t(
+                'A group gives every policy it contains. To take one away from this user, deny that policy afterwards.',
+              )}
             </FieldDescription>
           </Field>
         ) : (
           <>
             <Field>
-              <FieldLabel>Policy</FieldLabel>
+              <FieldLabel>{t('Policy')}</FieldLabel>
               <PolicyPicker
                 policies={policies}
                 heldPolicyIds={state.heldPolicyIds}
@@ -342,23 +369,25 @@ function GrantDialogBody({
             </Field>
 
             <Field>
-              <FieldLabel htmlFor="policy-effect">Effect</FieldLabel>
+              <FieldLabel htmlFor="policy-effect">{t('Effect')}</FieldLabel>
               <Select value={effect} onValueChange={(value) => setEffect(value as typeof effect)}>
                 <SelectTrigger id="policy-effect" className="w-full">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="granted">Granted</SelectItem>
-                  <SelectItem value="denied">Denied</SelectItem>
+                  <SelectItem value="granted">{t('Granted')}</SelectItem>
+                  <SelectItem value="denied">{t('Denied')}</SelectItem>
                 </SelectContent>
               </Select>
               <FieldDescription>
                 {effect === 'denied'
-                  ? 'A denial wins over every grant of the same permission, even one that comes from a group.'
-                  : 'The user can do what this policy covers, unless a denial says otherwise.'}
+                  ? t('A denial wins over every grant of the same permission, even one that comes from a group.')
+                  : t('The user can do what this policy covers, unless a denial says otherwise.')}
               </FieldDescription>
               {isSelfLockout && (
-                <FieldError>You can't deny your own access to the staff area or to policy management.</FieldError>
+                <FieldError>
+                  {t("You can't deny your own access to the staff area or to policy management.")}
+                </FieldError>
               )}
             </Field>
           </>
@@ -368,7 +397,7 @@ function GrantDialogBody({
       </div>
 
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel disabled={isPending}>{t('Cancel')}</AlertDialogCancel>
         <Button
           disabled={!isReady || isPending}
           onClick={() =>
@@ -377,7 +406,7 @@ function GrantDialogBody({
               : grant.mutate({ userId: state.userId, policyId, effect, expiresOn })
           }
         >
-          {isPending ? 'Saving...' : 'Save'}
+          {isPending ? t('Saving...') : t('Save')}
         </Button>
       </AlertDialogFooter>
     </>
@@ -391,6 +420,8 @@ function RevokeDialogBody({
   state: Extract<PolicyDialogState, { kind: 'revoke' }>;
   onClose: () => void;
 }) {
+  const i18n = useI18n();
+  const { t } = i18n;
   const trpc = useTRPC();
   const refreshList = useRefreshList();
   const { target } = state;
@@ -401,14 +432,14 @@ function RevokeDialogBody({
     await refreshList();
     toast.success(
       isGroup
-        ? `Removed ${state.userName} from the ${target.label} group.`
+        ? t('Removed {name} from the {group} group.', { name: state.userName, group: target.label })
         : isDenial
-          ? `Lifted the denial of "${target.label}" for ${state.userName}.`
-          : `Revoked "${target.label}" for ${state.userName}.`,
+          ? t('Lifted the denial of "{label}" for {name}.', { label: target.label, name: state.userName })
+          : t('Revoked "{label}" for {name}.', { label: target.label, name: state.userName }),
     );
     onClose();
   };
-  const onError = (error: Parameters<typeof errorMessage>[0]) => toast.error(errorMessage(error));
+  const onError = (error: ServerError) => toast.error(errorMessage(i18n, error));
 
   const revokePolicy = useMutation(trpc.policies.revoke.mutationOptions({ onSuccess, onError }));
   const revokeGroup = useMutation(trpc.policies.revokeGroup.mutationOptions({ onSuccess, onError }));
@@ -418,18 +449,27 @@ function RevokeDialogBody({
     <>
       <AlertDialogHeader>
         <AlertDialogTitle>
-          {isGroup ? 'Remove from this group?' : isDenial ? 'Lift this denial?' : 'Revoke this policy?'}
+          {isGroup ? t('Remove from this group?') : isDenial ? t('Lift this denial?') : t('Revoke this policy?')}
         </AlertDialogTitle>
         <AlertDialogDescription>
           {isGroup
-            ? `${state.userName} loses everything the ${target.label} group gives them, unless another group or a direct grant also provides it. The membership stays on their record and can be extended later.`
+            ? t(
+                '{name} loses everything the {group} group gives them, unless another group or a direct grant also provides it. The membership stays on their record and can be extended later.',
+                { name: state.userName, group: target.label },
+              )
             : isDenial
-              ? `The denial of "${target.label}" for ${state.userName} ends right away. Anything else they hold for it applies again.`
-              : `${state.userName} loses "${target.label}" right away, unless a group still provides it. It stays on their record and can be extended later.`}
+              ? t('The denial of "{label}" for {name} ends right away. Anything else they hold for it applies again.', {
+                  label: target.label,
+                  name: state.userName,
+                })
+              : t(
+                  '{name} loses "{label}" right away, unless a group still provides it. It stays on their record and can be extended later.',
+                  { name: state.userName, label: target.label },
+                )}
         </AlertDialogDescription>
       </AlertDialogHeader>
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel disabled={isPending}>{t('Cancel')}</AlertDialogCancel>
         <Button
           variant={isDenial && !isGroup ? 'default' : 'destructive'}
           disabled={isPending}
@@ -439,7 +479,7 @@ function RevokeDialogBody({
               : revokePolicy.mutate({ userId: state.userId, policyId: target.id })
           }
         >
-          {isPending ? 'Saving...' : isGroup ? 'Remove' : isDenial ? 'Lift denial' : 'Revoke'}
+          {isPending ? t('Saving...') : isGroup ? t('Remove') : isDenial ? t('Lift denial') : t('Revoke')}
         </Button>
       </AlertDialogFooter>
     </>
@@ -453,6 +493,8 @@ function ExtendDialogBody({
   state: Extract<PolicyDialogState, { kind: 'extend' }>;
   onClose: () => void;
 }) {
+  const i18n = useI18n();
+  const { t, formatDateTime } = i18n;
   const trpc = useTRPC();
   const refreshList = useRefreshList();
   const { target } = state;
@@ -467,12 +509,12 @@ function ExtendDialogBody({
     await refreshList();
     toast.success(
       isGroup
-        ? `Updated the ${target.label} membership of ${state.userName}.`
-        : `Updated the expiry of "${target.label}" for ${state.userName}.`,
+        ? t('Updated the {group} membership of {name}.', { group: target.label, name: state.userName })
+        : t('Updated the expiry of "{label}" for {name}.', { label: target.label, name: state.userName }),
     );
     onClose();
   };
-  const onError = (error: Parameters<typeof errorMessage>[0]) => toast.error(errorMessage(error));
+  const onError = (error: ServerError) => toast.error(errorMessage(i18n, error));
 
   const extendPolicy = useMutation(trpc.policies.extend.mutationOptions({ onSuccess, onError }));
   const extendGroup = useMutation(trpc.policies.extendGroup.mutationOptions({ onSuccess, onError }));
@@ -483,22 +525,24 @@ function ExtendDialogBody({
       <AlertDialogHeader>
         <AlertDialogTitle>
           {isGroup
-            ? 'Extend this membership'
+            ? t('Extend this membership')
             : state.effect === 'denied'
-              ? 'Change the denial period'
-              : 'Extend this policy'}
+              ? t('Change the denial period')
+              : t('Extend this policy')}
         </AlertDialogTitle>
         <AlertDialogDescription>
           {isGroup
-            ? `${state.userName} in the ${target.label} group.`
+            ? t('{name} in the {group} group.', { name: state.userName, group: target.label })
             : state.effect === 'denied'
-              ? `"${target.label}" is denied for ${state.userName}.`
-              : `"${target.label}" for ${state.userName}.`}{' '}
+              ? t('"{label}" is denied for {name}.', { label: target.label, name: state.userName })
+              : t('"{label}" for {name}.', { label: target.label, name: state.userName })}{' '}
           {isCurrentlyEnded
-            ? `It expired ${formatDateTime(state.expiresOn as string | Date)}. Saving a new period makes it active again.`
+            ? t('It expired {date}. Saving a new period makes it active again.', {
+                date: formatDateTime(state.expiresOn as string | Date),
+              })
             : current
-              ? `It expires ${formatDateTime(current)}.`
-              : 'It currently has no expiry.'}
+              ? t('It expires {date}.', { date: formatDateTime(current) })
+              : t('It currently has no expiry.')}
         </AlertDialogDescription>
       </AlertDialogHeader>
 
@@ -506,27 +550,27 @@ function ExtendDialogBody({
         <div className="flex items-center gap-2 max-sm:min-h-11">
           <RadioGroupItem id="extend-date" value="date" />
           <label htmlFor="extend-date" className="flex-1 text-sm max-sm:py-2.5">
-            Until a date
+            {t('Until a date')}
           </label>
         </div>
         <div className="flex items-center gap-2 max-sm:min-h-11">
           <RadioGroupItem id="extend-indefinite" value="indefinite" />
           <label htmlFor="extend-indefinite" className="flex-1 text-sm max-sm:py-2.5">
-            No expiry
+            {t('No expiry')}
           </label>
         </div>
       </RadioGroup>
 
       {mode === 'date' && (
         <Field>
-          <FieldLabel htmlFor="policy-expiry">New expiry date</FieldLabel>
+          <FieldLabel htmlFor="policy-expiry">{t('New expiry date')}</FieldLabel>
           <DatePicker id="policy-expiry" value={expiry} onChange={setExpiry} min={toIsoDate(new Date())} />
-          <FieldDescription>It ends at the close of that day.</FieldDescription>
+          <FieldDescription>{t('It ends at the close of that day.')}</FieldDescription>
         </Field>
       )}
 
       <AlertDialogFooter>
-        <AlertDialogCancel disabled={isPending}>Cancel</AlertDialogCancel>
+        <AlertDialogCancel disabled={isPending}>{t('Cancel')}</AlertDialogCancel>
         <Button
           disabled={nextExpiry === undefined || isPending}
           onClick={() => {
@@ -535,7 +579,7 @@ function ExtendDialogBody({
             else extendPolicy.mutate({ userId: state.userId, policyId: target.id, expiresOn: nextExpiry });
           }}
         >
-          {isPending ? 'Saving...' : 'Save expiry'}
+          {isPending ? t('Saving...') : t('Save expiry')}
         </Button>
       </AlertDialogFooter>
     </>

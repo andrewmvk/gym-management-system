@@ -12,12 +12,14 @@ import { PasswordStep } from '@/app/signup/password-step';
 import { type CapturedPhoto, PHOTO_REJECTION_MESSAGES, PhotoStep } from '@/app/signup/photo-step';
 import { Stepper } from '@/components/stepper';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 
 type Step = 'basic-info' | 'consent' | 'photo' | 'password';
 
 const STEPS: readonly Step[] = ['basic-info', 'consent', 'photo', 'password'];
-const STATIONS = ['Details', 'Consent', 'Photo', 'Password'] as const;
+const STATIONS: readonly LabelKey[] = ['Details', 'Consent', 'Photo', 'Password'];
 
 const EMPTY_BASIC_INFO: BasicInfoInput = { name: '', phone: '', email: '', birthdate: '', gender: undefined };
 
@@ -25,6 +27,7 @@ const EMPTY_BASIC_INFO: BasicInfoInput = { name: '', phone: '', email: '', birth
 // auth.register call of the last step, so abandoning the wizard stores nothing (FR-1). Until then any
 // earlier step can be revisited.
 export function SignupWizard() {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const router = useRouter();
@@ -32,7 +35,7 @@ export function SignupWizard() {
   const [basicInfo, setBasicInfo] = useState<BasicInfoInput>(EMPTY_BASIC_INFO);
   const [consented, setConsented] = useState(false);
   const [photo, setPhoto] = useState<CapturedPhoto | null>(null);
-  const [photoRejection, setPhotoRejection] = useState<string | null>(null);
+  const [photoRejection, setPhotoRejection] = useState<LabelKey | null>(null);
   const [emailError, setEmailError] = useState<string | null>(null);
 
   const register = useMutation(
@@ -54,7 +57,7 @@ export function SignupWizard() {
         await queryClient.fetchQuery({ ...trpc.auth.me.queryOptions(), staleTime: 0 });
         router.replace('/onboarding');
       },
-      onError: () => toast.error("We couldn't create your account. Try again."),
+      onError: () => toast.error(t("We couldn't create your account. Try again.")),
     }),
   );
 
@@ -114,7 +117,7 @@ export function SignupWizard() {
 
   return (
     <div className="flex flex-col gap-8">
-      <Stepper steps={STATIONS} current={position} />
+      <Stepper steps={STATIONS.map((station) => t(station))} current={position} />
       {previousStep && (
         <Button
           variant="ghost"
@@ -124,7 +127,7 @@ export function SignupWizard() {
           onClick={() => setStep(previousStep)}
         >
           <ArrowLeftIcon />
-          Back
+          {t('Back')}
         </Button>
       )}
       <div key={step} className="animate-block-in">

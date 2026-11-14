@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { serverMessage } from '@/lib/error-message';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 interface LinkableExercise {
@@ -28,8 +29,8 @@ interface EquipmentLinksSheetProps {
   onOpenChange?: (isOpen: boolean) => void;
 }
 
-function exerciseCount(count: number) {
-  return `${count} ${count === 1 ? 'exercise' : 'exercises'}`;
+function exerciseCount({ t }: I18n, count: number) {
+  return count === 1 ? t('1 exercise') : t('{count} exercises', { count });
 }
 
 function LinksForm({
@@ -39,13 +40,14 @@ function LinksForm({
   onCreateExercise,
   onDone,
 }: EquipmentLinksSheetProps & { onDone: () => void }) {
+  const { t, tn, tx } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const initial = exercises.filter((exercise) => exercise.equipment.some((piece) => piece.id === equipmentId));
   const [selected, setSelected] = useState(() => new Set(initial.map((exercise) => exercise.id)));
   const [query, setQuery] = useState('');
   const term = query.trim().toLowerCase();
-  const matches = exercises.filter((exercise) => !term || exercise.name.toLowerCase().includes(term));
+  const matches = exercises.filter((exercise) => !term || tx(exercise.name).toLowerCase().includes(term));
 
   // An exercise with no equipment at all counts as bodyweight, so it is always available. Unlinking a piece
   // from an exercise that only used this piece turns the exercise into one, which is worth saying out loud.
@@ -63,11 +65,13 @@ function LinksForm({
         await queryClient.invalidateQueries({ queryKey: trpc.catalog.list.queryKey() });
         queryClient.invalidateQueries({ queryKey: trpc.reviews.queue.queryKey() });
         queryClient.invalidateQueries({ queryKey: trpc.reviews.overview.queryKey() });
-        toast.success(`Linked exercises of ${equipmentName} saved.`);
+        toast.success(t('Linked exercises of {name} saved.', { name: tx(equipmentName) }));
         onDone();
       },
       onError: (error) =>
-        toast.error(serverMessage(error, `We couldn't save the links of ${equipmentName}. Try again.`)),
+        toast.error(
+          tx(serverMessage(error, t("We couldn't save the links of {name}. Try again.", { name: tx(equipmentName) }))),
+        ),
     }),
   );
 
@@ -84,26 +88,30 @@ function LinksForm({
     <>
       <div className="flex flex-col gap-3 border-b px-5 py-4 pr-16">
         <div>
-          <SheetTitle>Linked exercises</SheetTitle>
+          <SheetTitle>{t('Linked exercises')}</SheetTitle>
           <SheetDescription>
-            The exercises that use {equipmentName}. An exercise can be done while at least one of its linked pieces is
-            in service.
+            {t(
+              'The exercises that use {name}. An exercise can be done while at least one of its linked pieces is in service.',
+              { name: tx(equipmentName) },
+            )}
           </SheetDescription>
         </div>
-        <SearchInput value={query} onChange={setQuery} placeholder="Search exercises" />
+        <SearchInput value={query} onChange={setQuery} placeholder={t('Search exercises')} />
         <p className="text-sm text-muted-foreground">
-          <span className="numerals text-base font-semibold text-foreground">{selected.size}</span> of{' '}
-          <span className="numerals text-base font-semibold text-foreground">{exercises.length}</span> exercises linked.
+          {tn('{selected} of {total} exercises linked.', {
+            selected: <span className="numerals text-base font-semibold text-foreground">{selected.size}</span>,
+            total: <span className="numerals text-base font-semibold text-foreground">{exercises.length}</span>,
+          })}
         </p>
       </div>
-      <ul aria-label="Exercises" className="min-h-0 flex-1 divide-y overflow-y-auto">
+      <ul aria-label={t('Exercises')} className="min-h-0 flex-1 divide-y overflow-y-auto">
         {matches.length === 0 && (
           <li className="flex flex-col items-start gap-3 px-5 py-4 text-sm text-muted-foreground">
-            No exercise matches.
+            {t('No exercise matches.')}
             {onCreateExercise && (
               <Button variant="outline" size="sm" onClick={onCreateExercise}>
                 <PlusIcon data-icon="inline-start" />
-                New exercise with {equipmentName}
+                {t('New exercise with {name}', { name: tx(equipmentName) })}
               </Button>
             )}
           </li>
@@ -119,7 +127,7 @@ function LinksForm({
                 checked={selected.has(exercise.id)}
                 onCheckedChange={(checked) => toggle(exercise.id, checked === true)}
               />
-              <span className="text-sm font-semibold">{exercise.name}</span>
+              <span className="text-sm font-semibold">{tx(exercise.name)}</span>
             </label>
           </li>
         ))}
@@ -129,10 +137,15 @@ function LinksForm({
           <div role="status" className="flex gap-2 text-sm text-pretty">
             <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden />
             <p>
-              <span className="numerals text-base font-semibold">{losingAllEquipment.length}</span>{' '}
-              {losingAllEquipment.length === 1 ? 'exercise would have' : 'exercises would have'} no equipment at all and
-              count as always available, even if this piece is out of service:{' '}
-              {losingAllEquipment.map((exercise) => exercise.name).join(', ')}.
+              {tn(
+                losingAllEquipment.length === 1
+                  ? '{count} exercise would have no equipment at all and count as always available, even if this piece is out of service: {names}.'
+                  : '{count} exercises would have no equipment at all and count as always available, even if this piece is out of service: {names}.',
+                {
+                  count: <span className="numerals text-base font-semibold">{losingAllEquipment.length}</span>,
+                  names: losingAllEquipment.map((exercise) => tx(exercise.name)).join(', '),
+                },
+              )}
             </p>
           </div>
         )}
@@ -140,14 +153,14 @@ function LinksForm({
           {onCreateExercise && (
             <Button variant="outline" onClick={onCreateExercise} disabled={save.isPending}>
               <PlusIcon data-icon="inline-start" />
-              New exercise
+              {t('New exercise')}
             </Button>
           )}
           <Button
             disabled={!isChanged || save.isPending}
             onClick={() => save.mutate({ equipmentId, exerciseIds: [...selected] })}
           >
-            {save.isPending ? 'Saving...' : 'Save links'}
+            {save.isPending ? t('Saving...') : t('Save links')}
           </Button>
         </div>
       </div>
@@ -164,6 +177,8 @@ export function EquipmentLinksSheet({
   isOpen: controlledIsOpen,
   onOpenChange,
 }: EquipmentLinksSheetProps) {
+  const i18n = useI18n();
+  const { t, tx } = i18n;
   const [ownIsOpen, setOwnIsOpen] = useState(false);
   const isControlled = controlledIsOpen !== undefined && onOpenChange !== undefined;
   const isOpen = isControlled ? controlledIsOpen : ownIsOpen;
@@ -179,11 +194,14 @@ export function EquipmentLinksSheet({
           <Button
             variant="outline"
             size="sm"
-            aria-label={`Linked exercises of ${equipmentName}, ${exerciseCount(linkedCount)}`}
+            aria-label={t('Linked exercises of {name}, {exercises}', {
+              name: tx(equipmentName),
+              exercises: exerciseCount(i18n, linkedCount),
+            })}
           >
             <LinkIcon data-icon="inline-start" />
             <span className="numerals text-base">{linkedCount}</span>
-            <span className="hidden sm:inline">linked</span>
+            <span className="hidden sm:inline">{t('linked')}</span>
           </Button>
         </SheetTrigger>
       )}

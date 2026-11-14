@@ -8,11 +8,11 @@ import type { CoachMessage as CoachMessageData } from '@/app/(member)/coach/use-
 import type { CoachDraftApi } from '@/app/(member)/coach/use-coach-draft';
 import { AiMark } from '@/components/ai-mark';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 const OFFER_QUESTION =
-  /\b(would you like|do you want|want me to|shall i|should i|can i)\b[^?]*\b(add|swap|replace|remove|include|change)\b[^?]*\?$/i;
-const OFFER_REPLIES = ['Yes, do that', 'No, thanks'];
+  /\b(would you like|do you want|want me to|shall i|should i|can i|voc[eê] quer|quer que eu|posso|devo)\b[^?]*\b(add|swap|replace|remove|include|change|adicion\w*|troc\w*|substitu\w*|remov\w*|inclu\w*|mud\w*)\b[^?]*\?$/i;
 
 interface CoachMessageProps {
   message: CoachMessageData;
@@ -33,6 +33,8 @@ export function CoachMessage({
   onQuickReply,
   onRetry,
 }: CoachMessageProps) {
+  const { t } = useI18n();
+
   if (message.role === 'member') {
     return (
       <div className="flex max-w-5/6 flex-col items-end gap-1 self-end">
@@ -76,14 +78,16 @@ export function CoachMessage({
           onQuickReply={onQuickReply}
         />
       ))}
-      {hasOpenOffer && <QuickReplies replies={OFFER_REPLIES} isDisabled={isStreaming} onPick={onQuickReply} />}
+      {hasOpenOffer && (
+        <QuickReplies replies={[t('Yes, do that'), t('No, thanks')]} isDisabled={isStreaming} onPick={onQuickReply} />
+      )}
       {isWorking && (
         <p
           role="status"
           className="flex items-center gap-2 self-start rounded-lg rounded-bl-sm bg-muted px-3.5 py-2.5 text-sm text-muted-foreground"
         >
           <AiMark isActive className="size-5 text-primary" />
-          {hasContent ? 'Still working on it...' : 'Your coach is working on it...'}
+          {hasContent ? t('Still working on it...') : t('Your coach is working on it...')}
         </p>
       )}
       {message.status === 'error' && (
@@ -92,13 +96,14 @@ export function CoachMessage({
           className="flex flex-col gap-2 rounded-lg border-2 border-dashed border-destructive/50 px-3.5 py-3 text-sm"
         >
           <p className="text-pretty">
-            {hasContent ? 'The reply broke off before it was finished.' : "Your coach couldn't reply."} Nothing was
-            changed.
+            {hasContent
+              ? t('The reply broke off before it was finished. Nothing was changed.')
+              : t("Your coach couldn't reply. Nothing was changed.")}
           </p>
           {isLatest && (
             <Button type="button" size="sm" variant="outline" className="w-fit" onClick={onRetry}>
               <RotateCwIcon data-icon="inline-start" />
-              Try again
+              {t('Try again')}
             </Button>
           )}
         </div>

@@ -14,7 +14,8 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { oneOf, useUrlState } from '@/hooks/use-url-state';
-import { formatDateTime } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
@@ -31,16 +32,17 @@ const FAILURE_REASONS = {
   http_error: 'Turnstile answered with an error',
   network_error: 'Could not reach the turnstile',
   unknown: 'Unknown',
-} as const;
+} as const satisfies Record<string, LabelKey>;
 
 function CheckInHead() {
+  const { t } = useI18n();
   return (
     <TableHeader>
       <TableRow>
-        <TableHead>Member</TableHead>
-        <TableHead>Time</TableHead>
-        <TableHead>Turnstile</TableHead>
-        <TableHead className="hidden sm:table-cell">Reason</TableHead>
+        <TableHead>{t('Member')}</TableHead>
+        <TableHead>{t('Time')}</TableHead>
+        <TableHead>{t('Turnstile')}</TableHead>
+        <TableHead className="hidden sm:table-cell">{t('Reason')}</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -84,6 +86,7 @@ function CheckInLogSkeleton() {
 }
 
 function CheckInLogRoot() {
+  const { t, formatDateTime } = useI18n();
   const trpc = useTRPC();
   const ability = useAppAbility();
   const canRead = ability.can('read', 'CheckIn');
@@ -108,8 +111,8 @@ function CheckInLogRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={LockIcon}
-          title="No access"
-          description="Your account doesn't include the check-in log. Ask an admin if you need it."
+          title={t('No access')}
+          description={t("Your account doesn't include the check-in log. Ask an admin if you need it.")}
         />
       </div>
     );
@@ -126,7 +129,7 @@ function CheckInLogRoot() {
   if (!query.data) {
     return (
       <QueryError
-        title="We couldn't load the check-ins"
+        title={t("We couldn't load the check-ins")}
         onRetry={() => query.refetch()}
         isRetrying={query.isRefetching}
       />
@@ -138,8 +141,8 @@ function CheckInLogRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={DoorOpenIcon}
-          title="No check-ins yet"
-          description="Check-ins show up here as members arrive at the kiosk."
+          title={t('No check-ins yet')}
+          description={t('Check-ins show up here as members arrive at the kiosk.')}
         />
       </div>
     );
@@ -154,20 +157,20 @@ function CheckInLogRoot() {
             setSearch(value);
             pagination.setPage(1);
           }}
-          placeholder="Search members"
+          placeholder={t('Search members')}
           className="w-full lg:w-72"
         />
         <FilterBar.Trailing>
           <SegmentedFilter
-            label="Filter by turnstile result"
+            label={t('Filter by turnstile result')}
             value={result}
             onChange={(value) => {
               setResult(value);
               pagination.setPage(1);
             }}
             options={[
-              { value: 'all', label: 'All', count: matching.length },
-              { value: 'failed', label: 'Did not open', count: failedCount },
+              { value: 'all', label: t('All'), count: matching.length },
+              { value: 'failed', label: t('Did not open'), count: failedCount },
             ]}
             className="w-full lg:w-auto"
           />
@@ -176,12 +179,12 @@ function CheckInLogRoot() {
       {filtered.length === 0 ? (
         <div className="rounded-lg border bg-card">
           {term ? (
-            <EmptyState icon={SearchXIcon} title="No matches" description="Try another member name." />
+            <EmptyState icon={SearchXIcon} title={t('No matches')} description={t('Try another member name.')} />
           ) : (
             <EmptyState
               icon={SearchXIcon}
-              title="Every recent check-in opened the turnstile"
-              description="Check-ins where the turnstile did not open would be listed here."
+              title={t('Every recent check-in opened the turnstile')}
+              description={t('Check-ins where the turnstile did not open would be listed here.')}
             />
           )}
         </div>
@@ -198,18 +201,18 @@ function CheckInLogRoot() {
                   </TableCell>
                   <TableCell>
                     {entry.turnstileStatus === 'success' ? (
-                      <Badge variant="live">Opened</Badge>
+                      <Badge variant="live">{t('Opened')}</Badge>
                     ) : (
-                      <Badge variant="retry">Did not open</Badge>
+                      <Badge variant="retry">{t('Did not open')}</Badge>
                     )}
                     {entry.failureReason && (
                       <p className="mt-1 text-sm text-pretty text-muted-foreground sm:hidden">
-                        {FAILURE_REASONS[entry.failureReason]}
+                        {t(FAILURE_REASONS[entry.failureReason])}
                       </p>
                     )}
                   </TableCell>
                   <TableCell className="hidden text-muted-foreground sm:table-cell">
-                    {entry.failureReason ? FAILURE_REASONS[entry.failureReason] : ''}
+                    {entry.failureReason ? t(FAILURE_REASONS[entry.failureReason]) : ''}
                   </TableCell>
                 </TableRow>
               ))}
@@ -223,7 +226,7 @@ function CheckInLogRoot() {
         pageSize={pagination.pageSize}
         total={pagination.total}
         onPageChange={pagination.setPage}
-        noun="check-ins"
+        noun={t('check-ins')}
       />
     </div>
   );

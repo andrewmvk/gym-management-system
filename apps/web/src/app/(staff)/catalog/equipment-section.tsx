@@ -1,7 +1,7 @@
 'use client';
 
 import { computeEquipmentImpact } from '@cadence/shared/schemas/muscle-heat';
-import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PlusIcon, SearchXIcon, WrenchIcon } from 'lucide-react';
@@ -27,6 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUrlState } from '@/hooks/use-url-state';
 import { serverMessage } from '@/lib/error-message';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 const SHOWN_MUSCLES = 3;
@@ -39,20 +40,21 @@ type CreateEquipmentInput = z.infer<typeof CreateEquipmentSchema>;
 type LinkableExercises = ComponentProps<typeof EquipmentLinksSheet>['exercises'];
 
 // The first few muscles by name, with a count of the rest so the cell stays one line.
-function describeMuscles(muscles: readonly MuscleId[]) {
+function describeMuscles({ t, muscleLabel }: I18n, muscles: readonly MuscleId[]) {
   const shown = muscles.slice(0, SHOWN_MUSCLES).map(muscleLabel).join(', ');
   const rest = muscles.length - SHOWN_MUSCLES;
-  return rest > 0 ? `${shown} + ${rest}` : shown;
+  return rest > 0 ? t('{muscles} + {count}', { muscles: shown, count: rest }) : shown;
 }
 
 function EquipmentTableHead({ canManage }: { canManage: boolean }) {
+  const { t } = useI18n();
   return (
     <TableHeader>
       <TableRow>
-        <TableHead>Equipment</TableHead>
-        <TableHead className="hidden lg:table-cell">If out of service</TableHead>
-        {canManage && <TableHead>Exercises</TableHead>}
-        <TableHead className="text-right">Status</TableHead>
+        <TableHead>{t('Equipment')}</TableHead>
+        <TableHead className="hidden lg:table-cell">{t('If out of service')}</TableHead>
+        {canManage && <TableHead>{t('Exercises')}</TableHead>}
+        <TableHead className="text-right">{t('Status')}</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -108,6 +110,7 @@ function AddEquipmentButton({
   existingNames: readonly string[];
   onAdded: (piece: { id: string; name: string }) => void;
 }) {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [isOpen, setIsOpen] = useState(false);
@@ -122,18 +125,18 @@ function AddEquipmentButton({
         queryClient.invalidateQueries({ queryKey: trpc.catalog.listEquipment.queryKey() });
         form.reset();
         setIsOpen(false);
-        toast.success(`${piece.name} added and in service.`, {
-          action: { label: 'Link exercises', onClick: () => onAdded({ id: piece.id, name: piece.name }) },
+        toast.success(t('{name} added and in service.', { name: piece.name }), {
+          action: { label: t('Link exercises'), onClick: () => onAdded({ id: piece.id, name: piece.name }) },
         });
       },
-      onError: (error) => toast.error(serverMessage(error, "Couldn't add the equipment. Try again.")),
+      onError: (error) => toast.error(tx(serverMessage(error, t("Couldn't add the equipment. Try again.")))),
     }),
   );
 
   function submit(values: CreateEquipmentInput) {
     const name = values.name.toLowerCase();
     if (existingNames.some((existing) => existing.trim().toLowerCase() === name)) {
-      form.setError('name', { message: 'This equipment is already in the list.' });
+      form.setError('name', { message: t('This equipment is already in the list.') });
       form.setFocus('name');
       return;
     }
@@ -151,7 +154,7 @@ function AddEquipmentButton({
       <PopoverTrigger asChild>
         <Button>
           <PlusIcon data-icon="inline-start" />
-          Add equipment
+          {t('Add equipment')}
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-80 p-4">
@@ -161,11 +164,11 @@ function AddEquipmentButton({
             control={form.control}
             render={({ field, fieldState }) => (
               <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor="equipment-name">Name</FieldLabel>
+                <FieldLabel htmlFor="equipment-name">{t('Name')}</FieldLabel>
                 <Input
                   {...field}
                   id="equipment-name"
-                  placeholder="e.g. Battle ropes"
+                  placeholder={t('e.g. Battle ropes')}
                   disabled={create.isPending}
                   aria-invalid={fieldState.invalid}
                 />
@@ -173,13 +176,15 @@ function AddEquipmentButton({
               </Field>
             )}
           />
-          <p className="text-sm text-muted-foreground">It starts in service. Link its exercises once it is added.</p>
+          <p className="text-sm text-muted-foreground">
+            {t('It starts in service. Link its exercises once it is added.')}
+          </p>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => setIsOpen(false)} disabled={create.isPending}>
-              Cancel
+              {t('Cancel')}
             </Button>
             <Button type="submit" disabled={create.isPending}>
-              {create.isPending ? 'Adding...' : 'Add'}
+              {create.isPending ? t('Adding...') : t('Add')}
             </Button>
           </div>
         </form>
@@ -205,14 +210,16 @@ function EquipmentRow({
   canManage: boolean;
   onCreateExercise: () => void;
 }) {
-  const impactText = affects ? describeMuscles(affects) : 'Nothing, every exercise has another option';
+  const i18n = useI18n();
+  const { t, tx } = i18n;
+  const impactText = affects ? describeMuscles(i18n, affects) : t('Nothing, every exercise has another option');
 
   return (
     <TableRow>
       <TableCell>
-        <p className="font-semibold">{name}</p>
+        <p className="font-semibold">{tx(name)}</p>
         <p className="text-muted-foreground lg:hidden">
-          {affects ? `Out of service takes out ${impactText}` : impactText}
+          {affects ? t('Out of service takes out {muscles}', { muscles: impactText }) : impactText}
         </p>
       </TableCell>
       <TableCell className="hidden text-muted-foreground lg:table-cell">{impactText}</TableCell>
@@ -234,12 +241,14 @@ function EquipmentRow({
         {canManage ? (
           <div className="flex items-center justify-end gap-3">
             <span className="hidden text-muted-foreground sm:inline">
-              {isAvailable ? 'In service' : 'Out of service'}
+              {isAvailable ? t('In service') : t('Out of service')}
             </span>
             <EquipmentToggle id={id} name={name} isAvailable={isAvailable} />
           </div>
         ) : (
-          <Badge variant={isAvailable ? 'live' : 'unavailable'}>{isAvailable ? 'Available' : 'Out of service'}</Badge>
+          <Badge variant={isAvailable ? 'live' : 'unavailable'}>
+            {isAvailable ? t('Available') : t('Out of service')}
+          </Badge>
         )}
       </TableCell>
     </TableRow>
@@ -247,6 +256,7 @@ function EquipmentRow({
 }
 
 function EquipmentSectionRoot() {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const ability = useAppAbility();
   const canManage = ability.can('manage', 'Catalog');
@@ -259,7 +269,7 @@ function EquipmentSectionRoot() {
   // Its own URL key: the Exercises tab keeps its search in "q", and a search for a bench should not filter it.
   const [search, setSearch] = useUrlState<string>('equipment-q', '');
   const term = search.trim().toLowerCase();
-  const filtered = (query.data ?? []).filter((item) => !term || item.name.toLowerCase().includes(term));
+  const filtered = (query.data ?? []).filter((item) => !term || tx(item.name).toLowerCase().includes(term));
   const startExercise = (equipmentId: string) => {
     setCreateFor(equipmentId);
     setIsCreatingExercise(true);
@@ -281,7 +291,7 @@ function EquipmentSectionRoot() {
   if (query.isError) {
     return (
       <QueryError
-        title="We couldn't load the equipment"
+        title={t("We couldn't load the equipment")}
         onRetry={() => query.refetch()}
         isRetrying={query.isRefetching}
       />
@@ -297,11 +307,11 @@ function EquipmentSectionRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={WrenchIcon}
-          title="No equipment yet"
+          title={t('No equipment yet')}
           description={
             canManage
-              ? 'Add the first piece. Bodyweight exercises work without any.'
-              : 'Bodyweight exercises work without any.'
+              ? t('Add the first piece. Bodyweight exercises work without any.')
+              : t('Bodyweight exercises work without any.')
           }
           action={addAction}
         />
@@ -312,12 +322,17 @@ function EquipmentSectionRoot() {
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <FilterBar>
-        <SearchInput value={search} onChange={setSearch} placeholder="Search equipment" className="w-full lg:w-72" />
+        <SearchInput
+          value={search}
+          onChange={setSearch}
+          placeholder={t('Search equipment')}
+          className="w-full lg:w-72"
+        />
         {addAction && <FilterBar.Trailing>{addAction}</FilterBar.Trailing>}
       </FilterBar>
       {filtered.length === 0 ? (
         <div className="rounded-lg border bg-card">
-          <EmptyState icon={SearchXIcon} title="No matches" description="Try another name." />
+          <EmptyState icon={SearchXIcon} title={t('No matches')} description={t('Try another name.')} />
         </div>
       ) : (
         <div className="overflow-hidden rounded-lg border bg-card">

@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { todayLocal } from '@api/lib/dates';
+import { unusableProposalNote, withLanguage } from '@api/lib/locale';
 import { type AiResult, type AiStreamItem, type AiTool, streamStructured } from '@api/modules/ai';
 import { listExercises } from '@api/modules/catalog/service';
 import { buildExplainerBlock, buildPickerBlock, buildProposalBlock, buildSafetyBlock } from '@api/modules/chat/blocks';
@@ -26,6 +27,7 @@ import {
   type SafetyWarning,
 } from '@cadence/shared/schemas/coach';
 import { findInjuryConflicts } from '@cadence/shared/schemas/coach-draft';
+import type { Locale } from '@cadence/shared/schemas/locale';
 import {
   injuryMuscles,
   needsConfirmation,
@@ -51,9 +53,6 @@ export interface CoachStreamRequest {
 
 export type CoachStream = (request: CoachStreamRequest) => AsyncGenerator<AiStreamItem<CoachAiEnvelope>>;
 
-const UNUSABLE_PROPOSAL_NOTE =
-  "\n\nI couldn't turn that into a plan change, so nothing has been proposed. Ask me again and I'll rebuild it.";
-
 const MAX_QUICK_REPLIES = 3;
 const MAX_QUICK_REPLY_LENGTH = 60;
 
@@ -77,6 +76,8 @@ function validQuickReplies(value: unknown): string[] {
 
 export interface SendMessageOverrides {
   stream?: CoachStream;
+  // The language the member picked in the app; the coach answers in it. English when not given.
+  locale?: Locale;
 }
 
 function toPendingFact(event: { id: string }, fact: ProfileEventFact): PendingFact {
@@ -128,6 +129,7 @@ export async function* sendMessage(
 ): AsyncGenerator<CoachStreamEvent> {
   const context = await assembleChatContext(userId, input);
   const stream = overrides.stream ?? defaultStream;
+  const locale = overrides.locale ?? 'en';
 
   const emitted = new Set<string>();
   let hasText = false;
@@ -139,7 +141,7 @@ export async function* sendMessage(
 
   for await (const item of stream({
     purpose: 'chat',
-    system: CHAT_SYSTEM_PROMPT,
+    system: withLanguage(CHAT_SYSTEM_PROMPT, locale),
     user: buildChatUserPrompt(context, input),
     schema: CoachAiEnvelopeSchema,
     instructionSchema: CoachAiResponseSchema,
@@ -177,7 +179,7 @@ export async function* sendMessage(
     }
     if (block) yield { type: 'block', block };
   }
-  if (hasProposalAttempt && !hasProposalBlock) yield { type: 'text', delta: UNUSABLE_PROPOSAL_NOTE };
+  if (hasProposalAttempt && !hasProposalBlock) yield { type: 'text', delta: unusableProposalNote(locale) };
 
   // A plan the coach proposes is remembered when the member applies it, with a note that carries what was
   // asked, so the request is not also reported as a fact here.

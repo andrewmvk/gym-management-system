@@ -17,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { serverMessage } from '@/lib/error-message';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 interface MembershipControlProps {
@@ -28,6 +29,7 @@ interface MembershipControlProps {
 // Admins flip the membership here; everyone else with access to the page reads the badge. Activating is one
 // click, deactivating asks first because it signs the member out.
 export function MembershipControl({ userId, name, status }: MembershipControlProps) {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ability = useAppAbility();
@@ -47,13 +49,13 @@ export function MembershipControl({ userId, name, status }: MembershipControlPro
         setIsConfirming(false);
         toast.success(
           row.membershipStatus === 'active'
-            ? `${name} is active again and can log in.`
-            : `${name} is inactive and was signed out.`,
+            ? t('{name} is active again and can log in.', { name })
+            : t('{name} is inactive and was signed out.', { name }),
         );
       },
       onError: (error) => {
         setIsConfirming(false);
-        toast.error(serverMessage(error, `We couldn't change the membership of ${name}. Try again.`));
+        toast.error(tx(serverMessage(error, t("We couldn't change the membership of {name}. Try again.", { name }))));
       },
     }),
   );
@@ -68,7 +70,7 @@ export function MembershipControl({ userId, name, status }: MembershipControlPro
         <Switch
           checked={isActive}
           disabled={setStatus.isPending}
-          aria-label={`Membership of ${name}`}
+          aria-label={t('Membership of {name}', { name })}
           onCheckedChange={(checked) => {
             if (checked) setStatus.mutate({ userId, status: 'active' });
             else setIsConfirming(true);
@@ -79,20 +81,22 @@ export function MembershipControl({ userId, name, status }: MembershipControlPro
       <AlertDialog open={isConfirming} onOpenChange={setIsConfirming}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Deactivate {name}?</AlertDialogTitle>
+            <AlertDialogTitle>{t('Deactivate {name}?', { name })}</AlertDialogTitle>
             <AlertDialogDescription>
-              {name} is signed out right away and cannot log in until a staff member activates the membership again.
-              Their plans and history stay as they are.
+              {t(
+                '{name} is signed out right away and cannot log in until a staff member activates the membership again. Their plans and history stay as they are.',
+                { name },
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={setStatus.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogCancel disabled={setStatus.isPending}>{t('Cancel')}</AlertDialogCancel>
             <Button
               variant="destructive"
               disabled={setStatus.isPending}
               onClick={() => setStatus.mutate({ userId, status: 'inactive' })}
             >
-              {setStatus.isPending ? 'Deactivating...' : 'Deactivate'}
+              {setStatus.isPending ? t('Deactivating...') : t('Deactivate')}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

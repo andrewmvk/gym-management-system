@@ -1,6 +1,6 @@
 'use client';
 
-import { type ExerciseMuscle, muscleLabel } from '@cadence/shared/schemas/muscles';
+import type { ExerciseMuscle } from '@cadence/shared/schemas/muscles';
 import { useQuery } from '@tanstack/react-query';
 import { DumbbellIcon, PlusIcon, SearchXIcon } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -17,26 +17,29 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { useUrlState } from '@/hooks/use-url-state';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { usePagination } from '@/lib/use-pagination';
 
 const PAGE_SIZE = 12;
 
 // Primary muscles by name, with a count of the supporting ones so the cell stays one line.
-function describeMuscles(muscles: readonly ExerciseMuscle[]) {
+function describeMuscles({ t, muscleLabel }: I18n, muscles: readonly ExerciseMuscle[]) {
   const primary = muscles.filter((entry) => entry.role === 'primary').map((entry) => muscleLabel(entry.muscle));
   const supporting = muscles.length - primary.length;
-  if (primary.length === 0) return 'No muscles tagged';
-  return supporting > 0 ? `${primary.join(', ')} + ${supporting}` : primary.join(', ');
+  if (primary.length === 0) return t('No muscles tagged');
+  if (supporting === 0) return primary.join(', ');
+  return t('{muscles} + {count}', { muscles: primary.join(', '), count: supporting });
 }
 
 function ExerciseTableHead() {
+  const { t } = useI18n();
   return (
     <TableHeader>
       <TableRow>
-        <TableHead>Exercise</TableHead>
-        <TableHead className="hidden sm:table-cell">Muscles</TableHead>
-        <TableHead className="text-right">Status</TableHead>
+        <TableHead>{t('Exercise')}</TableHead>
+        <TableHead className="hidden sm:table-cell">{t('Muscles')}</TableHead>
+        <TableHead className="text-right">{t('Status')}</TableHead>
       </TableRow>
     </TableHeader>
   );
@@ -81,6 +84,8 @@ function ExerciseSectionSkeleton({ action }: { action?: ReactNode }) {
 }
 
 function ExerciseSectionRoot() {
+  const i18n = useI18n();
+  const { t, tx, muscleLabel } = i18n;
   const trpc = useTRPC();
   const ability = useAppAbility();
   const canManage = ability.can('manage', 'Catalog');
@@ -92,14 +97,14 @@ function ExerciseSectionRoot() {
   const filtered = (query.data ?? []).filter(
     (exercise) =>
       !term ||
-      exercise.name.toLowerCase().includes(term) ||
+      tx(exercise.name).toLowerCase().includes(term) ||
       exercise.muscles.some((entry) => muscleLabel(entry.muscle).toLowerCase().includes(term)),
   );
   const pagination = usePagination(filtered, PAGE_SIZE);
   const addAction = canManage ? (
     <Button onClick={() => setIsCreating(true)}>
       <PlusIcon data-icon="inline-start" />
-      Add exercise
+      {t('Add exercise')}
     </Button>
   ) : undefined;
 
@@ -113,7 +118,7 @@ function ExerciseSectionRoot() {
   } else if (query.isError) {
     list = (
       <QueryError
-        title="We couldn't load the exercises"
+        title={t("We couldn't load the exercises")}
         onRetry={() => query.refetch()}
         isRetrying={query.isRefetching}
       />
@@ -123,8 +128,8 @@ function ExerciseSectionRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={DumbbellIcon}
-          title="No exercises yet"
-          description={canManage ? 'Add the first one to start building plans.' : 'An admin adds exercises here.'}
+          title={t('No exercises yet')}
+          description={canManage ? t('Add the first one to start building plans.') : t('An admin adds exercises here.')}
           action={addAction}
         />
       </div>
@@ -139,14 +144,14 @@ function ExerciseSectionRoot() {
               setSearch(value);
               pagination.setPage(1);
             }}
-            placeholder="Search exercises or muscles"
+            placeholder={t('Search exercises or muscles')}
             className="w-full lg:w-80"
           />
           {addAction && <FilterBar.Trailing>{addAction}</FilterBar.Trailing>}
         </FilterBar>
         {filtered.length === 0 ? (
           <div className="rounded-lg border bg-card">
-            <EmptyState icon={SearchXIcon} title="No matches" description="Try another name or muscle." />
+            <EmptyState icon={SearchXIcon} title={t('No matches')} description={t('Try another name or muscle.')} />
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
@@ -156,13 +161,13 @@ function ExerciseSectionRoot() {
                 {pagination.pageItems.map((exercise) => (
                   <TableRow key={exercise.id}>
                     <TableCell>
-                      <p className="font-semibold">{exercise.name}</p>
-                      <p className="text-muted-foreground sm:hidden">{describeMuscles(exercise.muscles)}</p>
+                      <p className="font-semibold">{tx(exercise.name)}</p>
+                      <p className="text-muted-foreground sm:hidden">{describeMuscles(i18n, exercise.muscles)}</p>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">{describeMuscles(exercise.muscles)}</TableCell>
+                    <TableCell className="hidden sm:table-cell">{describeMuscles(i18n, exercise.muscles)}</TableCell>
                     <TableCell className="text-right">
                       <Badge variant={exercise.isAvailable ? 'live' : 'unavailable'}>
-                        {exercise.isAvailable ? 'Available' : 'Out of service'}
+                        {exercise.isAvailable ? t('Available') : t('Out of service')}
                       </Badge>
                     </TableCell>
                   </TableRow>
@@ -177,7 +182,7 @@ function ExerciseSectionRoot() {
           pageSize={pagination.pageSize}
           total={pagination.total}
           onPageChange={pagination.setPage}
-          noun="exercises"
+          noun={t('exercises')}
         />
       </div>
     );

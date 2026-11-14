@@ -2,7 +2,7 @@ import { MessageSquareIcon, PencilLineIcon } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { formatDateTime } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface ReviewEntry {
   id: string;
@@ -13,12 +13,14 @@ interface ReviewEntry {
 }
 
 function Header() {
+  const { t } = useI18n();
   return (
     <CardHeader>
-      <CardTitle>Review history</CardTitle>
+      <CardTitle>{t('Review history')}</CardTitle>
       <CardDescription>
-        Every trainer&apos;s notes and edits, in order. Any staff member can read them, the member cannot, and none
-        overwrite another.
+        {t(
+          "Every trainer's notes and edits, in order. Any staff member can read them, the member cannot, and none overwrite another.",
+        )}
       </CardDescription>
     </CardHeader>
   );
@@ -45,11 +47,12 @@ function ReviewHistorySkeleton() {
 }
 
 function ReviewHistoryRoot({ reviews }: { reviews: readonly ReviewEntry[] }) {
+  const { t, formatDateTime } = useI18n();
   return (
     <Card>
       <Header />
       <CardContent className="py-2">
-        {reviews.length === 0 && <p className="py-4 text-sm text-muted-foreground">No notes or edits yet.</p>}
+        {reviews.length === 0 && <p className="py-4 text-sm text-muted-foreground">{t('No notes or edits yet.')}</p>}
         <ol className="flex flex-col">
           {reviews.map((review) => (
             <li key={review.id} className="flex gap-3 border-b py-4 last:border-b-0">
@@ -60,7 +63,11 @@ function ReviewHistoryRoot({ reviews }: { reviews: readonly ReviewEntry[] }) {
                 <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
                   <span className="font-semibold">{review.authorName}</span>
                   <span className="numerals text-base text-muted-foreground">{formatDateTime(review.createdAt)}</span>
-                  {review.isEdit ? <Badge variant="tape">Edit</Badge> : <Badge variant="secondary">Note</Badge>}
+                  {review.isEdit ? (
+                    <Badge variant="tape">{t('review::Edit')}</Badge>
+                  ) : (
+                    <Badge variant="secondary">{t('review::Note')}</Badge>
+                  )}
                 </p>
                 <p className="text-sm text-pretty break-words whitespace-pre-wrap">{review.note}</p>
               </div>

@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Popover, PopoverAnchor, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fromIsoDate } from '@/lib/calendar-date';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -51,14 +52,20 @@ function ringBackground(exerciseCount: number, completedCount: number) {
   return `conic-gradient(${stops.join(', ')})`;
 }
 
-function describeTile(day: WeekDay, isToday: boolean, summary: DaySummary | undefined, isFuture: boolean) {
-  const date = day.date.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+function describeTile(
+  { t, formatDate }: I18n,
+  day: WeekDay,
+  isToday: boolean,
+  summary: DaySummary | undefined,
+  isFuture: boolean,
+) {
+  const date = formatDate(day.date, { weekday: 'long', day: 'numeric', month: 'long' });
   const parts = [date];
-  if (isToday) parts.push('today');
-  if (!summary) parts.push('no plan');
-  else if (isFuture) parts.push(`${summary.exerciseCount} planned`);
-  else parts.push(`${summary.completedCount} of ${summary.exerciseCount} done`);
-  if (summary?.status === 'trainer_edited') parts.push('edited by a trainer');
+  if (isToday) parts.push(t('today'));
+  if (!summary) parts.push(t('no plan'));
+  else if (isFuture) parts.push(t('{count} planned', { count: summary.exerciseCount }));
+  else parts.push(t('{done} of {total} done', { done: summary.completedCount, total: summary.exerciseCount }));
+  if (summary?.status === 'trainer_edited') parts.push(t('edited by a trainer'));
   return parts.join(', ');
 }
 
@@ -75,6 +82,7 @@ interface DayTileProps {
 // A circle with the day number in it. The border is the plan: one arc per exercise, filled as they are done.
 // A day with no plan has no border, only its number, so every day takes the same room.
 function DayTile({ day, todayIso, isSelected, isDimmed, isLoading, summary, onSelect }: DayTileProps) {
+  const i18n = useI18n();
   const relation = relationOf(day.iso, todayIso);
   const isToday = relation === 'today';
   const isFuture = relation === 'future';
@@ -85,7 +93,7 @@ function DayTile({ day, todayIso, isSelected, isDimmed, isLoading, summary, onSe
       type="button"
       aria-pressed={isSelected}
       aria-current={isToday ? 'date' : undefined}
-      aria-label={describeTile(day, isToday, summary, isFuture)}
+      aria-label={describeTile(i18n, day, isToday, summary, isFuture)}
       onClick={onSelect}
       className={cn(
         'group relative min-w-0 outline-none',
@@ -138,8 +146,8 @@ function DayTile({ day, todayIso, isSelected, isDimmed, isLoading, summary, onSe
   );
 }
 
-function weekdayNames(week: readonly WeekDay[]) {
-  return week.map((day) => day.date.toLocaleDateString(undefined, { weekday: 'short' }));
+function weekdayNames({ formatDate }: I18n, week: readonly WeekDay[]) {
+  return week.map((day) => formatDate(day.date, { weekday: 'short' }).replace('.', ''));
 }
 
 function WeekdayLabels({ names, todayColumn }: { names: readonly string[]; todayColumn: number }) {
@@ -161,9 +169,10 @@ function WeekdayLabels({ names, todayColumn }: { names: readonly string[]; today
 }
 
 function DayStripSkeleton() {
-  const names = weekdayNames(currentWeek());
+  const i18n = useI18n();
+  const names = weekdayNames(i18n, currentWeek());
   return (
-    <section aria-label="Choose a day" className={STRIP}>
+    <section aria-label={i18n.t('Choose a day')} className={STRIP}>
       <WeekdayLabels names={names} todayColumn={-1} />
       <div className="grid w-full grid-cols-7">
         {names.map((name) => (
@@ -214,6 +223,8 @@ interface DayStripProps {
 // The chosen day's week as circles under a fixed Monday-to-Sunday row of names. The whole month of today opens in
 // a popover over the page, as wide as the strip so its columns sit under the same names, and takes no room of its own.
 function DayStripRoot({ selected, todayIso, onSelect }: DayStripProps) {
+  const i18n = useI18n();
+  const { t, formatDate } = i18n;
   const trpc = useTRPC();
   const [isOpen, setIsOpen] = useState(false);
   const today = fromIsoDate(todayIso) ?? new Date();
@@ -224,26 +235,27 @@ function DayStripRoot({ selected, todayIso, onSelect }: DayStripProps) {
   const daysQuery = useQuery(trpc.plans.listDays.queryOptions({ from, to }));
   const summaries = new Map<string, DaySummary>(daysQuery.data?.map((day) => [day.planDate, day]));
   const todayColumn = (today.getDay() + 6) % 7;
-  const monthTitle = today.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const monthTitle = formatDate(today, { month: 'long', year: 'numeric' });
+  const names = weekdayNames(i18n, selectedWeek);
   const rowProps = { selected, todayIso, isLoading: daysQuery.isPending, summaries };
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverAnchor asChild>
-        <section aria-label="Choose a day" className={STRIP}>
-          <WeekdayLabels names={weekdayNames(selectedWeek)} todayColumn={todayColumn} />
+        <section aria-label={t('Choose a day')} className={STRIP}>
+          <WeekdayLabels names={names} todayColumn={todayColumn} />
           <div className="w-full">
             <WeekRow week={selectedWeek} onSelect={onSelect} {...rowProps} />
           </div>
           {daysQuery.isError && (
             <p role="alert" className="text-sm text-muted-foreground">
-              We couldn&apos;t load how much of each day is done.{' '}
+              {t("We couldn't load how much of each day is done.")}{' '}
               <button
                 type="button"
                 className="font-semibold text-foreground underline underline-offset-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/45"
                 onClick={() => daysQuery.refetch()}
               >
-                Try again
+                {t('Try again')}
               </button>
             </p>
           )}
@@ -253,7 +265,7 @@ function DayStripRoot({ selected, todayIso, onSelect }: DayStripProps) {
               size="xs"
               className="absolute inset-x-0 top-full mx-auto -mt-3 h-6 w-fit rounded-full pointer-fine:opacity-0 pointer-fine:transition-opacity pointer-fine:group-has-focus-visible/strip:opacity-100 pointer-fine:group-hover/strip:opacity-100 data-[state=open]:opacity-100"
             >
-              Show this Month
+              {t('Show this month')}
               <ChevronDownIcon className={cn('transition-transform duration-300', isOpen && 'rotate-180')} />
             </Button>
           </PopoverTrigger>
@@ -269,7 +281,7 @@ function DayStripRoot({ selected, todayIso, onSelect }: DayStripProps) {
         <h2 className="font-display text-xl font-bold tracking-wide leading-loose uppercase w-full text-center mb-2">
           {monthTitle}
         </h2>
-        <WeekdayLabels names={weekdayNames(selectedWeek)} todayColumn={todayColumn} />
+        <WeekdayLabels names={names} todayColumn={todayColumn} />
         <div>
           {month.map((week) => (
             <WeekRow

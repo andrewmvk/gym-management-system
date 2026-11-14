@@ -8,7 +8,7 @@ import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { API_URL } from '@/lib/env';
-import { formatDateTime, formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 const SKELETON_ROWS = 6;
@@ -22,11 +22,12 @@ function SectionShell({
   action?: ReactNode;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   return (
-    <section aria-label="Your health profile" className="overflow-hidden rounded-lg border bg-card">
+    <section aria-label={t('Your health profile')} className="overflow-hidden rounded-lg border bg-card">
       <div className="flex flex-col gap-3 border-b px-5 py-4 sm:px-6">
         <div>
-          <h2 className="font-display text-xl font-bold tracking-wide uppercase">Your health profile</h2>
+          <h2 className="font-display text-xl font-bold tracking-wide uppercase">{t('Your health profile')}</h2>
           <div className="text-sm text-pretty text-muted-foreground">{description}</div>
         </div>
         {action}
@@ -60,10 +61,12 @@ function CurrentProfileSkeleton() {
 }
 
 function None() {
-  return <span className="text-muted-foreground">None listed</span>;
+  const { t } = useI18n();
+  return <span className="text-muted-foreground">{t('None listed')}</span>;
 }
 
 function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
+  const { t, tn, formatDateTime, formatPlanDate } = useI18n();
   const trpc = useTRPC();
   const submissionsQuery = useQuery(trpc.onboarding.listMine.queryOptions());
 
@@ -77,9 +80,9 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
 
   if (submissionsQuery.isError) {
     return (
-      <SectionShell description="What you told us in your health profile.">
+      <SectionShell description={t('What you told us in your health profile.')}>
         <QueryError
-          title="We couldn't load your health profile"
+          title={t("We couldn't load your health profile")}
           onRetry={() => submissionsQuery.refetch()}
           isRetrying={submissionsQuery.isRefetching}
           className="m-5 sm:m-6"
@@ -93,41 +96,38 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
   return (
     <SectionShell
       description={
-        latest ? (
-          <>
-            Last updated <span className="numerals text-base font-semibold">{formatDateTime(latest.submittedAt)}</span>.
-            Each update is saved as a new entry, and your coach reads the newest first.
-          </>
-        ) : (
-          'Nothing saved yet.'
-        )
+        latest
+          ? tn('Last updated {date}. Each update is saved as a new entry, and your coach reads the newest first.', {
+              date: <span className="numerals text-base font-semibold">{formatDateTime(latest.submittedAt)}</span>,
+            })
+          : t('Nothing saved yet.')
       }
       action={
         <Button type="button" variant="outline" className="w-fit" onClick={onUpdate}>
           <PencilIcon data-icon="inline-start" />
-          Update my profile
+          {t('Update my profile')}
         </Button>
       }
     >
       {latest && (
         <dl>
-          <ProfileRow label="Height and weight">
+          <ProfileRow label={t('Height and weight')}>
             <span className="numerals text-lg font-semibold">{latest.heightCm}</span> cm,{' '}
             <span className="numerals text-lg font-semibold">{latest.weightKg}</span> kg
           </ProfileRow>
-          <ProfileRow label="Goals">{latest.goals}</ProfileRow>
-          <ProfileRow label="Medications">
+          <ProfileRow label={t('Goals')}>{latest.goals}</ProfileRow>
+          <ProfileRow label={t('Medications')}>
             {latest.medications.length > 0 ? latest.medications.join(', ') : <None />}
           </ProfileRow>
-          <ProfileRow label="Physical conditions">
+          <ProfileRow label={t('Physical conditions')}>
             {latest.physicalConditions.conditions.length > 0 ? (
               latest.physicalConditions.conditions.join(', ')
             ) : (
               <None />
             )}
           </ProfileRow>
-          <ProfileRow label="Other notes">{latest.physicalConditions.otherNotes ?? <None />}</ProfileRow>
-          <ProfileRow label="Medical exams">
+          <ProfileRow label={t('Other notes')}>{latest.physicalConditions.otherNotes ?? <None />}</ProfileRow>
+          <ProfileRow label={t('Medical exams')}>
             {latest.exams.length > 0 ? (
               <ul className="flex flex-col gap-3">
                 {latest.exams.map((exam) => (
@@ -150,7 +150,7 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
                         className="flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/45"
                       >
                         <PaperclipIcon className="size-4" aria-hidden />
-                        View attached file
+                        {t('View attached file')}
                       </a>
                     )}
                   </li>

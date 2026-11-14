@@ -1,8 +1,10 @@
+'use client';
+
 import type { CoachBlock, PickerOption } from '@cadence/shared/schemas/coach';
-import { muscleLabel } from '@cadence/shared/schemas/muscles';
 import { CheckIcon, PlusIcon, TriangleAlertIcon } from 'lucide-react';
 import { Prescription } from '@/app/(member)/coach/prescription';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 type PickerBlock = Extract<CoachBlock, { type: 'exercise_picker' }>;
 
@@ -16,13 +18,16 @@ interface ExercisePickerCardProps {
 // A short list the coach chose for a muscle the member pointed at, each with the reason it suits them.
 // Adding one puts it into the draft; the plan itself is untouched until the member applies the draft.
 export function ExercisePickerCard({ block, addedIds, isDisabled, onAdd }: ExercisePickerCardProps) {
+  const { t, tx, muscleLabel } = useI18n();
+  const muscle = muscleLabel(block.muscle);
+
   return (
     <section
-      aria-label={`Exercises for ${muscleLabel(block.muscle)}`}
+      aria-label={t('Exercises for {muscle}', { muscle })}
       className="animate-block-in flex flex-col rounded-lg border bg-card text-card-foreground"
     >
       <h3 className="border-b px-3 py-2 font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase">
-        For {muscleLabel(block.muscle)}
+        {t('For {muscle}', { muscle })}
       </h3>
       <ul>
         {block.options.map((option) => {
@@ -31,7 +36,7 @@ export function ExercisePickerCard({ block, addedIds, isDisabled, onAdd }: Exerc
             <li key={option.exerciseId} className="flex flex-col gap-1.5 border-b px-3 py-2.5 last:border-b-0">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex min-w-0 flex-col gap-0.5">
-                  <p className="text-base font-semibold text-pretty">{option.name}</p>
+                  <p className="text-base font-semibold text-pretty">{tx(option.name)}</p>
                   <p className="text-sm text-pretty text-muted-foreground">{option.reason}</p>
                 </div>
                 <Prescription sets={option.sets} reps={option.reps} load={option.load} className="shrink-0 text-xl" />
@@ -51,7 +56,7 @@ export function ExercisePickerCard({ block, addedIds, isDisabled, onAdd }: Exerc
                 onClick={() => onAdd(option)}
               >
                 {isAdded ? <CheckIcon data-icon="inline-start" /> : <PlusIcon data-icon="inline-start" />}
-                {isAdded ? 'In your draft' : 'Add to my plan'}
+                {isAdded ? t('In your draft') : t('Add to my plan')}
               </Button>
             </li>
           );

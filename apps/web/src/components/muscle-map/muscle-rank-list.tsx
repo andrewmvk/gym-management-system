@@ -1,7 +1,10 @@
-import { type MuscleId, muscleLabel } from '@cadence/shared/schemas/muscles';
+'use client';
+
+import type { MuscleId } from '@cadence/shared/schemas/muscles';
 import { TriangleAlertIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { HATCH_STYLE } from '@/components/muscle-map/muscle-legend';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 const STEP_SWATCHES = ['bg-heat-0', 'bg-heat-1', 'bg-heat-2', 'bg-heat-3', 'bg-heat-4', 'bg-heat-5'] as const;
@@ -27,6 +30,8 @@ interface MuscleRankListProps {
 
 // The keyboard and screen-reader path to the body: every muscle on the map is a button here.
 export function MuscleRankList({ label, items, selected, onSelect, onHover, className }: MuscleRankListProps) {
+  const { t, muscleLabel } = useI18n();
+
   return (
     <ul aria-label={label} className={cn('flex flex-col', className)}>
       {items.map((item) => {
@@ -57,12 +62,12 @@ export function MuscleRankList({ label, items, selected, onSelect, onHover, clas
               />
               <span className={cn('min-w-0 flex-1 truncate text-sm', isSelected ? 'font-bold' : 'font-semibold')}>
                 {muscleLabel(item.muscle)}
-                {item.isInjured && <span className="sr-only">, injured</span>}
+                {item.isInjured && <span className="sr-only">{t(', injured')}</span>}
               </span>
               {item.isInjured && (
                 <span
                   aria-hidden
-                  title="Injury you reported"
+                  title={t('Injury you reported')}
                   className="flex size-6 shrink-0 items-center justify-center rounded-sm bg-tape text-tape-foreground"
                 >
                   <TriangleAlertIcon className="size-3.5" />

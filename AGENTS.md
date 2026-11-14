@@ -1,6 +1,6 @@
 # Cadence - AI Gym Management System - Agent Instructions
 
-Academic project (not deployed to real users) replacing a gym's fingerprint access control and manual trainer interviews with face-recognition check-in and an AI that builds/refines training plans from accumulated structured facts, not a single interview. Full product context: [`PRODUCT.md`](./PRODUCT.md). Full functional/technical detail: [`docs/`](./docs/) (`01-product-overview.md`, `02-requirements.md` with FR-1..FR-72, `03-features-and-flows.md`, `04-architecture.md`, `05-data-model.md`).
+Academic project (not deployed to real users) replacing a gym's fingerprint access control and manual trainer interviews with face-recognition check-in and an AI that builds/refines training plans from accumulated structured facts, not a single interview. Full product context: [`PRODUCT.md`](./PRODUCT.md). Full functional/technical detail: [`docs/`](./docs/) (`01-product-overview.md`, `02-requirements.md` with FR-1..FR-73, `03-features-and-flows.md`, `04-architecture.md`, `05-data-model.md`).
 
 This file is the always-loaded index. It stays short by design - code-level conventions live in `rules/`, linked below. Don't duplicate FR/architecture detail here; link to `docs/` instead.
 
@@ -69,7 +69,7 @@ Every change should respect these (from `PRODUCT.md`):
 |---|---|
 | [`rules/naming-conventions.md`](./rules/naming-conventions.md) | naming a file, component, variable, tRPC procedure, or branch/commit |
 | [`rules/error-handling.md`](./rules/error-handling.md) | handling an AI/turnstile failure, validation error, or surfacing an error to the UI |
-| [`rules/frontend.md`](./rules/frontend.md) | writing anything in `apps/web` - data fetching, loading states (Skeleton), forms, styling, routing |
+| [`rules/frontend.md`](./rules/frontend.md) | writing anything in `apps/web` - data fetching, loading states (Skeleton), forms, styling, routing, user-visible text (i18n) |
 | [`DESIGN.md`](./DESIGN.md) | building or changing any UI - always through the `/impeccable` skill; it defines the visual system (tokens, components, do's and don'ts) |
 | [`rules/backend.md`](./rules/backend.md) | writing anything in `apps/api` - routers, services, AI calls, auth, uploads |
 | [`rules/database.md`](./rules/database.md) | touching Drizzle schema, migrations, or seed data |
@@ -90,5 +90,5 @@ Every change should respect these (from `PRODUCT.md`):
 
 ## Before you start
 
-- Don't invent scope beyond FR-1..FR-72 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
+- Don't invent scope beyond FR-1..FR-73 (`docs/02-requirements.md`) - the "Out of Scope" list there is deliberate, not an oversight.
 - Follow the repo layout above rather than improvising a different structure.

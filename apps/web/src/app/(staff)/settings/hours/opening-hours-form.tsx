@@ -23,17 +23,8 @@ import { FieldError } from '@/components/ui/field';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { serverMessage } from '@/lib/error-message';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
-
-const DAY_LABELS: Record<Weekday, string> = {
-  sunday: 'Sunday',
-  monday: 'Monday',
-  tuesday: 'Tuesday',
-  wednesday: 'Wednesday',
-  thursday: 'Thursday',
-  friday: 'Friday',
-  saturday: 'Saturday',
-};
 
 // The week reads Monday to Sunday even though the shared list follows Date#getDay (Sunday first).
 const DISPLAY_DAYS: readonly Weekday[] = [...WEEKDAYS.slice(1), WEEKDAYS[0]];
@@ -63,6 +54,7 @@ function OpeningHoursFormSkeleton() {
 }
 
 function OpeningHoursFormRoot() {
+  const { t, tx, weekdayLabel } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const ability = useAppAbility();
@@ -86,9 +78,9 @@ function OpeningHoursFormRoot() {
         queryClient.setQueryData(trpc.gym.getHours.queryKey(), values);
         queryClient.invalidateQueries({ queryKey: trpc.gym.info.queryKey() });
         form.reset(values);
-        toast.success('Opening hours saved.');
+        toast.success(t('Opening hours saved.'));
       },
-      onError: (error) => toast.error(serverMessage(error, "We couldn't save the opening hours. Try again.")),
+      onError: (error) => toast.error(tx(serverMessage(error, t("We couldn't save the opening hours. Try again.")))),
     }),
   );
 
@@ -97,8 +89,8 @@ function OpeningHoursFormRoot() {
       <div className="rounded-lg border bg-card">
         <EmptyState
           icon={LockIcon}
-          title="No access"
-          description="Your account doesn't include gym settings. Ask an admin if you need it."
+          title={t('No access')}
+          description={t("Your account doesn't include gym settings. Ask an admin if you need it.")}
         />
       </div>
     );
@@ -107,7 +99,7 @@ function OpeningHoursFormRoot() {
   if (hoursQuery.isError) {
     return (
       <QueryError
-        title="We couldn't load the opening hours"
+        title={t("We couldn't load the opening hours")}
         onRetry={() => hoursQuery.refetch()}
         isRetrying={hoursQuery.isRefetching}
       />
@@ -141,7 +133,7 @@ function OpeningHoursFormRoot() {
                   <div className="flex flex-col gap-2 px-5 py-4 sm:px-6">
                     <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
                       <span className="w-28 font-display text-xl font-bold tracking-wide uppercase">
-                        {DAY_LABELS[day]}
+                        {weekdayLabel(day)}
                       </span>
                       <div className="flex items-center gap-2">
                         <Switch
@@ -150,7 +142,7 @@ function OpeningHoursFormRoot() {
                           onCheckedChange={(checked) => field.onChange(checked ? null : OPEN_FALLBACK)}
                         />
                         <label htmlFor={`closed-${day}`} className="text-sm">
-                          Closed
+                          {t('Closed')}
                         </label>
                       </div>
                       {field.value ? (
@@ -163,12 +155,12 @@ function OpeningHoursFormRoot() {
                                 value={openField.value}
                                 onChange={openField.onChange}
                                 onBlur={openField.onBlur}
-                                aria-label={`${DAY_LABELS[day]} opens`}
+                                aria-label={t('{day} opens', { day: weekdayLabel(day) })}
                                 aria-invalid={Boolean(dayErrors?.open)}
                               />
                             )}
                           />
-                          <span className="text-sm text-muted-foreground">to</span>
+                          <span className="text-sm text-muted-foreground">{t('to')}</span>
                           <Controller
                             name={`${day}.close`}
                             control={form.control}
@@ -177,14 +169,14 @@ function OpeningHoursFormRoot() {
                                 value={closeField.value}
                                 onChange={closeField.onChange}
                                 onBlur={closeField.onBlur}
-                                aria-label={`${DAY_LABELS[day]} closes`}
+                                aria-label={t('{day} closes', { day: weekdayLabel(day) })}
                                 aria-invalid={Boolean(dayErrors?.close)}
                               />
                             )}
                           />
                         </div>
                       ) : (
-                        <span className="text-sm text-muted-foreground sm:ml-auto">Closed all day</span>
+                        <span className="text-sm text-muted-foreground sm:ml-auto">{t('Closed all day')}</span>
                       )}
                     </div>
                     {(dayErrors?.open || dayErrors?.close) && <FieldError errors={[dayErrors.open, dayErrors.close]} />}
@@ -198,10 +190,10 @@ function OpeningHoursFormRoot() {
 
       <div className="flex flex-col gap-3 border-t pt-6 sm:flex-row sm:items-center">
         <Button type="submit" disabled={save.isPending || !form.formState.isDirty}>
-          {save.isPending ? 'Saving...' : 'Save opening hours'}
+          {save.isPending ? t('Saving...') : t('Save opening hours')}
         </Button>
         <p className="text-sm text-muted-foreground">
-          Times use the gym's local clock. The public gym page and the open or closed state follow these hours.
+          {t("Times use the gym's local clock. The public gym page and the open or closed state follow these hours.")}
         </p>
       </div>
     </form>

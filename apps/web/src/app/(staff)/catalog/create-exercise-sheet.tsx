@@ -19,6 +19,7 @@ import { Sheet, SheetContent, SheetDescription, SheetTitle } from '@/components/
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import { serverMessage } from '@/lib/error-message';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 const FORM_ID = 'create-exercise-form';
@@ -47,6 +48,7 @@ export function CreateExerciseSheet({
   onCreated,
   presetEquipmentId = null,
 }: CreateExerciseSheetProps) {
+  const { t, tx } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const equipmentQuery = useQuery(trpc.catalog.listEquipment.queryOptions());
@@ -87,18 +89,18 @@ export function CreateExerciseSheet({
         form.reset();
         onOpenChange(false);
         toast.success(
-          `${variables.name} added to the catalog.`,
-          onCreated && { action: { label: 'Show it', onClick: () => onCreated(variables.name) } },
+          t('{name} added to the catalog.', { name: variables.name }),
+          onCreated && { action: { label: t('Show it'), onClick: () => onCreated(variables.name) } },
         );
       },
-      onError: (error) => toast.error(serverMessage(error, "Couldn't add the exercise. Try again.")),
+      onError: (error) => toast.error(tx(serverMessage(error, t("Couldn't add the exercise. Try again.")))),
     }),
   );
 
   function submit(values: CreateExerciseInput) {
     const name = values.name.toLowerCase();
     if (exercisesQuery.data?.some((exercise) => exercise.name.trim().toLowerCase() === name)) {
-      form.setError('name', { message: 'An exercise with this name is already in the catalog.' });
+      form.setError('name', { message: t('An exercise with this name is already in the catalog.') });
       form.setFocus('name');
       return;
     }
@@ -121,9 +123,11 @@ export function CreateExerciseSheet({
         }}
       >
         <div className="flex flex-col gap-1.5 border-b px-5 py-4 pr-16 sm:px-6">
-          <SheetTitle>New exercise</SheetTitle>
+          <SheetTitle>{t('New exercise')}</SheetTitle>
           <SheetDescription>
-            Stays in the catalog once added, so past plans keep resolving. Name, instructions and muscles are required.
+            {t(
+              'Stays in the catalog once added, so past plans keep resolving. Name, instructions and muscles are required.',
+            )}
           </SheetDescription>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-5 py-5 sm:px-6">
@@ -132,7 +136,7 @@ export function CreateExerciseSheet({
               role="status"
               className="mb-5 flex items-center justify-between gap-3 rounded-md bg-muted/60 px-3 text-sm"
             >
-              <span className="py-2">Draft restored from where you left off.</span>
+              <span className="py-2">{t('Draft restored from where you left off.')}</span>
               <Button
                 type="button"
                 variant="link"
@@ -142,7 +146,7 @@ export function CreateExerciseSheet({
                   setIsRestored(false);
                 }}
               >
-                Start over
+                {t('Start over')}
               </Button>
             </div>
           )}
@@ -154,11 +158,11 @@ export function CreateExerciseSheet({
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="exercise-name">Name</FieldLabel>
+                      <FieldLabel htmlFor="exercise-name">{t('Name')}</FieldLabel>
                       <Input
                         {...field}
                         id="exercise-name"
-                        placeholder="e.g. Incline dumbbell press"
+                        placeholder={t('e.g. Incline dumbbell press')}
                         aria-invalid={fieldState.invalid}
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -170,12 +174,12 @@ export function CreateExerciseSheet({
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="exercise-instructions">Instructions</FieldLabel>
+                      <FieldLabel htmlFor="exercise-instructions">{t('Instructions')}</FieldLabel>
                       <Textarea
                         {...field}
                         id="exercise-instructions"
                         className="min-h-20"
-                        placeholder="How to do it, in a few steps. Members and the coach read this."
+                        placeholder={t('How to do it, in a few steps. Members and the coach read this.')}
                         aria-invalid={fieldState.invalid}
                       />
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
@@ -188,8 +192,10 @@ export function CreateExerciseSheet({
                   render={({ field }) => (
                     <fieldset className="flex min-w-0 flex-col gap-2">
                       <legend className="mb-2 text-sm font-medium">
-                        Equipment needed{' '}
-                        <span className="font-normal text-muted-foreground">(optional, none for bodyweight)</span>
+                        {t('Equipment needed')}{' '}
+                        <span className="font-normal text-muted-foreground">
+                          {t('(optional, none for bodyweight)')}
+                        </span>
                       </legend>
                       {equipmentQuery.isPending && (
                         <Deferred>
@@ -201,7 +207,7 @@ export function CreateExerciseSheet({
                       )}
                       {equipmentQuery.isError && (
                         <QueryError
-                          title="We couldn't load the equipment"
+                          title={t("We couldn't load the equipment")}
                           onRetry={() => equipmentQuery.refetch()}
                           isRetrying={equipmentQuery.isRefetching}
                           className="py-6"
@@ -209,19 +215,20 @@ export function CreateExerciseSheet({
                       )}
                       {equipmentQuery.isSuccess && equipment.length === 0 && (
                         <p className="text-sm text-muted-foreground">
-                          No equipment in the gym yet. Add some on the Equipment tab, or save this as a bodyweight
-                          exercise.
+                          {t(
+                            'No equipment in the gym yet. Add some on the Equipment tab, or save this as a bodyweight exercise.',
+                          )}
                         </p>
                       )}
                       {equipmentQuery.isSuccess && equipment.length > 0 && (
                         <MultiSelect
-                          options={equipment.map((item) => ({ value: item.id, label: item.name }))}
+                          options={equipment.map((item) => ({ value: item.id, label: tx(item.name) }))}
                           value={field.value}
                           onChange={field.onChange}
-                          placeholder="Select equipment"
-                          searchPlaceholder="Search equipment"
-                          emptyMessage="No equipment matches."
-                          aria-label="Equipment needed"
+                          placeholder={t('Select equipment')}
+                          searchPlaceholder={t('Search equipment')}
+                          emptyMessage={t('No equipment matches.')}
+                          aria-label={t('Equipment needed')}
                         />
                       )}
                     </fieldset>
@@ -234,7 +241,7 @@ export function CreateExerciseSheet({
                   control={form.control}
                   render={({ field, fieldState }) => (
                     <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel id="exercise-muscles-label">Muscles trained</FieldLabel>
+                      <FieldLabel id="exercise-muscles-label">{t('Muscles trained')}</FieldLabel>
                       {fieldState.invalid && <FieldError errors={[fieldState.error]} />}
                       <MuscleSelector
                         value={field.value}
@@ -257,17 +264,17 @@ export function CreateExerciseSheet({
               onOpenChange(false);
             }}
           >
-            Cancel
+            {t('Cancel')}
           </Button>
           <AiButton
             mark="tempo"
             type="submit"
             form={FORM_ID}
             isPending={create.isPending}
-            pendingLabel="Adding..."
+            pendingLabel={t('Adding...')}
             disabled={!equipmentQuery.isSuccess}
           >
-            Add to catalog
+            {t('Add to catalog')}
           </AiButton>
         </div>
       </SheetContent>

@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/navigation-menu';
 import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
 import { UserMenu } from '@/components/user-menu';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import {
   type AppArea,
   isNavGroup,
@@ -48,12 +49,13 @@ function navLinkClass(isActive: boolean) {
 // Opens on hover (and on click or keyboard, which is also what a touch screen uses), so reaching a page is
 // one move: point at the group, then click the page.
 function NavGroupMenu({ group, pathname }: { group: NavGroup; pathname: string }) {
+  const { t } = useI18n();
   const isActive = group.items.some((item) => isNavItemActive(item, pathname));
 
   return (
     <NavigationMenuItem>
       <NavigationMenuTrigger className={navLinkClass(isActive)}>
-        {group.label}
+        {t(group.label)}
         <ChevronDownIcon
           className="size-4 transition-transform duration-200 group-data-[state=open]:rotate-180 motion-reduce:transition-none"
           aria-hidden
@@ -77,7 +79,7 @@ function NavGroupMenu({ group, pathname }: { group: NavGroup; pathname: string }
                       className={cn('h-4 w-1 -skew-x-12 rounded-xs', isCurrent ? 'bg-tape' : 'bg-kit-muted/40')}
                       aria-hidden
                     />
-                    {item.label}
+                    {t(item.label)}
                   </Link>
                 </NavigationMenuLink>
               </li>
@@ -90,6 +92,7 @@ function NavGroupMenu({ group, pathname }: { group: NavGroup; pathname: string }
 }
 
 function MobileNavLink({ item, pathname, onNavigate }: { item: NavItem; pathname: string; onNavigate: () => void }) {
+  const { t } = useI18n();
   const isActive = isNavItemActive(item, pathname);
   return (
     <Link
@@ -102,12 +105,13 @@ function MobileNavLink({ item, pathname, onNavigate }: { item: NavItem; pathname
       )}
     >
       <span className={cn('h-6 w-1.5 -skew-x-12 rounded-xs', isActive ? 'bg-tape' : 'bg-transparent')} aria-hidden />
-      {item.label}
+      {t(item.label)}
     </Link>
   );
 }
 
 function MobileNav({ entries, pathname }: { entries: NavEntry[]; pathname: string }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const close = () => setOpen(false);
 
@@ -116,21 +120,21 @@ function MobileNav({ entries, pathname }: { entries: NavEntry[]; pathname: strin
       <SheetTrigger asChild>
         <Button variant="ghost" size="icon" className="-ml-2 text-kit-foreground hover:bg-white/10 md:hidden">
           <MenuIcon className="size-6" />
-          <span className="sr-only">Open menu</span>
+          <span className="sr-only">{t('Open menu')}</span>
         </Button>
       </SheetTrigger>
       <SheetContent side="left" className="gap-8 border-r-0 bg-kit p-0 text-kit-foreground">
         <div className="flex h-16 items-center px-5">
           <Brand />
         </div>
-        <SheetTitle className="sr-only">Navigation</SheetTitle>
-        <SheetDescription className="sr-only">Go to another section of Cadence.</SheetDescription>
+        <SheetTitle className="sr-only">{t('Navigation')}</SheetTitle>
+        <SheetDescription className="sr-only">{t('Go to another section of Cadence.')}</SheetDescription>
         <nav className="flex flex-col px-3">
           {entries.map((entry) =>
             isNavGroup(entry) ? (
               <div key={entry.label} className="flex flex-col">
                 <p className="px-3 pt-4 pb-1 font-display text-xs font-semibold tracking-widest text-kit-muted uppercase">
-                  {entry.label}
+                  {t(entry.label)}
                 </p>
                 {entry.items.map((item) => (
                   <MobileNavLink key={item.href} item={item} pathname={pathname} onNavigate={close} />
@@ -147,6 +151,7 @@ function MobileNav({ entries, pathname }: { entries: NavEntry[]; pathname: strin
 }
 
 export function AppHeader({ area }: { area: AppArea }) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const pathname = usePathname();
   const me = useQuery(trpc.auth.me.queryOptions());
@@ -167,11 +172,11 @@ export function AppHeader({ area }: { area: AppArea }) {
         <Brand />
         {area === 'staff' && (
           <span className="rounded-sm bg-tape px-1.5 py-0.5 font-display text-xs font-bold tracking-widest text-tape-foreground uppercase">
-            Staff
+            {t('Staff')}
           </span>
         )}
       </Link>
-      <NavigationMenu aria-label="Main" className="ml-6 hidden h-full md:flex">
+      <NavigationMenu aria-label={t('Main')} className="ml-6 hidden h-full md:flex">
         <NavigationMenuList className="h-full">
           {entries.map((entry) => {
             if (isNavGroup(entry)) return <NavGroupMenu key={entry.label} group={entry} pathname={pathname} />;
@@ -180,7 +185,7 @@ export function AppHeader({ area }: { area: AppArea }) {
               <NavigationMenuItem key={entry.href}>
                 <NavigationMenuLink asChild active={isActive}>
                   <Link href={entry.href} className={navLinkClass(isActive)}>
-                    {entry.label}
+                    {t(entry.label)}
                   </Link>
                 </NavigationMenuLink>
               </NavigationMenuItem>

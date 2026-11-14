@@ -15,6 +15,8 @@ import { useEffect, useState } from 'react';
 import { Deferred } from '@/components/deferred';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey, Translate } from '@/lib/i18n/translate';
 import { cn } from '@/lib/utils';
 
 export const RESULT_COOLDOWN_MS = 5000;
@@ -41,9 +43,9 @@ export type KioskStatusState =
   | KioskResult;
 
 interface ResultCopy {
-  title: string;
-  detail: string;
-  staffNote?: string;
+  title: LabelKey;
+  detail: LabelKey;
+  staffNote?: LabelKey;
   tone: string;
   icon: LucideIcon;
 }
@@ -63,7 +65,7 @@ const COPY: Record<KioskResult['kind'], ResultCopy> = {
     icon: DoorOpenIcon,
   },
   retry: {
-    title: 'Try again',
+    title: 'kiosk::Try again',
     detail: 'We could not match your face. Step closer and look straight at the camera.',
     tone: 'outline-dashed outline-kit-muted text-kit-foreground',
     icon: RefreshCwIcon,
@@ -178,19 +180,20 @@ const DETAIL = 'max-w-prose text-2xl leading-snug lg:text-3xl';
 
 type ScanningState = Extract<KioskStatusState, { kind: 'scanning' }>;
 
-function scanningTitle({ source, severalFaces }: ScanningState) {
-  if (source === 'image') return 'Choose a photo';
-  return severalFaces ? 'One at a time' : 'Look at the camera';
+function scanningTitle({ source, severalFaces }: ScanningState, t: Translate) {
+  if (source === 'image') return t('Choose a photo');
+  return severalFaces ? t('One at a time') : t('Look at the camera');
 }
 
-function scanningDetail({ source, severalFaces }: ScanningState) {
-  if (source === 'image') return 'Pick a clear JPEG or PNG with one face in it.';
+function scanningDetail({ source, severalFaces }: ScanningState, t: Translate) {
+  if (source === 'image') return t('Pick a clear JPEG or PNG with one face in it.');
   return severalFaces
-    ? 'More than one face is in view. Please step up on your own.'
-    : 'Stand still and face the screen. The door opens when we know you.';
+    ? t('More than one face is in view. Please step up on your own.')
+    : t('Stand still and face the screen. The door opens when we know you.');
 }
 
 export function KioskStatus({ state, level }: { state: KioskStatusState; level: FrameLevel }) {
+  const { t } = useI18n();
   const frame = frameOutline(level);
 
   if (state.kind === 'preparing') {
@@ -208,8 +211,8 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
       <section role="status" className={cn(PANEL, frame, statusFrameTone(state))}>
         <div key="scanning" className="flex animate-block-in flex-col gap-8">
           <ScanFaceIcon className={cn(ICON, 'text-primary')} aria-hidden />
-          <h1 className={TITLE}>{scanningTitle(state)}</h1>
-          <p className={cn(DETAIL, 'text-kit-muted')}>{scanningDetail(state)}</p>
+          <h1 className={TITLE}>{scanningTitle(state, t)}</h1>
+          <p className={cn(DETAIL, 'text-kit-muted')}>{scanningDetail(state, t)}</p>
         </div>
         {state.source === 'camera' && <ScanningSegments />}
       </section>
@@ -223,10 +226,12 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
           <TriangleAlertIcon className={ICON} aria-hidden />
           <h1 className={TITLE}>{state.title}</h1>
           <p className={cn(DETAIL, 'text-kit-muted')}>{state.detail}</p>
-          {!IS_PRODUCTION && state.devNote && <p className="text-base text-kit-muted">Dev only: {state.devNote}</p>}
+          {!IS_PRODUCTION && state.devNote && (
+            <p className="text-base text-kit-muted">{t('Dev only: {note}', { note: state.devNote })}</p>
+          )}
         </div>
         <Button size="lg" variant="outline" className="self-start" onClick={state.onRetry}>
-          Retry
+          {t('Retry')}
         </Button>
       </section>
     );
@@ -238,9 +243,9 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
     <section role="status" className={cn(PANEL, frame, copy.tone)}>
       <div key={state.kind} className="flex animate-block-in flex-col gap-8">
         <Icon className={ICON} aria-hidden />
-        <h1 className={TITLE}>{copy.title}</h1>
-        <p className={DETAIL}>{copy.detail}</p>
-        {copy.staffNote && <p className="text-lg opacity-80">{copy.staffNote}</p>}
+        <h1 className={TITLE}>{t(copy.title)}</h1>
+        <p className={DETAIL}>{t(copy.detail)}</p>
+        {copy.staffNote && <p className="text-lg opacity-80">{t(copy.staffNote)}</p>}
       </div>
       <CooldownBar />
     </section>

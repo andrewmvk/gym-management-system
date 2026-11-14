@@ -19,6 +19,7 @@ import {
 import { Brand } from '@/components/brand';
 import { FileDropzone } from '@/components/file-dropzone';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { fileToCanvas, IMAGE_ACCEPTED_TYPES } from '@/lib/image';
 import { cn } from '@/lib/utils';
 
@@ -26,11 +27,12 @@ const EMBEDDINGS_REFRESH_MS = 5 * 60 * 1000;
 const SCAN_INTERVAL_MS = 600;
 const MISSES_BEFORE_FRONT_DESK = 3;
 const MISSES_IDLE_RESET_MS = 3 * 60 * 1000;
-const UNAVAILABLE_DETAIL = 'This check-in panel is not available right now. Please see the front desk.';
 
 type CameraState = 'starting' | 'ready' | 'failed';
 
 export function KioskPanel() {
+  const { t } = useI18n();
+  const unavailableDetail = t('This check-in panel is not available right now. Please see the front desk.');
   const videoRef = useRef<HTMLVideoElement>(null);
   const [camera, setCamera] = useState<CameraState>('starting');
   const [cameraAttempt, setCameraAttempt] = useState(0);
@@ -199,24 +201,24 @@ export function KioskPanel() {
   if (source === 'camera' && camera === 'failed') {
     state = {
       kind: 'unavailable',
-      title: 'Camera unavailable',
-      detail: 'Allow camera access for this panel, or check that the camera is plugged in.',
+      title: t('Camera unavailable'),
+      detail: t('Allow camera access for this panel, or check that the camera is plugged in.'),
       onRetry: retryCamera,
     };
   } else if (engine.isError) {
     state = {
       kind: 'unavailable',
-      title: 'Check-in unavailable',
-      detail: UNAVAILABLE_DETAIL,
-      devNote: 'The recognition files could not be loaded. See packages/shared/face-models/README.md.',
+      title: t('Check-in unavailable'),
+      detail: unavailableDetail,
+      devNote: t('The recognition files could not be loaded. See packages/shared/face-models/README.md.'),
       onRetry: () => void engine.refetch(),
     };
   } else if (embeddings.isError && !gallery) {
     state = {
       kind: 'unavailable',
-      title: 'Check-in unavailable',
-      detail: UNAVAILABLE_DETAIL,
-      devNote: 'The panel cannot reach the check-in service. Check the API and the kiosk key.',
+      title: t('Check-in unavailable'),
+      detail: unavailableDetail,
+      devNote: t('The panel cannot reach the check-in service. Check the API and the kiosk key.'),
       onRetry: () => void embeddings.refetch(),
     };
   } else if (result) {
@@ -263,21 +265,21 @@ export function KioskPanel() {
                 ref={videoRef}
                 muted
                 playsInline
-                aria-label="Live camera preview"
+                aria-label={t('Live camera preview')}
                 className="absolute inset-0 size-full -scale-x-100 object-cover"
               />
               {camera !== 'ready' && <Skeleton className="absolute inset-0 rounded-none bg-kit-foreground/10" />}
             </>
           ) : imagePreview ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={imagePreview} alt="Chosen face" className="absolute inset-0 size-full object-cover" />
+            <img src={imagePreview} alt={t('Chosen face')} className="absolute inset-0 size-full object-cover" />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center p-6">
               <div className="w-full max-w-md text-kit-foreground">
                 <FileDropzone
                   id="kiosk-image-upload"
                   accept={IMAGE_ACCEPTED_TYPES.join(',')}
-                  hint="JPEG or PNG with one face."
+                  hint={t('JPEG or PNG with one face.')}
                   onFiles={checkImage}
                   disabled={!ready || checkIn.isPending}
                 />

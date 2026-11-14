@@ -6,6 +6,8 @@ import { Calendar } from '@/components/calendar';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { addDays, fromIsoDate, toIsoDate } from '@/lib/calendar-date';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { cn } from '@/lib/utils';
 
 export interface DateRange {
@@ -14,7 +16,7 @@ export interface DateRange {
 }
 
 export interface DateRangePreset {
-  label: string;
+  label: LabelKey;
   // Every preset ends today, so it only has to say where it starts.
   start: (today: Date) => Date;
 }
@@ -43,9 +45,6 @@ interface DateRangePickerProps {
   'aria-label'?: string;
 }
 
-const formatDay = (date: Date, withYear: boolean) =>
-  date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', ...(withYear && { year: 'numeric' }) });
-
 export function DateRangePicker({
   value,
   onChange,
@@ -54,6 +53,7 @@ export function DateRangePicker({
   className,
   ...aria
 }: DateRangePickerProps) {
+  const { t, formatDate } = useI18n();
   const [open, setOpen] = useState(false);
   // The first click of a custom range waits here until the second one completes it.
   const [anchor, setAnchor] = useState<Date | null>(null);
@@ -65,6 +65,9 @@ export function DateRangePicker({
   const maxDate = max ? (fromIsoDate(max) ?? undefined) : undefined;
 
   const activePreset = presets.find((preset) => value.to === todayIso && toIsoDate(preset.start(today)) === value.from);
+
+  const formatDay = (date: Date, withYear: boolean) =>
+    formatDate(date, { day: 'numeric', month: 'short', ...(withYear && { year: 'numeric' }) });
 
   function choose(next: DateRange) {
     onChange(next);
@@ -83,8 +86,11 @@ export function DateRangePicker({
 
   const summary =
     from && to
-      ? `${formatDay(from, from.getFullYear() !== to.getFullYear())} to ${formatDay(to, true)}`
-      : 'Pick a range';
+      ? t('{from} to {to}', {
+          from: formatDay(from, from.getFullYear() !== to.getFullYear()),
+          to: formatDay(to, true),
+        })
+      : t('Pick a range');
 
   return (
     <Popover
@@ -105,7 +111,7 @@ export function DateRangePicker({
         >
           <CalendarRangeIcon className="size-4 shrink-0 text-muted-foreground" />
           <span className="flex-1 truncate">
-            {activePreset && <span className="font-semibold">{activePreset.label}</span>}
+            {activePreset && <span className="font-semibold">{t(activePreset.label)}</span>}
             {activePreset && <span className="text-muted-foreground"> · </span>}
             <span className={cn(activePreset && 'text-muted-foreground')}>{summary}</span>
           </span>
@@ -124,7 +130,7 @@ export function DateRangePicker({
                   className="justify-start whitespace-nowrap"
                   onClick={() => choose({ from: toIsoDate(preset.start(today)), to: todayIso })}
                 >
-                  {preset.label}
+                  {t(preset.label)}
                 </Button>
               );
             })}
@@ -138,7 +144,7 @@ export function DateRangePicker({
               max={maxDate}
             />
             <p className="border-t pt-3 text-sm text-muted-foreground">
-              {anchor ? 'Now pick the last day of the range.' : 'Or pick the first and last day on the calendar.'}
+              {anchor ? t('Now pick the last day of the range.') : t('Or pick the first and last day on the calendar.')}
             </p>
           </div>
         </div>

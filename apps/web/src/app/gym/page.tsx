@@ -10,10 +10,8 @@ import { KitBar } from '@/components/kit-bar';
 import { PageContainer } from '@/components/page-container';
 import { PageHeading } from '@/components/page-heading';
 import { PublicHeader } from '@/components/public-header';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
-
-const TITLE = 'Gym info';
-const DESCRIPTION = 'Whether the gym is open today and roughly how many people are on the floor right now.';
 
 // The page is public, so the header follows whoever is looking: the staff or member area they came from,
 // or the public one for a visitor.
@@ -37,11 +35,16 @@ function GymHeader() {
 }
 
 export default function GymPage() {
+  const { t } = useI18n();
+
   return (
     <>
       <GymHeader />
       <PageContainer>
-        <PageHeading title={TITLE} description={DESCRIPTION} />
+        <PageHeading
+          title={t('Gym info')}
+          description={t('Whether the gym is open today and roughly how many people are on the floor right now.')}
+        />
         <GymInfo />
       </PageContainer>
     </>

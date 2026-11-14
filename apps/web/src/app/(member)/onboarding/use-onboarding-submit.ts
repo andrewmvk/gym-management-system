@@ -4,6 +4,7 @@ import { toast } from 'sonner';
 import type { OnboardingFormOutput } from '@/app/(member)/onboarding/onboarding-form-types';
 import type { StreamedPlanExercise } from '@/app/(member)/plan/plan-build-progress';
 import { useStreamAction } from '@/hooks/use-stream-action';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC, useTRPCClient } from '@/lib/trpc';
 
 // building: the plan is being written; built or kept: the server finished it; failed: the information is
@@ -17,6 +18,7 @@ interface UseOnboardingSubmitOptions {
 // The server saves the information first and then writes the plan, streaming each exercise. A failure before
 // the information is saved is the member's to retry; one after it only concerns the plan.
 export function useOnboardingSubmit({ onSaved }: UseOnboardingSubmitOptions) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const client = useTRPCClient();
   const queryClient = useQueryClient();
@@ -48,7 +50,7 @@ export function useOnboardingSubmit({ onSaved }: UseOnboardingSubmitOptions) {
         return;
       }
       setOutcome('idle');
-      toast.error("We couldn't save your information. Nothing was changed. Try again.");
+      toast.error(t("We couldn't save your information. Nothing was changed. Try again."));
     },
   });
 

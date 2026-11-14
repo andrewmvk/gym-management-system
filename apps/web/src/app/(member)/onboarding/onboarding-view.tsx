@@ -15,6 +15,7 @@ import { Deferred } from '@/components/deferred';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { MEMBER_HOME_PATH } from '@/lib/routes';
 import { useTRPC } from '@/lib/trpc';
 
@@ -82,6 +83,7 @@ function SubmittedPanel({
   outcome: PlanOutcome;
   streamed: StreamedPlanExercise[];
 }) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const todayQuery = useQuery({ ...trpc.plans.getToday.queryOptions(), enabled: outcome !== 'building' });
   const rebuild = useRebuildPlan({ isErrorInline: true });
@@ -92,8 +94,10 @@ function SubmittedPanel({
       <div className="flex flex-col gap-4">
         <StatusPanel
           icon={<AiMark isActive className="size-6" />}
-          title="Building your plan"
-          description="Your information is saved. Your coach is writing today's plan from it, and each exercise appears as it is ready."
+          title={t('Building your plan')}
+          description={t(
+            "Your information is saved. Your coach is writing today's plan from it, and each exercise appears as it is ready.",
+          )}
         />
         {exercises.length > 0 && <PlanBuildProgress exercises={exercises} className="rounded-lg border bg-card" />}
       </div>
@@ -111,7 +115,7 @@ function SubmittedPanel({
   if (todayQuery.isError) {
     return (
       <QueryError
-        title="We couldn't check your plan"
+        title={t("We couldn't check your plan")}
         onRetry={() => todayQuery.refetch()}
         isRetrying={todayQuery.isRefetching}
       />
@@ -122,7 +126,7 @@ function SubmittedPanel({
     return (
       <>
         <QueryError
-          title="We couldn't build your plan right now"
+          title={t("We couldn't build your plan right now")}
           onRetry={rebuild.requestRebuild}
           isRetrying={rebuild.isPending}
         />
@@ -134,20 +138,26 @@ function SubmittedPanel({
   return (
     <StatusPanel
       icon={<SparklesIcon className="size-6" />}
-      title="Thanks, got it"
+      title={t('Thanks, got it')}
       description={
         outcome === 'kept'
-          ? "Your update is saved and your coach uses it from now on. Today's plan was kept as it is, because you already ticked exercises or a trainer edited it. You can rebuild it from My plan."
+          ? t(
+              "Your update is saved and your coach uses it from now on. Today's plan was kept as it is, because you already ticked exercises or a trainer edited it. You can rebuild it from My plan.",
+            )
           : outcome === 'failed'
-            ? "Your information is saved and your coach uses it from now on. Today's plan could not be rebuilt right now. You can rebuild it from My plan."
+            ? t(
+                "Your information is saved and your coach uses it from now on. Today's plan could not be rebuilt right now. You can rebuild it from My plan.",
+              )
             : isUpdate
-              ? "Your update is saved and your coach uses it from now on. Today's plan was rebuilt from it. You can rebuild it again from My plan."
-              : 'Your health profile is saved and your first plan is ready.'
+              ? t(
+                  "Your update is saved and your coach uses it from now on. Today's plan was rebuilt from it. You can rebuild it again from My plan.",
+                )
+              : t('Your health profile is saved and your first plan is ready.')
       }
       actions={
         <Button asChild>
           <Link href={MEMBER_HOME_PATH}>
-            Go to today
+            {t('Go to today')}
             <ArrowRightIcon data-icon="inline-end" />
           </Link>
         </Button>
@@ -157,6 +167,7 @@ function SubmittedPanel({
 }
 
 function OnboardingViewRoot() {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const status = useQuery(trpc.onboarding.getStatus.queryOptions());
   const submissions = useQuery(trpc.onboarding.listMine.queryOptions());
@@ -178,7 +189,7 @@ function OnboardingViewRoot() {
   if (status.isError || submissions.isError) {
     return (
       <QueryError
-        title="We couldn't load your profile"
+        title={t("We couldn't load your profile")}
         onRetry={() => {
           status.refetch();
           submissions.refetch();

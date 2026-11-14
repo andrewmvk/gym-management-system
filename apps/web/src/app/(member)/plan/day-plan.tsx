@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLaggedValue } from '@/hooks/use-lagged-value';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -73,9 +74,10 @@ function ProgressSegments({ states, isPlanned }: { states: boolean[]; isPlanned:
 
 // h-12 is the line box of the text-5xl tally at leading-none; h-5 is the line box of the text-sm title.
 function DayPlanSkeleton({ date, todayIso }: { date?: string; todayIso?: string }) {
+  const i18n = useI18n();
   return (
     <PlanShell
-      title={date && todayIso ? describeDay(date, todayIso) : <Skeleton className="h-5 w-48 bg-white/12" />}
+      title={date && todayIso ? describeDay(i18n, date, todayIso) : <Skeleton className="h-5 w-48 bg-white/12" />}
       tally={<Skeleton className="h-12 w-24 bg-white/12" />}
       progress={<Skeleton className="h-2 w-full bg-white/12" />}
     >
@@ -104,13 +106,14 @@ interface DayPlanBodyProps {
   query: PlanQuery;
 }
 
-function statusLine(relation: DayRelation, remaining: number) {
-  if (relation === 'future') return 'Ticks open on the day';
-  if (remaining === 0) return relation === 'today' ? 'All done. Nice work.' : 'All done';
-  return relation === 'today' ? `${remaining} to go` : `${remaining} not done`;
+function statusLine({ t }: I18n, relation: DayRelation, remaining: number) {
+  if (relation === 'future') return t('Ticks open on the day');
+  if (remaining === 0) return relation === 'today' ? t('All done. Nice work.') : t('All done');
+  return relation === 'today' ? t('{count} to go', { count: remaining }) : t('{count} not done', { count: remaining });
 }
 
 function NoPlan({ relation }: { relation: DayRelation }) {
+  const { t } = useI18n();
   const coach = useCoach();
   const generate = useRebuildPlan({ isErrorInline: true });
 
@@ -119,23 +122,23 @@ function NoPlan({ relation }: { relation: DayRelation }) {
       <>
         {generate.isError ? (
           <QueryError
-            title="We couldn't build your plan right now"
+            title={t("We couldn't build your plan right now")}
             onRetry={generate.requestRebuild}
             className="m-5 sm:m-6"
           />
         ) : (
           <EmptyState
             icon={DumbbellIcon}
-            title="No plan yet for today"
-            description="Your plan is built from your health profile and everything you've told your coach."
+            title={t('No plan yet for today')}
+            description={t("Your plan is built from your health profile and everything you've told your coach.")}
             action={
               <AiButton
                 size="lg"
                 isPending={generate.isPending}
-                pendingLabel="Building your plan..."
+                pendingLabel={t('Building your plan...')}
                 onClick={generate.requestRebuild}
               >
-                Build my plan
+                {t('Build my plan')}
               </AiButton>
             }
           />
@@ -152,27 +155,29 @@ function NoPlan({ relation }: { relation: DayRelation }) {
     return (
       <EmptyState
         icon={CalendarX2Icon}
-        title="No plan yet"
-        description="Nothing is planned for this day yet. Ask your coach to plan it and it shows up here."
+        title={t('No plan yet')}
+        description={t('Nothing is planned for this day yet. Ask your coach to plan it and it shows up here.')}
         action={
           <Button onClick={() => coach.setIsOpen(true)}>
             <AiMark data-icon="inline-start" />
-            Ask your coach
+            {t('Ask your coach')}
           </Button>
         }
       />
     );
   }
 
-  return <EmptyState icon={CalendarX2Icon} title="Rest day" description="There's no plan for this date." />;
+  return <EmptyState icon={CalendarX2Icon} title={t('Rest day')} description={t("There's no plan for this date.")} />;
 }
 
 function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
+  const i18n = useI18n();
+  const { t, tx } = i18n;
   const relation = relationOf(date, todayIso);
   const isToday = relation === 'today';
   const isFuture = relation === 'future';
   const isPast = relation === 'past';
-  const title = describeDay(date, todayIso);
+  const title = describeDay(i18n, date, todayIso);
 
   const coach = useCoach();
   const toggle = useToggleExercise();
@@ -187,7 +192,7 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
         tally={<p className="numerals text-5xl leading-none font-extrabold text-kit-muted">-</p>}
       >
         <QueryError
-          title="We couldn't load this plan"
+          title={t("We couldn't load this plan")}
           onRetry={() => query.refetch()}
           isRetrying={query.isRefetching}
           className="m-5 sm:m-6"
@@ -211,7 +216,7 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
   const doneStates = plan.exercises.map((exercise) => exercise.completed);
   const doneCount = doneStates.filter(Boolean).length;
   const remaining = plan.exercises.length - doneCount;
-  const status = statusLine(relation, remaining);
+  const status = statusLine(i18n, relation, remaining);
 
   return (
     <PlanShell
@@ -221,7 +226,7 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
           <p className="numerals text-5xl leading-none font-extrabold">
             {plan.exercises.length}
             <span className="ml-2 font-display text-xl font-semibold tracking-widest text-kit-muted uppercase">
-              planned
+              {t('planned')}
             </span>
           </p>
         ) : (
@@ -230,7 +235,7 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
               {doneCount}
             </span>
             <span className="text-kit-muted">/{plan.exercises.length}</span>
-            <span className="sr-only"> exercises done</span>
+            <span className="sr-only"> {t('exercises done')}</span>
           </p>
         )
       }
@@ -238,9 +243,9 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
       aside={
         <>
           {plan.status === 'trainer_edited' ? (
-            <Badge variant="tape">Edited by a trainer</Badge>
+            <Badge variant="tape">{t('Edited by a trainer')}</Badge>
           ) : (
-            plan.trainerNotes.length > 0 && <Badge variant="secondary">Trainer note</Badge>
+            plan.trainerNotes.length > 0 && <Badge variant="secondary">{t('Trainer note')}</Badge>
           )}
           <p className="text-sm text-kit-muted">{status}</p>
         </>
@@ -284,7 +289,7 @@ function DayPlanBody({ date, todayIso, query }: DayPlanBodyProps) {
                     coach.toggleMention({
                       type: 'exercise',
                       exerciseId: exercise.exerciseId,
-                      name: exercise.exerciseName,
+                      name: tx(exercise.exerciseName),
                     }),
                 }
           }

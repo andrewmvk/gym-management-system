@@ -3,6 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { ChevronDownIcon, LogOutIcon } from 'lucide-react';
 import { Deferred } from '@/components/deferred';
+import { LocaleMenuItems } from '@/components/locale-switch';
 import { MembershipBadge } from '@/components/membership-badge';
 import {
   DropdownMenu,
@@ -14,6 +15,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useLogout } from '@/hooks/use-logout';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import type { AppArea } from '@/lib/navigation';
 import { useTRPC } from '@/lib/trpc';
 
@@ -32,6 +34,7 @@ function UserMenuSkeleton() {
 }
 
 function UserMenuRoot({ area }: { area: AppArea }) {
+  const { t } = useI18n();
   const trpc = useTRPC();
   const me = useQuery(trpc.auth.me.queryOptions());
   const logout = useLogout();
@@ -54,7 +57,7 @@ function UserMenuRoot({ area }: { area: AppArea }) {
         </span>
         <span className="hidden max-w-40 truncate text-sm font-medium sm:inline">{user.name}</span>
         <ChevronDownIcon className="hidden size-4 text-kit-muted transition-transform group-data-[state=open]:rotate-180 sm:block" />
-        <span className="sr-only">Open account menu</span>
+        <span className="sr-only">{t('Open account menu')}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
         <DropdownMenuLabel className="flex flex-col gap-0.5">
@@ -65,6 +68,8 @@ function UserMenuRoot({ area }: { area: AppArea }) {
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <LocaleMenuItems withSeparator={false} />
+        <DropdownMenuSeparator />
         <DropdownMenuItem
           variant="destructive"
           disabled={logout.isPending}
@@ -72,7 +77,7 @@ function UserMenuRoot({ area }: { area: AppArea }) {
           onSelect={() => logout.mutate()}
         >
           <LogOutIcon className="text-destructive" />
-          {logout.isPending ? 'Signing out...' : 'Sign out'}
+          {logout.isPending ? t('Signing out...') : t('Sign out')}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

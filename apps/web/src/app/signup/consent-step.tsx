@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { StepPanel } from '@/components/step-panel';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface ConsentStepProps {
   initialAgreed: boolean;
@@ -15,18 +16,19 @@ interface ConsentStepProps {
 // their facial biometric data before the reference photo is taken. The consent is held in the browser
 // and recorded by the backend together with the rest of the signup, before any embedding is computed.
 export function ConsentStep({ initialAgreed, onConsented }: ConsentStepProps) {
+  const { t } = useI18n();
   const [agreed, setAgreed] = useState(initialAgreed);
 
   return (
     <StepPanel
       icon={ShieldCheckIcon}
-      title="Biometric consent"
-      description="Required before we can take your reference photo (LGPD, Art. 11)."
+      title={t('Biometric consent')}
+      description={t('Required before we can take your reference photo (LGPD, Art. 11).')}
     >
       <div className="rounded-md bg-muted px-4 py-4 text-sm text-pretty">
-        To check you in with face recognition, Cadence needs to process a facial biometric template derived from a
-        reference photo of you. This template is sensitive personal data under Brazil&apos;s LGPD and is used only to
-        verify your identity at check-in. The photo itself never leaves our server.
+        {t(
+          "To check you in with face recognition, Cadence needs to process a facial biometric template derived from a reference photo of you. This template is sensitive personal data under Brazil's LGPD and is used only to verify your identity at check-in. The photo itself never leaves our server.",
+        )}
       </div>
       <label
         htmlFor="biometric-consent"
@@ -38,10 +40,10 @@ export function ConsentStep({ initialAgreed, onConsented }: ConsentStepProps) {
           onCheckedChange={(checked) => setAgreed(checked === true)}
           className="mt-px"
         />
-        <span>I consent to Cadence processing my facial biometric data for check-in identification.</span>
+        <span>{t('I consent to Cadence processing my facial biometric data for check-in identification.')}</span>
       </label>
       <Button size="lg" className="w-full" disabled={!agreed} onClick={onConsented}>
-        Continue
+        {t('Continue')}
       </Button>
     </StepPanel>
   );

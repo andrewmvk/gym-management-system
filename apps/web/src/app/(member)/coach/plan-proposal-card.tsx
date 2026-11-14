@@ -1,10 +1,12 @@
+'use client';
+
 import { countChanges, diffDraft } from '@cadence/shared/schemas/coach-draft';
 import { ArrowRightIcon, PanelRightOpenIcon, TriangleAlertIcon } from 'lucide-react';
 import { Prescription } from '@/app/(member)/coach/prescription';
 import type { PlanProposalBlock } from '@/app/(member)/coach/use-coach-draft';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 const PREVIEW_ROWS = 3;
 
@@ -19,6 +21,7 @@ interface PlanProposalCardProps {
 
 // The proposal at a glance, inside the thread. The whole editable version opens beside the chat.
 export function PlanProposalCard({ block, state, onReview }: PlanProposalCardProps) {
+  const { t, tx, formatPlanDate } = useI18n();
   const diff = diffDraft(block.before, block.after);
   const changed = diff.rows.filter((entry) => entry.change !== 'unchanged');
   const changeCount = countChanges(diff);
@@ -26,19 +29,19 @@ export function PlanProposalCard({ block, state, onReview }: PlanProposalCardPro
 
   return (
     <section
-      aria-label={`Proposed plan for ${formatPlanDate(block.date)}`}
+      aria-label={t('Proposed plan for {date}', { date: formatPlanDate(block.date) })}
       className="animate-block-in flex flex-col gap-3 rounded-lg border bg-card p-3 text-card-foreground"
     >
       <div className="flex items-start justify-between gap-3">
         <div className="flex min-w-0 flex-col gap-0.5">
           <h3 className="font-display text-lg leading-tight font-bold tracking-wide uppercase">
-            Plan for {formatPlanDate(block.date, { day: 'numeric', month: 'short' })}
+            {t('Plan for {date}', { date: formatPlanDate(block.date, { day: 'numeric', month: 'short' }) })}
           </h3>
           <p className="text-sm text-pretty text-muted-foreground">{block.summary}</p>
         </div>
         <span className="numerals shrink-0 text-3xl leading-none font-bold">
           {changeCount}
-          <span className="sr-only"> {changeCount === 1 ? 'change' : 'changes'}</span>
+          <span className="sr-only"> {changeCount === 1 ? t('change') : t('changes')}</span>
         </span>
       </div>
 
@@ -46,8 +49,10 @@ export function PlanProposalCard({ block, state, onReview }: PlanProposalCardPro
         {changed.slice(0, PREVIEW_ROWS).map(({ row, change, previous }) => (
           <li key={row.exerciseId} className="flex items-center justify-between gap-2 text-sm">
             <span className="min-w-0 truncate font-semibold">
-              {change === 'added' && <span className="font-display tracking-widest text-primary uppercase">New </span>}
-              {row.name}
+              {change === 'added' && (
+                <span className="font-display tracking-widest text-primary uppercase">{t('New')} </span>
+              )}
+              {tx(row.name)}
             </span>
             <span className="flex shrink-0 items-center gap-1.5">
               {previous && (
@@ -66,11 +71,11 @@ export function PlanProposalCard({ block, state, onReview }: PlanProposalCardPro
         ))}
         {diff.removed.slice(0, Math.max(0, PREVIEW_ROWS - changed.length)).map((row) => (
           <li key={row.exerciseId} className="flex items-center justify-between gap-2 text-sm text-muted-foreground">
-            <span className="min-w-0 truncate font-semibold line-through decoration-2">{row.name}</span>
-            <span className="font-display tracking-widest uppercase">Removed</span>
+            <span className="min-w-0 truncate font-semibold line-through decoration-2">{tx(row.name)}</span>
+            <span className="font-display tracking-widest uppercase">{t('Removed')}</span>
           </li>
         ))}
-        {hidden > 0 && <li className="text-xs text-muted-foreground">and {hidden} more</li>}
+        {hidden > 0 && <li className="text-xs text-muted-foreground">{t('and {count} more', { count: hidden })}</li>}
       </ul>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -78,16 +83,16 @@ export function PlanProposalCard({ block, state, onReview }: PlanProposalCardPro
           {block.warnings.length > 0 && state === 'active' && (
             <Badge variant="tape">
               <TriangleAlertIcon data-icon="inline-start" />
-              Safety warning
+              {t('Safety warning')}
             </Badge>
           )}
-          {state === 'applied' && <Badge variant="live">Applied</Badge>}
-          {state === 'closed' && <Badge variant="outline">Not applied</Badge>}
+          {state === 'applied' && <Badge variant="live">{t('Applied')}</Badge>}
+          {state === 'closed' && <Badge variant="outline">{t('Not applied')}</Badge>}
         </div>
         {state === 'active' && (
           <Button type="button" size="sm" variant="outline" onClick={onReview}>
             <PanelRightOpenIcon data-icon="inline-start" />
-            Review and edit
+            {t('Review and edit')}
           </Button>
         )}
       </div>

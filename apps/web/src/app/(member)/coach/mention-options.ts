@@ -1,10 +1,9 @@
-import { MUSCLE_GROUPS, MUSCLES, muscleGroupLabel, muscleGroupOf } from '@cadence/shared/schemas/muscles';
+import { MUSCLE_GROUPS, MUSCLES, muscleGroupOf } from '@cadence/shared/schemas/muscles';
 import type { MentionChip } from '@/app/(member)/coach/coach-context';
 import { mentionLabel } from '@/app/(member)/coach/mention-chips';
+import type { I18n } from '@/lib/i18n/i18n-provider';
 
 export type MentionSection = 'plan' | 'groups' | 'muscles';
-
-const STATIC_SECTION_LABELS = { groups: 'Muscle groups', muscles: 'Muscles' } as const;
 
 export interface MentionOption {
   chip: MentionChip;
@@ -20,41 +19,49 @@ export interface MentionOption {
 // so an exercise outside the plan on screen costs nothing worse than being ignored. `planDay` names the day of
 // that plan when it is not today's.
 export function buildMentionOptions(
+  i18n: I18n,
   planExercises: readonly { exerciseId: string; name: string }[],
   planDay: string | null,
 ): MentionOption[] {
-  const planLabel = planDay ? `Plan for ${planDay}` : "Today's plan";
+  const { t, tx, muscleLabel, groupLabel } = i18n;
+  const planLabel = planDay ? t('Plan for {day}', { day: planDay }) : t("Today's plan");
   const distribution: MentionChip = { type: 'distribution' };
   return [
     {
       chip: distribution,
-      label: mentionLabel(distribution),
-      hint: 'whole plan',
+      label: mentionLabel(i18n, distribution),
+      hint: t('whole plan'),
       section: 'plan',
       sectionLabel: planLabel,
     },
     ...planExercises.map((exercise) => {
       const chip: MentionChip = { type: 'exercise', exerciseId: exercise.exerciseId, name: exercise.name };
-      return { chip, label: exercise.name, hint: 'exercise', section: 'plan' as const, sectionLabel: planLabel };
+      return {
+        chip,
+        label: tx(exercise.name),
+        hint: t('exercise'),
+        section: 'plan' as const,
+        sectionLabel: planLabel,
+      };
     }),
     ...MUSCLE_GROUPS.map((group) => {
       const chip: MentionChip = { type: 'group', group: group.id };
       return {
         chip,
-        label: group.label,
-        hint: `${group.muscles.length} muscles`,
+        label: groupLabel(group.id),
+        hint: t('{count} muscles', { count: group.muscles.length }),
         section: 'groups' as const,
-        sectionLabel: STATIC_SECTION_LABELS.groups,
+        sectionLabel: t('Muscle groups'),
       };
     }),
     ...MUSCLES.map((muscle) => {
       const chip: MentionChip = { type: 'muscle', muscle: muscle.id };
       return {
         chip,
-        label: muscle.label,
-        hint: muscleGroupLabel(muscleGroupOf(muscle.id)),
+        label: muscleLabel(muscle.id),
+        hint: groupLabel(muscleGroupOf(muscle.id)),
         section: 'muscles' as const,
-        sectionLabel: STATIC_SECTION_LABELS.muscles,
+        sectionLabel: t('Muscles'),
       };
     }),
   ];
@@ -68,27 +75,34 @@ export function filterMentionOptions(options: readonly MentionOption[], query: s
 
 // What a member is likely to ask about the thing they pointed at. Choosing one only fills the message box, so
 // they read it, change it and send it themselves.
-export function suggestionsFor(chip: MentionChip): string[] {
+export function suggestionsFor(i18n: I18n, chip: MentionChip): string[] {
+  const { t } = i18n;
   switch (chip.type) {
-    case 'exercise':
-      return [`How do I do ${chip.name}?`, `Swap ${chip.name} for something else`, `Make ${chip.name} easier`];
-    case 'muscle': {
-      const name = mentionLabel(chip).toLowerCase();
+    case 'exercise': {
+      const exercise = mentionLabel(i18n, chip);
       return [
-        `Which exercises could I add for my ${name}?`,
-        `I'd like more ${name} work in my next plans`,
-        `Do I train my ${name} enough?`,
+        t('How do I do {exercise}?', { exercise }),
+        t('Swap {exercise} for something else', { exercise }),
+        t('Make {exercise} easier', { exercise }),
+      ];
+    }
+    case 'muscle': {
+      const name = mentionLabel(i18n, chip).toLowerCase();
+      return [
+        t('Which exercises could I add for my {name}?', { name }),
+        t("I'd like more {name} work in my next plans", { name }),
+        t('Do I train my {name} enough?', { name }),
       ];
     }
     case 'group': {
-      const name = mentionLabel(chip).toLowerCase();
+      const name = mentionLabel(i18n, chip).toLowerCase();
       return [
-        `Is my ${name} work balanced?`,
-        `I'd like more ${name} work in my next plans`,
-        `What should I add for my ${name}?`,
+        t('Is my {name} work balanced?', { name }),
+        t("I'd like more {name} work in my next plans", { name }),
+        t('What should I add for my {name}?', { name }),
       ];
     }
     case 'distribution':
-      return ['Is this plan balanced for my goals?', 'Rebalance it for me'];
+      return [t('Is this plan balanced for my goals?'), t('Rebalance it for me')];
   }
 }

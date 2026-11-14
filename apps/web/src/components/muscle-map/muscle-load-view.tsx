@@ -7,15 +7,15 @@ import {
   type MuscleGroupId,
   type MuscleId,
   muscleGroupOf,
-  muscleLabel,
 } from '@cadence/shared/schemas/muscles';
 import { type ReactNode, useState } from 'react';
 import { MuscleLegend } from '@/components/muscle-map/muscle-legend';
 import { MuscleMap } from '@/components/muscle-map/muscle-map';
-import { formatSets, marksFromLoad } from '@/components/muscle-map/muscle-marks';
+import { formatSets as formatLoad, marksFromLoad } from '@/components/muscle-map/muscle-marks';
 import { MuscleRadarChart, type RadarPoint } from '@/components/muscle-map/muscle-radar-chart';
 import { MuscleRankList } from '@/components/muscle-map/muscle-rank-list';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 const SUMMARY_MUSCLES = 3;
@@ -80,9 +80,9 @@ function MuscleLoadViewRoot({
   isSingleView,
   isPaired,
   breakdown = 'groups',
-  emptyNote = 'No muscle work to show yet.',
-  note = 'Counted in weighted sets. A supporting muscle counts half.',
-  unit = { singular: 'set', plural: 'sets' },
+  emptyNote: emptyNoteProp,
+  note: noteProp,
+  unit: unitProp,
   legend,
   selected: controlledSelected,
   onSelectedChange,
@@ -90,6 +90,11 @@ function MuscleLoadViewRoot({
   pointing,
   className,
 }: MuscleLoadViewProps) {
+  const { t, locale, muscleLabel, groupLabel } = useI18n();
+  const emptyNote = emptyNoteProp ?? t('No muscle work to show yet.');
+  const note = noteProp === undefined ? t('Counted in weighted sets. A supporting muscle counts half.') : noteProp;
+  const unit = unitProp ?? { singular: t('set'), plural: t('sets') };
+  const formatSets = (value: number) => formatLoad(locale, value);
   const [localSelected, setLocalSelected] = useState<MuscleId | null>(null);
   const [hovered, setHovered] = useState<MuscleId | null>(null);
   const [hoveredGroup, setHoveredGroup] = useState<MuscleGroupId | null>(null);
@@ -159,7 +164,7 @@ function MuscleLoadViewRoot({
 
   const radarPoints: RadarPoint[] = groups.map((entry) => ({
     key: entry.group,
-    label: GROUP_BY_ID[entry.group].label,
+    label: groupLabel(entry.group),
     value: entry.load,
   }));
   const radarActiveKeys: string[] = [...(activeGroup ? [activeGroup] : []), ...markedGroups.map((group) => group.id)];
@@ -178,17 +183,19 @@ function MuscleLoadViewRoot({
 
   const summary =
     ranked.length > 0
-      ? `Most work: ${ranked
-          .slice(0, SUMMARY_MUSCLES)
-          .map((entry) => muscleLabel(entry.muscle))
-          .join(', ')}.`
+      ? t('Most work: {muscles}.', {
+          muscles: ranked
+            .slice(0, SUMMARY_MUSCLES)
+            .map((entry) => muscleLabel(entry.muscle))
+            .join(', '),
+        })
       : emptyNote;
 
   const rankLists = (
     <>
       {trainedItems.length > 0 && (
         <MuscleRankList
-          label={`${label}, ranked`}
+          label={t('{label}, ranked', { label })}
           items={isChart && includeUntrained ? [...trainedItems, ...untrainedItems] : trainedItems}
           selected={selected}
           onSelect={selectMuscle}
@@ -199,10 +206,10 @@ function MuscleLoadViewRoot({
       {!isChart && includeUntrained && (
         <details className="group">
           <summary className="flex min-h-11 items-center font-display text-sm font-semibold tracking-widest text-muted-foreground uppercase outline-none focus-visible:ring-3 focus-visible:ring-ring/45">
-            {trainedItems.length > 0 ? 'Other muscles' : 'All muscles'} ({untrainedItems.length})
+            {trainedItems.length > 0 ? t('Other muscles') : t('All muscles')} ({untrainedItems.length})
           </summary>
           <MuscleRankList
-            label="Muscles without work"
+            label={t('Muscles without work')}
             items={untrainedItems}
             selected={selected}
             onSelect={selectMuscle}

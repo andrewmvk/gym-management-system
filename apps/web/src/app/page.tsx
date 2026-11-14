@@ -4,9 +4,11 @@ import { ApiStatus } from '@/components/api-status';
 import { PublicHeader } from '@/components/public-header';
 import { SamplePlanRoster } from '@/components/sample-plan-roster';
 import { Button } from '@/components/ui/button';
+import { getI18n } from '@/lib/i18n/server';
+import type { LabelKey } from '@/lib/i18n/translate';
 import { LOGIN_PATH } from '@/lib/routes';
 
-const STEPS = [
+const STEPS: { icon: typeof ScanFaceIcon; title: LabelKey; body: LabelKey }[] = [
   {
     icon: ScanFaceIcon,
     title: 'Walk in',
@@ -24,7 +26,9 @@ const STEPS = [
   },
 ];
 
-export default function HomePage() {
+export default async function HomePage() {
+  const { t } = await getI18n();
+
   return (
     <>
       <PublicHeader />
@@ -32,28 +36,30 @@ export default function HomePage() {
         <section className="mx-auto grid w-full max-w-6xl items-center gap-12 px-4 pt-12 pb-16 sm:px-6 lg:grid-cols-2 lg:gap-16 lg:pt-20 lg:pb-24">
           <div className="flex flex-col gap-6">
             <h1 className="font-display text-6xl leading-none font-extrabold text-balance uppercase sm:text-7xl lg:text-8xl">
-              Train on a plan that remembers you.
+              {t('Train on a plan that remembers you.')}
             </h1>
             <p className="max-w-xl text-lg text-pretty text-muted-foreground">
-              Cadence checks you in with your face and writes each day&apos;s training plan from your accumulated
-              history, not a single interview at the front desk.
+              {t(
+                "Cadence checks you in with your face and writes each day's training plan from your accumulated history, not a single interview at the front desk.",
+              )}
             </p>
             <p className="max-w-xl text-pretty text-muted-foreground">
-              Joining happens in person at the gym: a staff member checks your workout restrictions first, then you
-              register on site and fill in your health profile.
+              {t(
+                'Joining happens in person at the gym: a staff member checks your workout restrictions first, then you register on site and fill in your health profile.',
+              )}
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button asChild size="lg">
                 <Link href="/signup">
-                  Join Cadence
+                  {t('Join Cadence')}
                   <ArrowRightIcon data-icon="inline-end" />
                 </Link>
               </Button>
               <Button asChild size="lg" variant="outline">
-                <Link href={LOGIN_PATH}>Sign in</Link>
+                <Link href={LOGIN_PATH}>{t('Sign in')}</Link>
               </Button>
               <Button asChild size="lg" variant="ghost">
-                <Link href="/gym">Gym info</Link>
+                <Link href="/gym">{t('Gym info')}</Link>
               </Button>
             </div>
           </div>
@@ -71,9 +77,9 @@ export default function HomePage() {
                 <div className="flex flex-col gap-2">
                   <p className="flex items-center gap-2 font-display text-xl font-bold tracking-wide uppercase">
                     <step.icon className="size-5 text-muted-foreground" />
-                    {step.title}
+                    {t(step.title)}
                   </p>
-                  <p className="text-sm text-pretty text-muted-foreground">{step.body}</p>
+                  <p className="text-sm text-pretty text-muted-foreground">{t(step.body)}</p>
                 </div>
               </li>
             ))}
@@ -81,7 +87,7 @@ export default function HomePage() {
         </section>
 
         <footer className="mx-auto flex w-full max-w-6xl flex-col items-start justify-between gap-2 px-4 py-6 text-sm text-muted-foreground sm:flex-row sm:items-center sm:px-6">
-          <p>Academic demo. All members, plans and biometric data are synthetic.</p>
+          <p>{t('Academic demo. All members, plans and biometric data are synthetic.')}</p>
           <ApiStatus />
         </footer>
       </main>

@@ -14,7 +14,7 @@ import { toast } from 'sonner';
 import { isDockedViewport } from '@/app/(member)/coach/viewport';
 import { type PlanOverwriteConfirmation, PlanOverwriteDialog } from '@/app/(member)/plan/plan-overwrite-dialog';
 import { toIsoDate } from '@/lib/calendar-date';
-import { formatPlanDate } from '@/lib/format';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
 export type PlanProposalBlock = Extract<CoachBlock, { type: 'plan_proposal' }>;
@@ -58,6 +58,7 @@ function toRow(option: PickerOption): ProposalRow {
 // `viewedDate` is the day of the plan on screen: an exercise added or swapped from a picker lands in the draft
 // the member is already reviewing, or else in the plan of that day, and in today's when none is on screen.
 export function useCoachDraft(viewedDate: string | null) {
+  const { t, formatPlanDate } = useI18n();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [draft, setDraft] = useState<CoachDraftState | null>(null);
@@ -90,15 +91,15 @@ export function useCoachDraft(viewedDate: string | null) {
                 }
               : current,
           );
-          toast.message('Read the safety warning before you apply this.');
+          toast.message(t('Read the safety warning before you apply this.'));
           return;
         }
         invalidatePlanQueries();
         setDraft((current) => (current ? { ...current, status: 'applied' } : current));
         setIsPanelOpen(false);
-        toast.message(`Plan for ${formatPlanDate(variables.date)} updated.`);
+        toast.message(t('Plan for {date} updated.', { date: formatPlanDate(variables.date) }));
       },
-      onError: () => toast.error("We couldn't apply that change right now. Nothing was changed. Try again."),
+      onError: () => toast.error(t("We couldn't apply that change right now. Nothing was changed. Try again.")),
     }),
   );
 

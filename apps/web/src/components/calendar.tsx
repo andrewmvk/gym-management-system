@@ -5,6 +5,7 @@ import { type KeyboardEvent, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { addDays, isSameDay, startOfMonth, toIsoDate } from '@/lib/calendar-date';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 interface CalendarProps {
@@ -50,6 +51,7 @@ export function Calendar({
   fromYear,
   toYear,
 }: CalendarProps) {
+  const { t, locale, formatDate } = useI18n();
   const initial = selected ?? rangeTo ?? rangeFrom ?? clamp(new Date(), min, max);
   const [month, setMonth] = useState(startOfMonth(initial));
   const [focused, setFocused] = useState(initial);
@@ -72,9 +74,11 @@ export function Calendar({
 
   const gridStart = addDays(month, -month.getDay());
   const days = Array.from({ length: 42 }, (_, index) => addDays(gridStart, index));
+  // Two letters tell English weekdays apart; Portuguese needs three ("ter" and "qua" share their first letters).
   const weekdays = Array.from({ length: 7 }, (_, index) => {
     const date = addDays(WEEKDAY_REFERENCE_SUNDAY, index);
-    return { key: toIsoDate(date), label: date.toLocaleDateString(undefined, { weekday: 'short' }).slice(0, 2) };
+    const short = formatDate(date, { weekday: 'short' }).replace('.', '');
+    return { key: toIsoDate(date), label: short.slice(0, locale === 'pt' ? 3 : 2) };
   });
 
   const showMonth = (next: Date) => {
@@ -106,7 +110,7 @@ export function Calendar({
       <div className="flex items-center justify-between gap-1">
         <Button variant="ghost" size="icon-sm" disabled={!canGoBack} onClick={() => showMonth(previousMonth)}>
           <ChevronLeftIcon />
-          <span className="sr-only">Previous month</span>
+          <span className="sr-only">{t('Previous month')}</span>
         </Button>
         {captionLayout === 'dropdown' ? (
           <div className="flex flex-1 gap-1.5">
@@ -114,14 +118,14 @@ export function Calendar({
               value={String(month.getMonth())}
               onValueChange={(value) => showMonth(new Date(month.getFullYear(), Number(value), 1))}
             >
-              <SelectTrigger size="sm" className="flex-1" aria-label="Month">
+              <SelectTrigger size="sm" className="flex-1" aria-label={t('Month')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 {Array.from({ length: 12 }, (_, index) => (
                   // biome-ignore lint/suspicious/noArrayIndexKey: the index is the month number, a fixed 12-item list.
                   <SelectItem key={index} value={String(index)}>
-                    {new Date(2023, index, 1).toLocaleDateString(undefined, { month: 'short' })}
+                    {formatDate(new Date(2023, index, 1), { month: 'short' })}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -130,7 +134,7 @@ export function Calendar({
               value={String(month.getFullYear())}
               onValueChange={(value) => showMonth(new Date(Number(value), month.getMonth(), 1))}
             >
-              <SelectTrigger size="sm" className="w-24" aria-label="Year">
+              <SelectTrigger size="sm" className="w-24" aria-label={t('Year')}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-64">
@@ -145,13 +149,13 @@ export function Calendar({
         ) : (
           <p className="font-display text-lg font-bold tracking-wider uppercase" aria-live="polite">
             <span key={toIsoDate(month)} className="inline-block animate-tick">
-              {month.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}
+              {formatDate(month, { month: 'long', year: 'numeric' })}
             </span>
           </p>
         )}
         <Button variant="ghost" size="icon-sm" disabled={!canGoForward} onClick={() => showMonth(nextMonth)}>
           <ChevronRightIcon />
-          <span className="sr-only">Next month</span>
+          <span className="sr-only">{t('Next month')}</span>
         </Button>
       </div>
 
@@ -182,12 +186,7 @@ export function Calendar({
               data-date={toIsoDate(date)}
               aria-selected={isSelected}
               aria-current={isToday ? 'date' : undefined}
-              aria-label={date.toLocaleDateString(undefined, {
-                weekday: 'long',
-                day: 'numeric',
-                month: 'long',
-                year: 'numeric',
-              })}
+              aria-label={formatDate(date, { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
               tabIndex={isSameDay(date, focused) ? 0 : -1}
               disabled={isDisabled(date)}
               onClick={() => onSelect(date)}

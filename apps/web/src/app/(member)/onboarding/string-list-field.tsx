@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { useI18n } from '@/lib/i18n/i18n-provider';
 
 interface StringListFieldProps {
   id: string;
@@ -18,6 +19,7 @@ interface StringListFieldProps {
 // A lightweight add/remove list for free-text items (medications, conditions) - plain state instead of
 // a form-library field array, matching this codebase's general preference for the simplest thing that works.
 export function StringListField({ id, label, description, placeholder, values, onChange }: StringListFieldProps) {
+  const { t } = useI18n();
   const [draft, setDraft] = useState('');
 
   function addDraft() {
@@ -46,7 +48,7 @@ export function StringListField({ id, label, description, placeholder, values, o
         />
         <Button type="button" variant="outline" onClick={addDraft} disabled={!draft.trim()}>
           <PlusIcon data-icon="inline-start" />
-          Add
+          {t('Add')}
         </Button>
       </div>
       {values.length > 0 && (
@@ -59,7 +61,7 @@ export function StringListField({ id, label, description, placeholder, values, o
               {value}
               <button
                 type="button"
-                aria-label={`Remove ${value}`}
+                aria-label={t('Remove {name}', { name: value })}
                 className="flex size-6 items-center justify-center rounded-sm text-muted-foreground outline-none hover:bg-foreground/10 hover:text-destructive focus-visible:ring-3 focus-visible:ring-ring/45"
                 onClick={() => onChange(values.filter((_, i) => i !== index))}
               >

@@ -5,14 +5,14 @@ import { ChevronDownIcon } from 'lucide-react';
 import { type ComponentProps, type ReactNode, useState } from 'react';
 import {
   type GroupOption,
-  groupLabel,
   type PolicyDialogState,
   type PolicyOption,
+  policyGroupLabel,
   policyMeta,
 } from '@/app/(staff)/policies/policy-dialogs';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatDateTime } from '@/lib/format';
+import { type I18n, useI18n } from '@/lib/i18n/i18n-provider';
 import { cn } from '@/lib/utils';
 
 const EXPIRING_SOON_DAYS = 7;
@@ -67,14 +67,10 @@ const BADGES = {
   expiring: { variant: 'pending', label: 'Expiring' },
 } as const;
 
-function expiryText(expiresOn: string | Date | null, isActive: boolean) {
-  if (!expiresOn) return 'no expiry';
-  return (
-    <>
-      {isActive ? 'expires' : 'expired'}{' '}
-      <span className="numerals text-sm font-semibold text-foreground">{formatDateTime(expiresOn)}</span>
-    </>
-  );
+function expiryText({ t, tn, formatDateTime }: I18n, expiresOn: string | Date | null, isActive: boolean) {
+  if (!expiresOn) return t('no expiry');
+  const date = <span className="numerals text-sm font-semibold text-foreground">{formatDateTime(expiresOn)}</span>;
+  return isActive ? tn('expires {date}', { date }) : tn('expired {date}', { date });
 }
 
 function LineButton(props: ComponentProps<typeof Button>) {
@@ -115,18 +111,20 @@ interface RowContext {
 }
 
 function GroupLine({ context, group }: { context: RowContext; group: UserGroup }) {
+  const i18n = useI18n();
+  const { t, tx } = i18n;
   const { user, groupById, onDialog } = context;
-  const label = groupLabel(group.groupId);
+  const label = policyGroupLabel(tx, group.groupId);
   const target = { type: 'group' as const, id: group.groupId, label };
   return (
     <Line
       badge={group.isActive ? { variant: 'secondary', label } : { variant: 'unavailable', label }}
-      label={groupById.get(group.groupId)?.description ?? ''}
-      meta={expiryText(group.expiresOn, group.isActive)}
+      label={tx(groupById.get(group.groupId)?.description ?? '')}
+      meta={expiryText(i18n, group.expiresOn, group.isActive)}
       actions={
         <>
           <LineButton
-            aria-label={`Extend the ${label} membership of ${user.name}`}
+            aria-label={t('Extend the {group} membership of {name}', { group: label, name: user.name })}
             onClick={() =>
               onDialog({
                 kind: 'extend',
@@ -138,16 +136,16 @@ function GroupLine({ context, group }: { context: RowContext; group: UserGroup }
               })
             }
           >
-            Extend
+            {t('Extend')}
           </LineButton>
           <LineButton
             disabled={!group.isActive}
-            aria-label={`Remove ${user.name} from the ${label} group`}
+            aria-label={t('Remove {name} from the {group} group', { name: user.name, group: label })}
             onClick={() =>
               onDialog({ kind: 'revoke', userId: user.id, userName: user.name, target, effect: 'granted' })
             }
           >
-            Remove
+            {t('Remove')}
           </LineButton>
         </>
       }
@@ -156,9 +154,11 @@ function GroupLine({ context, group }: { context: RowContext; group: UserGroup }
 }
 
 function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant: UserGrant; kind: GrantKind }) {
+  const i18n = useI18n();
+  const { t, tx } = i18n;
   const { user, policyById, isSelf, onDialog } = context;
   const policy = policyById.get(grant.policyId);
-  const label = policy?.description ?? grant.policyId;
+  const label = tx(policy?.description ?? grant.policyId);
   const target = { type: 'policy' as const, id: grant.policyId, label };
   // Only the pre-check the dialogs repeat: the server decides from the real effective ability, since a group may
   // still supply a protected policy this direct row also grants.
@@ -166,7 +166,7 @@ function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant:
     isSelf &&
     grant.effect === 'granted' &&
     (LOCKOUT_PROTECTED_POLICY_IDS as readonly string[]).includes(grant.policyId);
-  const badge = kind === 'normal' ? undefined : BADGES[kind];
+  const badge = kind === 'normal' ? undefined : { variant: BADGES[kind].variant, label: t(BADGES[kind].label) };
 
   return (
     <Line
@@ -174,15 +174,15 @@ function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant:
       label={label}
       meta={
         <>
-          {policy ? `${policyMeta(policy)} · direct · ` : 'direct · '}
-          {expiryText(grant.expiresOn, grant.isActive)}
-          {mayLockOut && ' · revoking is refused if no group still gives you this access'}
+          {policy ? `${policyMeta(t, policy)} · ${t('grant::direct')} · ` : `${t('grant::direct')} · `}
+          {expiryText(i18n, grant.expiresOn, grant.isActive)}
+          {mayLockOut && ` · ${t('revoking is refused if no group still gives you this access')}`}
         </>
       }
       actions={
         <>
           <LineButton
-            aria-label={`Extend ${label} for ${user.name}`}
+            aria-label={t('Extend {label} for {name}', { label, name: user.name })}
             onClick={() =>
               onDialog({
                 kind: 'extend',
@@ -194,16 +194,20 @@ function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant:
               })
             }
           >
-            Extend
+            {t('Extend')}
           </LineButton>
           <LineButton
             disabled={!grant.isActive}
-            aria-label={`${grant.effect === 'denied' ? 'Lift denial of' : 'Revoke'} ${label} for ${user.name}`}
+            aria-label={
+              grant.effect === 'denied'
+                ? t('Lift denial of {label} for {name}', { label, name: user.name })
+                : t('Revoke {label} for {name}', { label, name: user.name })
+            }
             onClick={() =>
               onDialog({ kind: 'revoke', userId: user.id, userName: user.name, target, effect: grant.effect })
             }
           >
-            {grant.effect === 'denied' ? 'Lift' : 'Revoke'}
+            {grant.effect === 'denied' ? t('Lift') : t('Revoke')}
           </LineButton>
         </>
       }
@@ -213,18 +217,21 @@ function DirectGrantLine({ context, grant, kind }: { context: RowContext; grant:
 
 // A policy the user holds only because a group gives it: it can't be revoked on its own, only overridden.
 function GroupSuppliedLine({ context, effective }: { context: RowContext; effective: EffectivePolicy }) {
+  const { t, tx } = useI18n();
   const { user, policyById, onDialog } = context;
   const policy = policyById.get(effective.policyId);
-  const label = policy?.description ?? effective.policyId;
-  const sources = effective.sources.map((source) => (source === 'direct' ? 'direct' : `via ${groupLabel(source)}`));
+  const label = tx(policy?.description ?? effective.policyId);
+  const sources = effective.sources.map((source) =>
+    source === 'direct' ? t('grant::direct') : t('via {group}', { group: policyGroupLabel(tx, source) }),
+  );
 
   return (
     <Line
       label={label}
-      meta={`${policy ? `${policyMeta(policy)} · ` : ''}${sources.join(', ')} · a denial overrides what the group gives`}
+      meta={`${policy ? `${policyMeta(t, policy)} · ` : ''}${sources.join(', ')} · ${t('a denial overrides what the group gives')}`}
       actions={
         <LineButton
-          aria-label={`Deny ${label} for ${user.name}`}
+          aria-label={t('Deny {label} for {name}', { label, name: user.name })}
           onClick={() =>
             onDialog({
               kind: 'grant',
@@ -237,7 +244,7 @@ function GroupSuppliedLine({ context, effective }: { context: RowContext; effect
             })
           }
         >
-          Deny
+          {t('Deny')}
         </LineButton>
       }
     />
@@ -245,6 +252,7 @@ function GroupSuppliedLine({ context, effective }: { context: RowContext; effect
 }
 
 export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDialog }: RowContext & { now: number }) {
+  const { t, tn } = useI18n();
   const [isExpanded, setIsExpanded] = useState(false);
   const context: RowContext = { user, groupById, policyById, isSelf, onDialog };
 
@@ -257,6 +265,7 @@ export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDial
       effective,
       direct: classified.find((item) => item.grant.policyId === effective.policyId && item.kind === 'normal'),
     }));
+  const routineCount = <span className="numerals text-base font-semibold">{routine.length}</span>;
 
   return (
     <li className="flex flex-col gap-3 px-5 py-5 sm:px-6">
@@ -264,7 +273,7 @@ export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDial
         <div className="min-w-0">
           <p className="flex items-center gap-2 font-display text-xl font-bold tracking-wide uppercase">
             <span className="truncate">{user.name}</span>
-            {isSelf && <Badge variant="outline">You</Badge>}
+            {isSelf && <Badge variant="outline">{t('You')}</Badge>}
           </p>
           <p className="truncate text-sm text-muted-foreground">{user.email}</p>
         </div>
@@ -272,7 +281,7 @@ export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDial
           size="sm"
           variant="outline"
           className="max-sm:h-11"
-          aria-label={`Add access for ${user.name}`}
+          aria-label={t('Add access for {name}', { name: user.name })}
           onClick={() =>
             onDialog({
               kind: 'grant',
@@ -284,12 +293,14 @@ export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDial
             })
           }
         >
-          Add access
+          {t('Add access')}
         </Button>
       </div>
 
       {user.groups.length === 0 && user.grants.length === 0 && (
-        <p className="text-sm text-muted-foreground">No groups or policies, so this account can't do anything yet.</p>
+        <p className="text-sm text-muted-foreground">
+          {t("No groups or policies, so this account can't do anything yet.")}
+        </p>
       )}
 
       {user.groups.length > 0 && (
@@ -317,8 +328,13 @@ export function PolicyUserRow({ user, groupById, policyById, now, isSelf, onDial
             className="inline-flex w-fit items-center gap-1 rounded-sm text-sm text-muted-foreground outline-none hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/45 max-sm:min-h-11"
           >
             <ChevronDownIcon className={cn('size-4 transition-transform', isExpanded && 'rotate-180')} />
-            {isExpanded ? 'Hide' : 'Show'} <span className="numerals text-base font-semibold">{routine.length}</span>{' '}
-            active {routine.length === 1 ? 'policy' : 'policies'}
+            {isExpanded
+              ? routine.length === 1
+                ? tn('Hide {count} active policy', { count: routineCount })
+                : tn('Hide {count} active policies', { count: routineCount })
+              : routine.length === 1
+                ? tn('Show {count} active policy', { count: routineCount })
+                : tn('Show {count} active policies', { count: routineCount })}
           </button>
           {isExpanded && (
             <ul className="flex animate-in flex-col gap-3 duration-200 fade-in-0 slide-in-from-top-1">

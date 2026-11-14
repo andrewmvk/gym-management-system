@@ -6,11 +6,13 @@ import { useState } from 'react';
 import { MuscleLoadView } from '@/components/muscle-map/muscle-load-view';
 import { SegmentedFilter } from '@/components/segmented-filter';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { useI18n } from '@/lib/i18n/i18n-provider';
+import type { LabelKey } from '@/lib/i18n/translate';
 
 const VIEWS = [
   { value: 'plan', label: 'This plan' },
   { value: 'recent', label: 'Last 14 days' },
-] as const;
+] as const satisfies readonly { value: string; label: LabelKey }[];
 type PreviewView = (typeof VIEWS)[number]['value'];
 
 interface PlanMusclePreviewProps {
@@ -21,10 +23,11 @@ interface PlanMusclePreviewProps {
 }
 
 function PlanMusclePreviewSkeleton() {
+  const { t } = useI18n();
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Muscle balance</CardTitle>
+        <CardTitle>{t('Muscle balance')}</CardTitle>
       </CardHeader>
       <CardContent>
         <MuscleLoadView.Skeleton isPaired />
@@ -35,21 +38,22 @@ function PlanMusclePreviewSkeleton() {
 
 // Reads from the exercises as the trainer edits them, so a change shows up on the body before it is saved.
 function PlanMusclePreviewRoot({ planLoad, recentLoad, injured }: PlanMusclePreviewProps) {
+  const { t } = useI18n();
   const [view, setView] = useState<PreviewView>('plan');
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Muscle balance</CardTitle>
+        <CardTitle>{t('Muscle balance')}</CardTitle>
         <CardDescription>
-          Follows the exercises you are editing. Switch to see what this member completed before.
+          {t('Follows the exercises you are editing. Switch to see what this member completed before.')}
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
         <SegmentedFilter
-          label="Muscle map source"
+          label={t('Muscle map source')}
           value={view}
-          options={VIEWS}
+          options={VIEWS.map((option) => ({ value: option.value, label: t(option.label) }))}
           onChange={setView}
           className="w-full sm:w-fit"
         />
@@ -58,9 +62,11 @@ function PlanMusclePreviewRoot({ planLoad, recentLoad, injured }: PlanMusclePrev
           includeUntrained
           load={view === 'plan' ? planLoad : recentLoad}
           injured={injured}
-          label={view === 'plan' ? 'Muscles worked in this plan' : 'Muscles this member completed recently'}
+          label={view === 'plan' ? t('Muscles worked in this plan') : t('Muscles this member completed recently')}
           emptyNote={
-            view === 'plan' ? 'Nothing in this plan trains a muscle yet.' : 'Nothing completed in the last 14 days.'
+            view === 'plan'
+              ? t('Nothing in this plan trains a muscle yet.')
+              : t('Nothing completed in the last 14 days.')
           }
         />
       </CardContent>

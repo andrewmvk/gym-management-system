@@ -7,6 +7,8 @@ const rootEnvFile = resolve(process.cwd(), '../../.env');
 if (existsSync(rootEnvFile)) process.loadEnvFile(rootEnvFile);
 
 const apiProxyTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:4000';
+// /kiosk/models/* are the face weights this app serves itself (app/kiosk/models/[file]/route.ts), so they must
+// not reach the API, which answers them with a 404 and leaves the kiosk unable to recognise anyone.
 const API_REWRITES = [
   { source: '/trpc/:path*', destination: '/trpc/:path*' },
   { source: '/files/:path*', destination: '/files/:path*' },

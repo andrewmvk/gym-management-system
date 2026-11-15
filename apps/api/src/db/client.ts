@@ -45,7 +45,10 @@ function migrateUpToBoundary(database: Database, boundaryTag: string) {
   const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), 'cadence-migrate-phase-'));
   try {
     fs.mkdirSync(path.join(tempFolder, 'meta'));
-    fs.writeFileSync(path.join(tempFolder, 'meta', '_journal.json'), JSON.stringify({ ...journal, entries: entriesUpToBoundary }));
+    fs.writeFileSync(
+      path.join(tempFolder, 'meta', '_journal.json'),
+      JSON.stringify({ ...journal, entries: entriesUpToBoundary }),
+    );
     for (const entry of entriesUpToBoundary) {
       const filename = `${entry.tag}.sql`;
       fs.copyFileSync(path.join(MIGRATIONS_FOLDER, filename), path.join(tempFolder, filename));

@@ -53,7 +53,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 1. Member/trainer/admin logs in via a tRPC mutation on the backend.
 2. Backend verifies credentials (bcrypt-hashed password). A member whose membership is `inactive` cannot log in: after a correct password (so the message cannot be used to probe which e-mails exist) the login fails with "Your membership is inactive. Ask the front desk to reactivate it." (FR-40, RN-15). Otherwise it issues a signed JWT containing `{ userId }` - no role. Permissions are never embedded in the token; they're resolved fresh from the database on every request (see §11).
 3. JWT is set as a cookie with `httpOnly` and `sameSite=lax` always on; `Secure` is set conditionally - only when `NODE_ENV=production`. Local Docker Compose demo runs use plain HTTP, and a `Secure` cookie would silently never be sent/set by the browser in that case, so it must not be hardcoded on.
-4. Frontend includes credentials on every tRPC request (`fetch` with `credentials: 'include'`); CORS on the backend must allow the frontend's origin with credentials.
+4. Frontend includes credentials on every tRPC request (`fetch` with `credentials: 'include'`). The browser only calls its own origin (`/trpc`, `/files`, `/kiosk`), and `apps/web/next.config.ts` rewrites those paths to the API (`API_PROXY_TARGET`), so the cookie is first-party and the backend needs no CORS.
 5. Backend tRPC context middleware verifies the JWT on every request, attaching `{ userId }` to `ctx`, then builds a CASL `Ability` for that user from their active policy grants (§11) and attaches it as `ctx.ability`. Procedures check `ctx.ability.can(operation, resource)` as needed - there is no role to branch on. The session load returns no session (null) for a member whose membership is `inactive`, so a cookie issued before the lapse stops working at once and the member is treated as signed out everywhere.
 6. No login/authenticated route exists before registration completes (see FR-9) - the JWT is only issued once an account exists and has a password set, and registration creates the account and the password in the same request (see "Registration" below).
 7. Trainer/admin accounts are never created via a login-adjacent registration mutation - they only exist via the seed script (see §8). An existing account's policies and groups (including whether it belongs to the trainer/admin group) can later change through the Admin policy-management feature (FR-43) without ever creating a new account.
@@ -116,7 +116,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | `TEST_DATABASE_URL` | backend tests | Separate test database in the same local PostgreSQL, created by the backend entrypoint; tests truncate it freely |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` / `POSTGRES_DB` | backend container | Credentials and database name the entrypoint initializes PostgreSQL with; compose builds the in-container `DATABASE_URL` from them |
 | `API_PORT` | backend | Port the API listens on (4000) |
-| `WEB_ORIGIN` | backend | The web app URL: the only origin CORS allows with credentials, and the base for links in e-mails |
+| `WEB_ORIGIN` | backend | The web app URL: the base for links in e-mails |
 | `SEED_TRAINER_PASSWORD` / `SEED_ADMIN_PASSWORD` / `SEED_STUDENT_PASSWORD` | backend (seed) | Passwords of the fixed demo trainer, admin and student (member) accounts the seed creates |
 | `JWT_SECRET` | backend | Signing secret for auth JWTs |
 | `NODE_ENV` | backend | Gates the `Secure` cookie flag (production only) |
@@ -131,7 +131,7 @@ This is a decoupled architecture (frontend and backend are separate deployables)
 | `UPLOADS_DIR` | backend | Path inside container to the mounted uploads volume |
 | `KIOSK_API_KEY` | backend + kiosk client | Authenticates the kiosk's fetch of the face-embedding dataset |
 | `TURNSTILE_API_*` | backend (DB-backed, admin-editable) | Not a static env var - configured at runtime by whoever holds the turnstile-config permission and stored in the `d_turnstile_config` table, since it must be editable without a redeploy |
-| `NEXT_PUBLIC_API_URL` | frontend | Backend base URL for tRPC client |
+| `API_PROXY_TARGET` | frontend (build time) | Backend base URL the web app proxies `/trpc`, `/files` and `/kiosk` to; defaults to `http://localhost:4000` |
 
 ## 10. Notable Architectural Decisions & Rationale
 

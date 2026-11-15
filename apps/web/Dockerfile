@@ -16,9 +16,8 @@ COPY apps/web apps/web
 COPY apps/api apps/api
 COPY packages/shared packages/shared
 
-# NEXT_PUBLIC_* values are inlined into the browser bundle at build time, not read at runtime.
-ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ARG API_PROXY_TARGET
+ENV API_PROXY_TARGET=${API_PROXY_TARGET}
 ARG KIOSK_API_KEY
 ENV KIOSK_API_KEY=${KIOSK_API_KEY}
 RUN pnpm --filter @cadence/web build

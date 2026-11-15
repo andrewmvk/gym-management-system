@@ -1,7 +1,6 @@
 import type { AppRouter } from '@cadence/api';
 import { createTRPCClient, httpBatchLink, httpBatchStreamLink, splitLink } from '@trpc/client';
 import { createTRPCContext } from '@trpc/tanstack-react-query';
-import { API_URL } from '@/lib/env';
 
 export const { TRPCProvider, useTRPC, useTRPCClient } = createTRPCContext<AppRouter>();
 
@@ -13,7 +12,7 @@ const COOKIE_PROCEDURES = ['auth.login', 'auth.register', 'auth.logout'];
 // results as they are ready (the coach reply, a plan being built).
 export function createTrpcClient() {
   const linkOptions = {
-    url: `${API_URL}/trpc`,
+    url: '/trpc',
     fetch: (url: URL | RequestInfo, options?: RequestInit) => fetch(url, { ...options, credentials: 'include' }),
   };
 

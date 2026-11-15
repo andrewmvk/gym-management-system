@@ -35,6 +35,8 @@ export const PT_KIOSK = {
     'Permita o acesso à câmera neste painel ou confira se ela está conectada.',
   'The recognition files could not be loaded. See packages/shared/face-models/README.md.':
     'Não foi possível carregar os arquivos de reconhecimento. Veja packages/shared/face-models/README.md.',
+  'Face detection is failing in this browser. See the console for the error.':
+    'A detecção de rosto está falhando neste navegador. Veja o erro no console.',
   'The panel cannot reach the check-in service. Check the API and the kiosk key.':
     'O painel não consegue acessar o serviço de check-in. Verifique a API e a chave do quiosque.',
   'Live camera preview': 'Prévia da câmera ao vivo',

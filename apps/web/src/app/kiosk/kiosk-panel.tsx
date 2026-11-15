@@ -25,6 +25,7 @@ import { cn } from '@/lib/utils';
 
 const EMBEDDINGS_REFRESH_MS = 5 * 60 * 1000;
 const SCAN_INTERVAL_MS = 600;
+const DETECTIONS_FAILED_BEFORE_UNAVAILABLE = 3;
 const MISSES_BEFORE_FRONT_DESK = 3;
 const MISSES_IDLE_RESET_MS = 3 * 60 * 1000;
 
@@ -38,6 +39,7 @@ export function KioskPanel() {
   const [cameraAttempt, setCameraAttempt] = useState(0);
   const [result, setResult] = useState<KioskResult | null>(null);
   const [severalFaces, setSeveralFaces] = useState(false);
+  const [detectionFailed, setDetectionFailed] = useState(false);
   const [source, setSource] = useState<KioskSource>('camera');
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -151,12 +153,24 @@ export function KioskPanel() {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
+    // A detector that throws is a technical failure, not an empty room: it gets its own state after a few in a row.
+    let failures = 0;
     const tick = async () => {
       const video = videoRef.current;
-      const reading: FaceReading =
-        video && video.readyState >= 2
-          ? await readFace(faceApi, video).catch(() => ({ kind: 'none' as const }))
-          : { kind: 'none' };
+      let reading: FaceReading = { kind: 'none' };
+      if (video && video.readyState >= 2) {
+        try {
+          reading = await readFace(faceApi, video);
+          failures = 0;
+          setDetectionFailed(false);
+        } catch (error) {
+          failures += 1;
+          if (failures === DETECTIONS_FAILED_BEFORE_UNAVAILABLE) {
+            console.error('Kiosk face detection failed', error);
+            setDetectionFailed(true);
+          }
+        }
+      }
       if (cancelled) return;
 
       setSeveralFaces(reading.kind === 'several');
@@ -212,6 +226,14 @@ export function KioskPanel() {
       detail: unavailableDetail,
       devNote: t('The recognition files could not be loaded. See packages/shared/face-models/README.md.'),
       onRetry: () => void engine.refetch(),
+    };
+  } else if (detectionFailed && source === 'camera') {
+    state = {
+      kind: 'unavailable',
+      title: t('Check-in unavailable'),
+      detail: unavailableDetail,
+      devNote: t('Face detection is failing in this browser. See the console for the error.'),
+      onRetry: () => setDetectionFailed(false),
     };
   } else if (embeddings.isError && !gallery) {
     state = {

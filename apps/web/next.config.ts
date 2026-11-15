@@ -7,7 +7,11 @@ const rootEnvFile = resolve(process.cwd(), '../../.env');
 if (existsSync(rootEnvFile)) process.loadEnvFile(rootEnvFile);
 
 const apiProxyTarget = process.env.API_PROXY_TARGET ?? 'http://localhost:4000';
-const API_PATHS = ['trpc', 'files', 'kiosk'];
+const API_REWRITES = [
+  { source: '/trpc/:path*', destination: '/trpc/:path*' },
+  { source: '/files/:path*', destination: '/files/:path*' },
+  { source: '/kiosk/:path((?!models/).*)', destination: '/kiosk/:path' },
+];
 const PROXY_TIMEOUT_MS = 120_000;
 
 const nextConfig: NextConfig = {
@@ -17,8 +21,9 @@ const nextConfig: NextConfig = {
   // apps/web/AGENTS.md is a hand-edited copy of Next's generated block; regenerating would overwrite it.
   agentRules: false,
   experimental: { proxyTimeout: PROXY_TIMEOUT_MS },
+  outputFileTracingIncludes: { '/kiosk/models/\\[file\\]': ['../../packages/shared/face-models/**'] },
   async rewrites() {
-    return API_PATHS.map((path) => ({ source: `/${path}/:path*`, destination: `${apiProxyTarget}/${path}/:path*` }));
+    return API_REWRITES.map(({ source, destination }) => ({ source, destination: `${apiProxyTarget}${destination}` }));
   },
 };
 

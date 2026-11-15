@@ -23,6 +23,7 @@ const nextConfig: NextConfig = {
   // apps/web/AGENTS.md is a hand-edited copy of Next's generated block; regenerating would overwrite it.
   agentRules: false,
   experimental: { proxyTimeout: PROXY_TIMEOUT_MS },
+  outputFileTracingIncludes: { '/kiosk/models/\\[file\\]': ['../../packages/shared/face-models/**'] },
   async rewrites() {
     return API_REWRITES.map(({ source, destination }) => ({ source, destination: `${apiProxyTarget}${destination}` }));
   },

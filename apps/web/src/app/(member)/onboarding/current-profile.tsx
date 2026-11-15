@@ -7,7 +7,6 @@ import { Deferred } from '@/components/deferred';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { API_URL } from '@/lib/env';
 import { useI18n } from '@/lib/i18n/i18n-provider';
 import { useTRPC } from '@/lib/trpc';
 
@@ -144,7 +143,7 @@ function CurrentProfileRoot({ onUpdate }: { onUpdate: () => void }) {
                     <p>{exam.findings}</p>
                     {exam.attachmentPath && (
                       <a
-                        href={`${API_URL}/files/${exam.attachmentPath}`}
+                        href={`/files/${exam.attachmentPath}`}
                         target="_blank"
                         rel="noreferrer"
                         className="flex w-fit items-center gap-1.5 rounded-sm text-sm font-medium text-primary underline-offset-4 outline-none hover:underline focus-visible:ring-3 focus-visible:ring-ring/45"

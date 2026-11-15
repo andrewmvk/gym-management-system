@@ -13,23 +13,21 @@ export function renderAppIcon({ size, maskable = false }: { size: number; maskab
   const markSize = size * markScale;
 
   return new ImageResponse(
-    (
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          background: KIT,
-        }}
-      >
-        <svg width={markSize} height={markSize} viewBox="0 0 24 24">
-          <path d="M8.5 3h5L8 21H3z" fill={STRIPE} />
-          <path d="M16.5 3h5L16 21h-5z" fill={TAPE} />
-        </svg>
-      </div>
-    ),
+    <div
+      style={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        background: KIT,
+      }}
+    >
+      <svg width={markSize} height={markSize} viewBox="0 0 24 24">
+        <path d="M8.5 3h5L8 21H3z" fill={STRIPE} />
+        <path d="M16.5 3h5L16 21h-5z" fill={TAPE} />
+      </svg>
+    </div>,
     { width: size, height: size },
   );
 }

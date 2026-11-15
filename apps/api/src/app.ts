@@ -7,7 +7,6 @@ import { appRouter } from '@api/trpc/app-router';
 import { createContext } from '@api/trpc/context';
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import cookieParser from 'cookie-parser';
-import cors from 'cors';
 import express, { type RequestHandler } from 'express';
 
 function createTrpcHandler(maxBodySize: number) {
@@ -39,7 +38,6 @@ export function createApp(env: Env) {
 
   app.disable('x-powered-by');
   app.use(requestLogger);
-  app.use(cors({ origin: env.WEB_ORIGIN, credentials: true }));
   app.use(cookieParser());
   app.use(createFilesRouter(env.UPLOADS_DIR));
   app.use(createKioskRouter(env.KIOSK_API_KEY, env.NODE_ENV));

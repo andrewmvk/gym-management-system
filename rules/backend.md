@@ -1,6 +1,6 @@
 # Backend (`apps/api`)
 
-Node.js + Express hosting the tRPC HTTP adapter. Express itself stays a thin host - CORS (credentials-enabled, restricted to the frontend origin), cookie parsing, the tRPC adapter mount, and the authenticated file-serving route. All business logic lives behind tRPC procedures.
+Node.js + Express hosting the tRPC HTTP adapter. Express itself stays a thin host - cookie parsing (no CORS: the browser only reaches the API through the web app's same-origin proxy), the tRPC adapter mount, and the authenticated file-serving route. All business logic lives behind tRPC procedures.
 
 ## Module structure
 

@@ -1,5 +1,4 @@
 import type { GalleryEntry } from '@cadence/shared/faces/match';
-import { API_URL } from '@/lib/env';
 
 const KIOSK_KEY_HEADER = 'x-kiosk-key';
 
@@ -13,7 +12,7 @@ function kioskHeaders(extra: Record<string, string> = {}) {
 }
 
 export async function fetchEmbeddings(): Promise<GalleryEntry[]> {
-  const response = await fetch(`${API_URL}/kiosk/embeddings`, { headers: kioskHeaders(), cache: 'no-store' });
+  const response = await fetch('/kiosk/embeddings', { headers: kioskHeaders(), cache: 'no-store' });
   if (!response.ok) throw new Error(`Embeddings request failed with status ${response.status}`);
   return response.json();
 }
@@ -21,13 +20,13 @@ export async function fetchEmbeddings(): Promise<GalleryEntry[]> {
 export type DevMember = { memberId: string; name: string };
 
 export async function fetchDevMembers(): Promise<DevMember[]> {
-  const response = await fetch(`${API_URL}/kiosk/dev/members`, { headers: kioskHeaders(), cache: 'no-store' });
+  const response = await fetch('/kiosk/dev/members', { headers: kioskHeaders(), cache: 'no-store' });
   if (!response.ok) throw new Error(`Dev members request failed with status ${response.status}`);
   return response.json();
 }
 
 export async function postCheckIn(memberId: string): Promise<CheckInResult> {
-  const response = await fetch(`${API_URL}/kiosk/checkins`, {
+  const response = await fetch('/kiosk/checkins', {
     method: 'POST',
     headers: kioskHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify({ memberId }),

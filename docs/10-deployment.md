@@ -48,7 +48,7 @@ re-check its pricing page before assuming the steps below still apply.
    | `JWT_SECRET` | a new random 32+ character string (not the local dev one) |
    | `KIOSK_API_KEY` | a new random 16+ character string |
    | `SEED_TRAINER_PASSWORD`, `SEED_ADMIN_PASSWORD`, `SEED_STUDENT_PASSWORD` | your choice, 8+ characters |
-   | `WEB_ORIGIN` | the Vercel URL from step 3 (needed for CORS) |
+   | `WEB_ORIGIN` | the Vercel URL from step 3 (the base of e-mail links) |
    | `API_PORT` | `4000` |
    | `NODE_ENV` | `production` (turns on the `Secure` cookie flag) |
    | `AI_MODE` | `live` with `OPENROUTER_API_KEY`/`OPENROUTER_MODEL`, or `mock` to skip the network |
@@ -58,7 +58,7 @@ re-check its pricing page before assuming the steps below still apply.
 
 5. Deploy. The first boot runs `db:migrate` then `db:seed` against Neon before the API starts (same as
    local Docker Compose) - watch the Render logs for `"migrations applied"` and `"base seed applied"`.
-6. Copy the Render service's public URL - this is `NEXT_PUBLIC_API_URL` for the next step.
+6. Copy the Render service's public URL - this is `API_PROXY_TARGET` for the next step.
 
 ## 3. Frontend - Vercel
 
@@ -69,12 +69,11 @@ re-check its pricing page before assuming the steps below still apply.
 
    | Variable | Value |
    |---|---|
-   | `NEXT_PUBLIC_API_URL` | empty (`""`) - the browser calls the API through this same origin, not the Render URL directly; see "Why the API is proxied, not called directly" below |
-   | `API_PROXY_TARGET` | the Render URL from step 2.6. Server-side only (no `NEXT_PUBLIC_` prefix): `apps/web/next.config.ts` reads it to rewrite `/trpc/*`, `/files/*` and `/kiosk/*` to the real API |
+   | `API_PROXY_TARGET` | the Render URL from step 2.6, with no trailing slash. Server-side only (no `NEXT_PUBLIC_` prefix) and read at build time: `apps/web/next.config.ts` uses it to rewrite `/trpc/*`, `/files/*` and `/kiosk/*` to the real API. Redeploy after changing it |
    | `KIOSK_API_KEY` | the same value set on Render. `apps/web/next.config.ts` remaps it to `NEXT_PUBLIC_KIOSK_API_KEY` at build time (so it reaches the kiosk page's client bundle) - set the plain `KIOSK_API_KEY` name here, not the `NEXT_PUBLIC_` one |
 
 4. Deploy. Update the API's `WEB_ORIGIN` env var on Render to this Vercel URL once you have it (step 2.4
-   needs the real URL, not a guess), and redeploy the API so CORS allows it.
+   needs the real URL, not a guess), and redeploy the API so the e-mail links point to the right site.
 
 ### Why the API is proxied, not called directly
 
@@ -83,10 +82,10 @@ different registrable domain outright, even with `SameSite=None; Secure` - Verce
 different domains, so a direct cross-site call never keeps the member signed in on an iPhone (it works on
 desktop and Android, where each browser has its own networking stack). `apps/web/next.config.ts` rewrites
 the API paths through the Vercel origin instead, so the browser only ever talks to one domain and the
-session cookie is first-party everywhere. `NEXT_PUBLIC_API_URL=""` makes the frontend call `/trpc`, `/files`
-and `/kiosk` as relative paths instead of an absolute Render URL, so they hit the rewrite. Local Docker
-Compose does not set `API_PROXY_TARGET`, so the rewrite is a no-op there and the frontend calls the local API
-directly, same as before.
+session cookie is first-party everywhere. The frontend always calls `/trpc`, `/files` and `/kiosk` as
+relative paths, in every environment, so there is one code path and the API needs no CORS. Locally,
+`API_PROXY_TARGET` defaults to `http://localhost:4000`; Docker Compose sets it to `http://backend:4000` as a
+build argument. `next.config.ts` raises the proxy timeout to 120 seconds so long AI calls are not cut off.
 
 ## Verifying installability
 

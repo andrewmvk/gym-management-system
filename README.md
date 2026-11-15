@@ -84,7 +84,7 @@ Set in `.env` (see [`.env.example`](./.env.example)). The API stops at boot and 
 | `SEED_TRAINER_PASSWORD` / `SEED_ADMIN_PASSWORD` / `SEED_STUDENT_PASSWORD` | Passwords of the seeded demo accounts |
 | `NODE_ENV` | `production` turns on the `Secure` cookie flag |
 | `API_PORT` | API port (default 4000) |
-| `WEB_ORIGIN` | Web app URL: the CORS origin and the base of e-mail links |
+| `WEB_ORIGIN` | Web app URL: the base of e-mail links |
 | `JWT_SECRET` | Signing secret of the auth JWT |
 | `KIOSK_API_KEY` | Authenticates the kiosk's fetch of the face embeddings |
 | `UPLOADS_DIR` | Where uploaded files are stored |
@@ -94,7 +94,7 @@ Set in `.env` (see [`.env.example`](./.env.example)). The API stops at boot and 
 | `EMAIL_MODE` | `resend` sends e-mail (the registration-completed message with the login link), `log` writes it to the API log |
 | `RESEND_API_KEY` / `EMAIL_FROM` | Resend credentials and sender (key required when `EMAIL_MODE` is `resend`) |
 | `FACE_EMBEDDING_MODE` | `stub` (deterministic) or `real` (face-api.js model) |
-| `NEXT_PUBLIC_API_URL` | Backend base URL used by the web app |
+| `API_PROXY_TARGET` | Backend base URL the web app proxies API calls to (optional locally, defaults to `http://localhost:4000`) |
 
 ## Tests and checks
 

@@ -192,7 +192,7 @@ describe('recordCheckIn (RN-09)', () => {
       .values({ email: 'lapsed@example.com', name: 'Lapsed', membershipStatus: 'inactive' })
       .returning();
 
-    expect(await recordCheckIn(lapsed!.id)).toEqual({ kind: 'member_inactive' });
+    expect(await recordCheckIn(lapsed!.id)).toEqual({ kind: 'member_inactive', memberName: 'Lapsed' });
 
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
     expect(received).toHaveLength(0);
@@ -207,7 +207,11 @@ describe('recordCheckIn (RN-09)', () => {
     await recordCheckIn(member!.id);
     await db.update(dUsers).set({ membershipStatus: 'active' }).where(eq(dUsers.id, member!.id));
 
-    expect(await recordCheckIn(member!.id)).toMatchObject({ kind: 'recorded', turnstileStatus: 'success' });
+    expect(await recordCheckIn(member!.id)).toMatchObject({
+      kind: 'recorded',
+      memberName: 'Back',
+      turnstileStatus: 'success',
+    });
   });
 });
 

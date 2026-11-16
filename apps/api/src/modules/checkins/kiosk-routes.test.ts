@@ -142,7 +142,7 @@ describe('POST /kiosk/checkins', () => {
     const response = await postCheckIn({ memberId: lapsed!.id }, env.KIOSK_API_KEY);
 
     expect(response.status).toBe(403);
-    expect(await response.json()).toMatchObject({ reason: 'membership_inactive' });
+    expect(await response.json()).toMatchObject({ reason: 'membership_inactive', memberName: 'Lapsed' });
     expect(await db.select().from(fCheckIns)).toHaveLength(0);
   });
 
@@ -152,9 +152,10 @@ describe('POST /kiosk/checkins', () => {
     const response = await postCheckIn({ memberId }, env.KIOSK_API_KEY);
 
     expect(response.status).toBe(200);
-    const body = (await response.json()) as { checkInId: string; turnstileStatus: string };
+    const body = (await response.json()) as { checkInId: string; memberName: string; turnstileStatus: string };
     expect(body.turnstileStatus).toBe('failed');
-    expect(Object.keys(body).sort()).toEqual(['checkInId', 'turnstileStatus']);
+    expect(Object.keys(body).sort()).toEqual(['checkInId', 'memberName', 'turnstileStatus']);
+    expect(body.memberName).toBe('Member');
     const rows = await db.select().from(fCheckIns);
     expect(rows).toHaveLength(1);
     expect(rows[0]).toMatchObject({ id: body.checkInId, userId: memberId, turnstileStatus: 'failed' });

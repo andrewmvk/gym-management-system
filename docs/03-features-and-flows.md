@@ -120,7 +120,7 @@ Onboarding is not a one-time gate - members can add or revise this information l
 ```
 
 Notes:
-- The kiosk never shows a member's name or any other identity. It is the least trusted, public-facing client, so every result is anonymous.
+- The kiosk shows the matched member's own name on every identified result (access granted, "Please wait" after a turnstile failure or when the turnstile is not set, and "Membership inactive"), so the person sees who it recognized. It shows no other identity, and the results of a miss (try again, front desk) carry no name. It is the least trusted, public-facing client, so the name arrives only in the answer to that member's own check-in, never in the dataset it holds.
 - Each state has its own look: "Access not available" (solid red) is a settled decision about access, "Membership inactive" has its own status, and "Check-in unavailable" (dashed) means the request itself failed and nothing was recorded. The 3-miss "Please see the front desk" is a dashed state too, since it is a run of misses and not a determination about the person.
 - No developer text (file paths, key names) is shown on the panel in production.
 

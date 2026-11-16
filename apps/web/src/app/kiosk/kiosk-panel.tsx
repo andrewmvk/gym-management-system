@@ -59,17 +59,24 @@ export function KioskPanel() {
 
   const misses = useRef({ count: 0, lastAt: 0 });
 
-  // The member's name is never shown here: the kiosk is the public, least-trusted screen, so results carry no identity.
+  // An identified member is greeted by name, whatever the turnstile did (including when it is not configured).
   const checkIn = useMutation({
     mutationFn: postCheckIn,
     onSuccess: (outcome) => {
       if (outcome.kind === 'recorded') {
         misses.current = { count: 0, lastAt: 0 };
-        setResult({ kind: outcome.turnstileStatus === 'failed' ? 'turnstile_failed' : 'granted' });
+        setResult({
+          kind: outcome.turnstileStatus === 'failed' ? 'turnstile_failed' : 'granted',
+          memberName: outcome.memberName,
+        });
+        return;
+      }
+      if (outcome.kind === 'membership_inactive') {
+        setResult({ kind: 'membership_inactive', memberName: outcome.memberName });
         return;
       }
       // Any other outcome, including one this panel does not know yet, sends the person to the front desk.
-      setResult({ kind: outcome.kind === 'membership_inactive' ? 'membership_inactive' : 'see_staff' });
+      setResult({ kind: 'see_staff' });
     },
     onError: () => setResult({ kind: 'request_failed' }),
   });

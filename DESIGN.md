@@ -308,7 +308,7 @@ The wall-mounted check-in screen is the one surface with its own layout, because
 - **Step highlight:** each card has an inset outline (it never moves the content) in three weights, 1px, 2px, 4px, that rises as its own step progresses and is not synced with the other card. The camera stage is 1px until the camera is on or an image is chosen, 2px while it watches, 4px once a face is in. The status panel is 1px until recognition starts, 2px while it runs, 4px once it has an answer. The highlight walks from the camera to the status.
 - **Camera stage:** fills the column's full height, mirrored, with an outline that takes the state's color (cobalt while scanning, solid green, tape or red for a result, dashed for a miss or a failure). While scanning, a dashed oval shows where to stand.
 - **Status panel:** the peak of the screen. An outlined 8px panel holding a 5rem to 6rem icon, a Display-weight uppercase title (up to 6rem), and a 1.5 to 1.875rem sentence. A result that grants entry fills the whole panel: Cleared Green for "Access granted", Pace Tape for "Please wait" when the turnstile did not respond (the sentence says a staff member will open the door, and a small line below it tells staff the check-in is recorded). Every other result keeps the ink panel and is told by its outline alone, so form carries the meaning: a solid red outline for a settled decision ("Access not available", "Membership inactive", both sending the person to the front desk), a dashed outline for anything that is not a decision about the person ("Try again" after a missed match, "Please see the front desk" after three misses in a row, and "Check-in unavailable" in dashed red when the request itself failed and nothing was recorded). A slanted bar drains across its bottom edge during the 5 second cooldown.
-- **Wording:** the panel never names a member and never shows developer text on the wall (file paths and key names appear only in a dev build, under "Dev only"). Failures speak to the person in plain sentences and point to the front desk.
+- **Wording:** the panel names only the face-matched member, on an identified result, and never shows developer text on the wall (file paths and key names appear only in a dev build, under "Dev only"). Failures speak to the person in plain sentences and point to the front desk.
 - **Scanning:** the panel stays quiet, with three slanted cobalt segments pulsing in turn.
 
 ### Inputs / Fields
@@ -486,7 +486,7 @@ Skeletons are 4px blocks at 7% ink, pulsing, sized exactly like the content they
 - **Don't** use bracket values for size, tracking, leading, radius or borders (`text-[10px]`, `tracking-[0.04em]`); use the Tailwind scale.
 - **Don't** show a technical failure (a failed turnstile call, a failed request, a run of missed face matches) with a solid red form; solid red is for a settled decision such as "Access not available".
 - **Don't** show a membership that staff switched off as struck or red; "Inactive" is the neutral Secondary badge.
-- **Don't** show another person's name on the kiosk, or any developer text on the wall.
+- **Don't** show anyone's name on the kiosk except the face-matched member's own on an identified result, or any developer text on the wall.
 - **Don't** put a shadow on a card that sits on the page.
 - **Don't** use Pace Tape for a primary in-app action, or Kit Cobalt for decoration.
 - **Don't** show the app header on sign-in or sign-up, or a theme toggle there; those pages follow the system theme.

@@ -18,7 +18,7 @@ export async function listKioskDevMembers() {
 
 export async function findMemberForCheckIn(userId: string) {
   const [user] = await db
-    .select({ membershipStatus: dUsers.membershipStatus })
+    .select({ name: dUsers.name, membershipStatus: dUsers.membershipStatus })
     .from(dUsers)
     .where(eq(dUsers.id, userId));
   return user ?? null;

@@ -10,15 +10,15 @@ import {
 
 export type CheckInOutcome =
   | { kind: 'member_not_found' }
-  | { kind: 'member_inactive' }
-  | { kind: 'recorded'; checkInId: string; turnstileStatus: 'success' | 'failed' };
+  | { kind: 'member_inactive'; memberName: string }
+  | { kind: 'recorded'; checkInId: string; memberName: string; turnstileStatus: 'success' | 'failed' };
 
 // RN-09: once the member is validated the check-in row is always written, whatever the turnstile did.
 // An inactive membership is refused before the turnstile is called, so the door never opens for it.
 export async function recordCheckIn(memberId: string, options?: UnlockOptions): Promise<CheckInOutcome> {
   const member = await repository.findMemberForCheckIn(memberId);
   if (!member) return { kind: 'member_not_found' };
-  if (member.membershipStatus === 'inactive') return { kind: 'member_inactive' };
+  if (member.membershipStatus === 'inactive') return { kind: 'member_inactive', memberName: member.name };
 
   const { status, ...details } = await unlockTurnstile({ memberId }, options);
   const checkIn = await repository.insertCheckIn({
@@ -26,7 +26,7 @@ export async function recordCheckIn(memberId: string, options?: UnlockOptions): 
     turnstileStatus: status,
     turnstileResponse: details,
   });
-  return { kind: 'recorded', checkInId: checkIn.id, turnstileStatus: status };
+  return { kind: 'recorded', checkInId: checkIn.id, memberName: member.name, turnstileStatus: status };
 }
 
 const DEFAULT_RECENT_LIMIT = 50;

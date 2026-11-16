@@ -52,10 +52,16 @@ export function createKioskRouter(kioskApiKey: string, nodeEnv: Env['NODE_ENV'])
         res.status(404).json({ error: 'Member not found' });
         return;
       case 'member_inactive':
-        res.status(403).json({ error: 'Membership is inactive', reason: 'membership_inactive' });
+        res
+          .status(403)
+          .json({ error: 'Membership is inactive', reason: 'membership_inactive', memberName: outcome.memberName });
         return;
       case 'recorded':
-        res.json({ checkInId: outcome.checkInId, turnstileStatus: outcome.turnstileStatus });
+        res.json({
+          checkInId: outcome.checkInId,
+          memberName: outcome.memberName,
+          turnstileStatus: outcome.turnstileStatus,
+        });
     }
   });
 

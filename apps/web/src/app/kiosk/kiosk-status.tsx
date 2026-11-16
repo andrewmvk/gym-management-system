@@ -26,12 +26,12 @@ const IS_PRODUCTION = process.env.NODE_ENV === 'production';
 // no_match_limit is a run of misses, not a determination about the person: it keeps the dashed form.
 // see_staff and membership_inactive are settled decisions about access, so they are solid.
 export type KioskResult =
-  | { kind: 'granted' }
-  | { kind: 'turnstile_failed' }
+  | { kind: 'granted'; memberName?: string }
+  | { kind: 'turnstile_failed'; memberName?: string }
   | { kind: 'retry' }
   | { kind: 'no_match_limit' }
   | { kind: 'see_staff' }
-  | { kind: 'membership_inactive' }
+  | { kind: 'membership_inactive'; memberName?: string }
   | { kind: 'request_failed' };
 
 export type KioskSource = 'camera' | 'image';
@@ -239,10 +239,14 @@ export function KioskStatus({ state, level }: { state: KioskStatusState; level: 
 
   const copy = COPY[state.kind];
   const Icon = copy.icon;
+  const memberName = 'memberName' in state ? state.memberName : undefined;
   return (
     <section role="status" className={cn(PANEL, frame, copy.tone)}>
       <div key={state.kind} className="flex animate-block-in flex-col gap-8">
         <Icon className={ICON} aria-hidden />
+        {memberName && (
+          <p className="font-display text-4xl leading-tight font-bold break-words lg:text-5xl">{memberName}</p>
+        )}
         <h1 className={TITLE}>{t(copy.title)}</h1>
         <p className={DETAIL}>{t(copy.detail)}</p>
         {copy.staffNote && <p className="text-lg opacity-80">{t(copy.staffNote)}</p>}

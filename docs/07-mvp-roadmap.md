@@ -45,7 +45,7 @@ message (this is literally the course booklet's definition of MVP 3).
 
 - Real OpenRouter integration for plan and chat (FR-15, FR-25-29); an AI technical failure is its own error state and never saves a plan (RN-01). The AI purposes are only `plan` and `chat`. The plan is demand-aware (it receives other members' plans per equipment piece and their muscle load, with safety, injuries, medication, exams and the member's plan requests always winning), and plan safety is part of generation: completed exercises are kept and a confirmation is asked when ticks exist, and a past plan is history (FR-59, RN-06, RN-16, RN-17).
 - Remembered facts the member can see and correct: the Health profile page lists every fact, marks one "no longer true", and the chat shows what it just remembered (FR-58).
-- Real face recognition (face-api.js) at signup and on the kiosk (FR-2, FR-30-32, RN-08); the kiosk never shows a member's name.
+- Real face recognition (face-api.js) at signup and on the kiosk (FR-2, FR-30-32, RN-08); the kiosk greets the matched member by name and holds no names.
 - Check-in + turnstile (FR-33, FR-34, RN-09), with an inactive membership refused at the kiosk (RN-15), and an admin check-in log with turnstile health (FR-61).
 - Trainer review (FR-19, FR-21, FR-22, RN-06) and retroactive correction (FR-23, RN-07); trainer notes are readable by any staff member and by the member, the AI uses them, and the review page gives staff the "What the AI knew" card (FR-60).
 - Real e-mail via Resend (FR-10).

@@ -3,8 +3,8 @@ import type { GalleryEntry } from '@cadence/shared/faces/match';
 const KIOSK_KEY_HEADER = 'x-kiosk-key';
 
 export type CheckInResult =
-  | { kind: 'recorded'; turnstileStatus: 'success' | 'failed' }
-  | { kind: 'membership_inactive' }
+  | { kind: 'recorded'; memberName: string; turnstileStatus: 'success' | 'failed' }
+  | { kind: 'membership_inactive'; memberName?: string }
   | { kind: 'member_not_found' };
 
 function kioskHeaders(extra: Record<string, string> = {}) {
@@ -32,9 +32,12 @@ export async function postCheckIn(memberId: string): Promise<CheckInResult> {
     body: JSON.stringify({ memberId }),
   });
   if (response.status === 404) return { kind: 'member_not_found' };
-  if (response.status === 403) return { kind: 'membership_inactive' };
+  if (response.status === 403) {
+    const body: { memberName?: string } = await response.json().catch(() => ({}));
+    return { kind: 'membership_inactive', memberName: body.memberName };
+  }
   if (!response.ok) throw new Error(`Check-in request failed with status ${response.status}`);
 
-  const body: { turnstileStatus: 'success' | 'failed' } = await response.json();
-  return { kind: 'recorded', turnstileStatus: body.turnstileStatus };
+  const body: { memberName: string; turnstileStatus: 'success' | 'failed' } = await response.json();
+  return { kind: 'recorded', memberName: body.memberName, turnstileStatus: body.turnstileStatus };
 }
